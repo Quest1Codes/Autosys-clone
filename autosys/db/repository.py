@@ -199,6 +199,10 @@ class JobRepository:
             select(JobRow).order_by(JobRow.job_name)
         ))
 
+    def search(self, session: Session, pattern: str) -> list[JobRow]:
+        """Alias for list_by_pattern — used by the REST API."""
+        return self.list_by_pattern(session, pattern)
+
     def list_by_pattern(self, session: Session, pattern: str) -> list[JobRow]:
         """
         Return rows whose job_name matches an SQL LIKE *pattern*.
@@ -478,6 +482,22 @@ class RunRepository:
         if pid is not None:
             row.pid = pid
 
+    def get_history(
+        self,
+        session:  Session,
+        job_name: Optional[str] = None,
+        limit:    int = 20,
+    ) -> list[JobRunRow]:
+        """
+        Return up to *limit* run records, newest first.  If *job_name* is
+        given, filter to that job only.  Used by the REST API /runs endpoint.
+        """
+        from sqlalchemy import select, desc
+        q = select(JobRunRow).order_by(desc(JobRunRow.start_time)).limit(limit)
+        if job_name is not None:
+            q = q.where(JobRunRow.job_name == job_name)
+        return list(session.scalars(q))
+
     def list_runs(
         self,
         session: Session,
@@ -489,13 +509,7 @@ class RunRepository:
 
         Used by ``autosys jobs history`` to display the run log.
         """
-        from sqlalchemy import select, desc
-        return list(session.scalars(
-            select(JobRunRow)
-            .where(JobRunRow.job_name == job_name)
-            .order_by(desc(JobRunRow.start_time))
-            .limit(limit)
-        ))
+        return self.get_history(session, job_name=job_name, limit=limit)
 
     def latest_run_id(self, session: Session, job_name: str) -> Optional[str]:
         """
@@ -553,14 +567,27 @@ class OutputRepository:
     def get_lines(
         self,
         session: Session,
-        run_id: str,
+        run_id:  str,
+        offset:  int = 0,
+        limit:   int = 5000,
     ) -> list[JobOutputRow]:
-        """Return all output lines for *run_id*, ordered by line_no."""
+        """
+        Return output lines for *run_id*, ordered by line_no.
+
+        Parameters
+        ----------
+        offset:
+            Skip the first *offset* lines (0-based).
+        limit:
+            Maximum number of lines to return.
+        """
         from sqlalchemy import select
         return list(session.scalars(
             select(JobOutputRow)
             .where(JobOutputRow.run_id == run_id)
             .order_by(JobOutputRow.line_no)
+            .offset(offset)
+            .limit(limit)
         ))
 
     def get_lines_for_job(

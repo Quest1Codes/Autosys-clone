@@ -4,6 +4,7 @@ autosys scheduler — run the Event Processor daemon.
 Commands
 --------
 autosys scheduler start      Run the EPS in the foreground (Ctrl+C to stop).
+autosys scheduler serve      Run the EPS + REST API server together.
 autosys scheduler run-once   Process all pending events exactly once and exit.
 autosys scheduler status     Show pending event count and INACTIVE job counts.
 
@@ -221,3 +222,50 @@ def scheduler_status() -> None:
         _console.print(table)
 
     _console.print()
+
+
+# ---------------------------------------------------------------------------
+# scheduler serve  (EPS + REST API together)
+# ---------------------------------------------------------------------------
+
+@scheduler_group.command("serve")
+@click.option("--port", "-p", default=9000, show_default=True,
+              help="Port for the REST API server.")
+@click.option("--host", "-H", default="0.0.0.0", show_default=True,
+              help="Host to bind the REST API server to.")
+@click.option("--poll-interval", default=1.0, show_default=True,
+              help="EPS tick interval in seconds.")
+def scheduler_serve(port: int, host: str, poll_interval: float) -> None:
+    """
+    Run the Event Processor and REST API server together.
+
+    This starts uvicorn with the FastAPI app.  The EPS runs as a background
+    asyncio task inside the same event loop as the API server.  All REST
+    endpoints and the WebSocket live feed are available immediately.
+
+    Example
+    -------
+    \\b
+        $ autosys scheduler serve --port 9000
+        AutoSys App Server starting on http://0.0.0.0:9000
+        Docs: http://localhost:9000/docs
+        ^C  Stopped.
+    """
+    import uvicorn
+    from autosys.app_server.main import create_app
+
+    _console.print(
+        f"\n[bold green]AutoSys App Server[/bold green] starting on "
+        f"[cyan]http://{host}:{port}[/cyan]\n"
+        f"  API docs:  [bold]http://localhost:{port}/docs[/bold]\n"
+        f"  Live feed: [bold]ws://localhost:{port}/api/v1/ws/events[/bold]\n"
+        f"  EPS poll:  {poll_interval:.1f}s\n"
+        f"[dim]Ctrl+C to stop[/dim]\n"
+    )
+
+    app = create_app(start_eps=True, eps_poll_interval=poll_interval)
+
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="warning")
+    except KeyboardInterrupt:
+        _console.print("\n[yellow]Stopped.[/yellow]\n")

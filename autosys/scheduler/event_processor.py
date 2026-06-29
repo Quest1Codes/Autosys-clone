@@ -133,22 +133,52 @@ class EventProcessor:
 
     def __init__(
         self,
-        dispatch_fn:    Optional[DispatchFn] = None,
-        kill_fn:        Optional[KillFn]     = None,
-        poll_interval:  float = 1.0,
-        auto_complete:  bool  = True,
+        dispatch_fn:      Optional[DispatchFn]      = None,
+        kill_fn:          Optional[KillFn]           = None,
+        poll_interval:    float                      = 1.0,
+        auto_complete:    bool                       = True,
+        on_status_change: Optional[callable]         = None,
     ) -> None:
         from autosys.scheduler.box_manager import BoxManager
-        self._dispatch_fn   = dispatch_fn or _stub_dispatch
-        self._kill_fn       = kill_fn          # None → no signal to real process
-        self.poll_interval  = poll_interval
-        self.auto_complete  = auto_complete
-        self._running       = False
-        self._box_manager   = BoxManager(
+        self._dispatch_fn      = dispatch_fn or _stub_dispatch
+        self._kill_fn          = kill_fn          # None → no signal to real process
+        self.poll_interval     = poll_interval
+        self.auto_complete     = auto_complete
+        self._running          = False
+        # Optional callback invoked on every job status change.
+        # Signature: on_status_change({"type": "STATUS_CHANGE", "job_name": ...,
+        #            "old": ..., "new": ..., "ts": ...})
+        # Used by the App Server to broadcast live updates over WebSocket.
+        self._on_status_change = on_status_change
+        self._box_manager      = BoxManager(
             dispatch_fn   = dispatch_fn or _stub_dispatch,
             kill_fn       = kill_fn,
             auto_complete = auto_complete,
         )
+
+    # ------------------------------------------------------------------
+    # WebSocket broadcast helper
+    # ------------------------------------------------------------------
+
+    def _emit_status_change(self, job_name: str, old: str, new: str) -> None:
+        """
+        Fire the on_status_change callback if one was provided.
+
+        Called whenever a job transitions to a new status.  The payload
+        matches the WsStatusChange schema consumed by the WCC dashboard.
+        """
+        if self._on_status_change is None or old == new:
+            return
+        try:
+            self._on_status_change({
+                "type":     "STATUS_CHANGE",
+                "job_name": job_name,
+                "old":      old,
+                "new":      new,
+                "ts":       datetime.now().isoformat(),
+            })
+        except Exception as exc:
+            logger.debug("on_status_change callback error: {}", exc)
 
     # ------------------------------------------------------------------
     # Main synchronous tick (used by tests and the CLI one-shot mode)
@@ -404,9 +434,11 @@ class EventProcessor:
             except Exception as exc:
                 logger.warning("KILLJOB: kill_fn raised %s", exc)
 
+        old_status = row.status or "RUNNING"
         row.status  = "TERMINATED"
         row.last_end = now
         logger.info("KILLJOB: %r → TERMINATED", ev.job_name)
+        self._emit_status_change(ev.job_name, old_status, "TERMINATED")
 
     # -- HOLD_JOB / JOB_OFF_HOLD -----------------------------------------
 
@@ -659,15 +691,18 @@ class EventProcessor:
             logger.warning("activate_cmd: %s", exc)
             return
 
+        old_status = row.status or "INACTIVE"
         row.status     = "STARTING"
         row.last_start = now
         row.last_run_date = now.strftime("%Y-%m-%d")
         logger.info("STARTJOB: %r → STARTING", row.job_name)
+        self._emit_status_change(row.job_name, old_status, "STARTING")
 
         # Call the dispatcher (stub in Phase 4, real in Phase 5)
         self._dispatch_fn(session, row)
 
         if self.auto_complete and row.status == "RUNNING":
+            self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
             row.status  = "SUCCESS"
             row.last_end = now
             logger.info("STARTJOB: %r → SUCCESS (auto-complete stub)", row.job_name)
@@ -694,10 +729,12 @@ class EventProcessor:
             logger.warning("activate_box: %s", exc)
             return
 
+        old_status = row.status or "INACTIVE"
         row.status     = "ACTIVATED"
         row.last_start = now
         row.last_run_date = now.strftime("%Y-%m-%d")
         logger.info("STARTJOB: BOX %r → ACTIVATED", row.job_name)
+        self._emit_status_change(row.job_name, old_status, "ACTIVATED")
 
         # Cascade: start children whose conditions are satisfied
         self._cascade_box_children(session, row.job_name, now)
@@ -758,24 +795,30 @@ class EventProcessor:
 
         if not children:
             # Empty BOX → SUCCESS immediately
+            old = box_row.status or "ACTIVATED"
             box_row.status  = "SUCCESS"
             box_row.last_end = now
+            self._emit_status_change(box_row.job_name, old, "SUCCESS")
             return
 
         statuses = {c.job_name: (c.status or "INACTIVE") for c in children}
         vals     = list(statuses.values())
+        old      = box_row.status or "ACTIVATED"
 
         if any(s == "RUNNING" or s == "STARTING" for s in vals):
             if box_row.status == "ACTIVATED":
                 box_row.status = "RUNNING"
+                self._emit_status_change(box_row.job_name, old, "RUNNING")
         elif any(s == "FAILURE" for s in vals):
             box_row.status  = "FAILURE"
             box_row.last_end = now
             logger.info("BOX %r → FAILURE (child failed)", box_row.job_name)
+            self._emit_status_change(box_row.job_name, old, "FAILURE")
         elif all(s == "SUCCESS" for s in vals):
             box_row.status  = "SUCCESS"
             box_row.last_end = now
             logger.info("BOX %r → SUCCESS (all children succeeded)", box_row.job_name)
+            self._emit_status_change(box_row.job_name, old, "SUCCESS")
         elif any(s == "INACTIVE" for s in vals):
             # Some children haven't run yet — BOX stays ACTIVATED
             pass
