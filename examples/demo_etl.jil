@@ -1,0 +1,74 @@
+/* ============================================================
+   SAMPLE AUTOSYS WORKFLOW FOR ORBITER DEMO
+   A simple ETL pipeline: Extract -> Transform -> Load
+   ============================================================ */
+
+/* --- BOX: The workflow container --- */
+insert_job: demo_etl_box   job_type: BOX
+owner: svc_demo
+start_times: "06:00"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_holidays
+alarm_if_fail: 1
+max_run_alarm: 120
+
+/* --- JOB 1: Check if source data is ready --- */
+insert_job: check_source_ready   job_type: CMD
+box_name: demo_etl_box
+owner: svc_demo
+command: /scripts/check_file.sh /data/inbound/sales_%%DATE%%.csv
+machine: etl-server-01
+std_out_file: /logs/demo/check_source.out
+std_err_file: /logs/demo/check_source.err
+alarm_if_fail: 1
+n_retrys: 2
+
+/* --- JOB 2: Extract data (depends on check) --- */
+insert_job: extract_sales   job_type: CMD
+box_name: demo_etl_box
+owner: svc_demo
+command: /scripts/extract_sales.sh --date %%DATE%%
+machine: etl-server-01
+condition: success(check_source_ready)
+std_out_file: /logs/demo/extract_sales.out
+std_err_file: /logs/demo/extract_sales.err
+alarm_if_fail: 1
+
+/* --- JOB 3A: Generate report (parallel with 3B) --- */
+insert_job: generate_report   job_type: CMD
+box_name: demo_etl_box
+owner: svc_demo
+command: /scripts/gen_report.py --type sales --date %%DATE%%
+machine: etl-server-01
+condition: success(extract_sales)
+std_out_file: /logs/demo/generate_report.out
+alarm_if_fail: 1
+
+/* --- JOB 3B: Load to warehouse (parallel with 3A) --- */
+insert_job: load_to_warehouse   job_type: CMD
+box_name: demo_etl_box
+owner: svc_demo
+command: /scripts/load_snowflake.sh --date %%DATE%%
+machine: etl-server-02
+condition: success(extract_sales)
+std_out_file: /logs/demo/load_warehouse.out
+alarm_if_fail: 1
+
+/* --- JOB 4: Send success notification --- */
+insert_job: send_success_email   job_type: CMD
+box_name: demo_etl_box
+owner: svc_demo
+command: /scripts/send_email.sh "Sales ETL complete for %%DATE%%"
+machine: etl-server-01
+condition: success(generate_report) & success(load_to_warehouse)
+std_out_file: /logs/demo/send_email.out
+alarm_if_fail: 0
+
+/* --- STANDALONE JOB: No box, simple daily cleanup --- */
+insert_job: nightly_cleanup   job_type: CMD
+owner: svc_demo
+command: /scripts/cleanup_temp.sh --days 7
+machine: etl-server-01
+start_times: "02:00"
+days_of_week: all
+alarm_if_fail: 0

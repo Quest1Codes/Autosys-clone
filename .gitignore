@@ -1,0 +1,124 @@
+# =============================================================================
+# AutoSys Clone — .gitignore
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+MANIFEST
+wheels/
+sdist/
+.eggs/
+
+# pytest cache
+.pytest_cache/
+.cache/
+
+# mypy / pyright type-checker cache
+.mypy_cache/
+.pyright/
+pyrightconfig.json
+
+# Coverage reports
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+
+# tox
+.tox/
+
+# ---------------------------------------------------------------------------
+# Runtime data (never commit the live database or log files)
+# ---------------------------------------------------------------------------
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Log files
+logs/
+*.log
+*.out
+*.err
+
+# ---------------------------------------------------------------------------
+# AutoSys-specific runtime artifacts
+# ---------------------------------------------------------------------------
+# Agent PID files
+*.pid
+
+# Job output captured during runs (stored in DB, not as files)
+job_output/
+
+# Temp files written by scripts using %%DATE%% expansion
+/tmp/
+
+# ---------------------------------------------------------------------------
+# Configuration files that may contain secrets
+# ---------------------------------------------------------------------------
+config/autosys.conf
+*.conf
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# macOS
+# ---------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ---------------------------------------------------------------------------
+# JetBrains IDEs (PyCharm, IntelliJ)
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# ---------------------------------------------------------------------------
+# VS Code
+# ---------------------------------------------------------------------------
+.vscode/
+*.code-workspace
+
+# ---------------------------------------------------------------------------
+# Jupyter Notebooks (checkpoint files)
+# ---------------------------------------------------------------------------
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Node.js (for Phase 9 WCC dashboard assets if a build step is added)
+# ---------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+dist/

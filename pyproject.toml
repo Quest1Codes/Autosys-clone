@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools >= 68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["autosys", "autosys.*"]
+
+[project]
+name = "autosys-clone"
+version = "0.1.0"
+description = "A deep clone of CA Workload Automation AE (AutoSys) for learning its internals"
+readme = "README.md"
+requires-python = ">= 3.10"
+dependencies = [
+    # Data validation & serialisation
+    "pydantic >= 2.6",
+    "pydantic-settings",
+
+    # ORM & database
+    "sqlalchemy >= 2.0",
+    "aiosqlite",           # async SQLite driver
+
+    # Async runtime
+    "anyio",
+
+    # Web (used from Phase 6 onward – declared early so the venv is stable)
+    "fastapi",
+    "uvicorn[standard]",
+    "httpx",               # async HTTP client (agent callbacks)
+
+    # CLI
+    "click",
+    "rich",
+    "tabulate",
+
+    # Logging
+    "loguru",
+
+    # Utilities
+    "python-dateutil",     # calendar / time parsing helpers
+    "croniter",            # cron-style schedule evaluation
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest >= 7.4",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "black",
+]
+
+[project.scripts]
+autosys = "autosys.cli.main:autosys"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = ["-s", "--tb=short", "--no-header"]
+
+[tool.ruff]
+line-length = 100
