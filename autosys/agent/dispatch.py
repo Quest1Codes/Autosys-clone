@@ -117,11 +117,7 @@ class AgentDispatch:
         elif not self.local_only:
             self._dispatch_remote(session, row, machine)
         else:
-            logger.warning(
-                "[agent] %r targets %r (not local) — "
-                "use AgentDispatch(local_only=False) for remote dispatch.",
-                row.job_name, machine,
-            )
+            logger.warning(f"[agent] {row.job_name!r} targets {machine!r} (not local) — use AgentDispatch(local_only=False) for remote dispatch.")
             # Leave in STARTING; operator can CHANGE_STATUS manually
 
     def _dispatch_local(self, session: Session, row: JobRow, now: datetime) -> None:
@@ -161,10 +157,7 @@ class AgentDispatch:
             name   = f"agent-{row.job_name}",
         )
         t.start()
-        logger.info(
-            "[agent] local dispatch %r  run_id=%s  machine=%s",
-            row.job_name, run_id[:8], machine,
-        )
+        logger.info(f"[agent] local dispatch {row.job_name!r}  run_id={run_id[:8]}  machine={machine}")
 
     def _dispatch_remote(self, session: Session, row: JobRow, machine: str) -> None:
         """Send a DISPATCH message to a registered remote agent server."""
@@ -173,11 +166,7 @@ class AgentDispatch:
 
         machine_row = machine_repo.get(session, machine)
         if machine_row is None:
-            logger.warning(
-                "[agent] remote dispatch: machine %r not registered — "
-                "run 'autosys machine register %s --host <host>' first.",
-                machine, machine,
-            )
+            logger.warning(f"[agent] remote dispatch: machine {machine!r} not registered — run 'autosys machine register {machine} --host <host>' first.")
             return
 
         rd = RemoteDispatch()
@@ -201,11 +190,11 @@ class AgentDispatch:
             with self._lock:
                 entry = self._active.get(row.job_name)
             if entry is None:
-                logger.warning("[agent] kill: no active local runner for %r", row.job_name)
+                logger.warning(f"[agent] kill: no active local runner for {row.job_name!r}")
                 return
             runner, run_id = entry
             runner.kill()
-            logger.info("[agent] kill: SIGTERM sent to %r (run_id=%s)", row.job_name, run_id[:8])
+            logger.info(f"[agent] kill: SIGTERM sent to {row.job_name!r} (run_id={run_id[:8]})")
         elif not self.local_only:
             # Remote kill
             from autosys.db.repository import machines as machine_repo
@@ -214,7 +203,7 @@ class AgentDispatch:
             if machine_row:
                 RemoteDispatch().kill(session, row, machine_row)
             else:
-                logger.warning("[agent] kill: machine %r not registered", machine)
+                logger.warning(f"[agent] kill: machine {machine!r} not registered")
 
     # ------------------------------------------------------------------
     # Background thread — blocks until subprocess finishes
@@ -238,7 +227,7 @@ class AgentDispatch:
         try:
             exit_code = runner.run()
         except Exception as exc:
-            logger.error("[agent] unhandled error in %r: %s", job_name, exc)
+            logger.error(f"[agent] unhandled error in {job_name!r}: {exc}")
             exit_code  = -1
         finally:
             with self._lock:
@@ -268,11 +257,7 @@ class AgentDispatch:
                 pid       = runner.pid,
             )
 
-        logger.info(
-            "[agent] %r completed  status=%s  exit_code=%d%s",
-            job_name, status, exit_code,
-            "  (killed)" if was_killed else "",
-        )
+        logger.info(f"[agent] {job_name!r} completed  status={status}  exit_code={exit_code}{'  (killed)' if was_killed else ''}")
 
     # ------------------------------------------------------------------
     # Output callback — called per stdout line from reader thread
@@ -348,5 +333,5 @@ def _expand_command(
             strict        = False,
         )
     except UndefinedVariableError as exc:
-        logger.warning("[agent] variable expansion: %s", exc)
+        logger.warning(f"[agent] variable expansion: {exc}")
         return command

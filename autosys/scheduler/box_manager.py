@@ -289,13 +289,10 @@ class BoxManager:
                 try:
                     self._kill_fn(session, child)
                 except Exception as exc:
-                    logger.warning(
-                        "BOX reset: kill_fn raised for %r: %s",
-                        child.job_name, exc,
-                    )
+                    logger.warning(f"BOX reset: kill_fn raised for {child.job_name!r}: {exc}")
             child.status  = "INACTIVE"
             child.last_end = None
-            logger.debug("BOX %r: reset child %r → INACTIVE", box_name, child.job_name)
+            logger.debug(f"BOX {box_name!r}: reset child {child.job_name!r} → INACTIVE")
 
     # ------------------------------------------------------------------
     # Condition evaluation helper

@@ -221,5 +221,5 @@ def _expand_command(
             strict        = False,
         )
     except UndefinedVariableError as exc:
-        logger.warning("[remote] variable expansion: %s", exc)
+        logger.warning(f"[remote] variable expansion: {exc}")
         return command
