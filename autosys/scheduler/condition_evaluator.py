@@ -57,6 +57,9 @@ from autosys.parser.condition_parser import (
 def is_satisfied(
     condition_str: Optional[str],
     job_statuses: dict[str, str],
+    globals_dict: Optional[dict[str, str]] = None,
+    date_conditions: bool = False,
+    today_str: Optional[str] = None,
 ) -> bool:
     """
     Return True if *condition_str* is satisfied given the current *job_statuses*.
@@ -70,6 +73,15 @@ def is_satisfied(
     job_statuses:
         A mapping of ``{job_name: status_string}`` for every job currently
         in the system.  The evaluator looks up job names from this dict.
+    globals_dict:
+        Optional ``{name: value}`` dict of AutoSys global variables.
+        Required for ``value(GLOBAL) = "x"`` conditions to work correctly.
+    date_conditions:
+        If True, only consider job statuses for jobs that ran *today*.
+        Any job whose last_run_date != today is treated as INACTIVE for
+        condition evaluation purposes.
+    today_str:
+        Today's date as "YYYY-MM-DD".  Used when date_conditions=True.
 
     Returns
     -------
@@ -87,9 +99,18 @@ def is_satisfied(
     if not condition_str:
         return True
 
+    # If date_conditions is active, mask out statuses for jobs that haven't
+    # run today — treat them as INACTIVE.
+    effective_statuses = job_statuses
+    if date_conditions and today_str:
+        effective_statuses = {
+            name: (status if _ran_today(name, status, today_str) else "INACTIVE")
+            for name, status in job_statuses.items()
+        }
+
     try:
         node = parse_condition(condition_str)
-        result = evaluate(node, job_statuses)
+        result = evaluate(node, effective_statuses, global_vars=globals_dict)
         logger.debug(
             "Condition %r → %s  (given %d job statuses)",
             condition_str, result, len(job_statuses),
@@ -109,6 +130,15 @@ def is_satisfied(
             condition_str, exc,
         )
         return False
+
+
+def _ran_today(job_name: str, status: str, today_str: str) -> bool:
+    """
+    Placeholder: in a full implementation this would check job_runs.run_date.
+    For now we conservatively keep the current status (don't mask it).
+    Only INACTIVE jobs are definitively 'not run today'.
+    """
+    return status != "INACTIVE"
 
 
 def build_status_snapshot(session) -> dict[str, str]:

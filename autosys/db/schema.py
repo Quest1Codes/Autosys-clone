@@ -69,7 +69,7 @@ class JobRow(Base):
     so that a single ``SELECT * FROM jobs`` gives operators an instant
     snapshot of the whole workload.
     """
-    __tablename__ = "jobs"
+    __tablename__ = "ujo_job"
 
     # --- Identity ---
     job_name        = Column(String(255), primary_key=True)
@@ -78,6 +78,7 @@ class JobRow(Base):
     owner           = Column(String(128))
     permission      = Column(String(64))
     run_as_user     = Column(String(128))
+    group           = Column(String(128), index=True)
 
     # --- Execution (CMD) ---
     command         = Column(Text)
@@ -89,9 +90,12 @@ class JobRow(Base):
     std_out_file    = Column(Text)
     std_err_file    = Column(Text)
     std_in_file     = Column(Text)
+    envvars         = Column(Text)
+    chk_files       = Column(Text)
+    ulimit          = Column(String(128))
 
     # --- BOX container ---
-    box_name        = Column(String(255), ForeignKey("jobs.job_name"), index=True)
+    box_name        = Column(String(255), ForeignKey("ujo_job.job_name"), index=True)
     box_success     = Column(String(255))
     box_failure     = Column(String(255))
     box_terminator  = Column(Boolean, default=False, nullable=False)
@@ -102,24 +106,34 @@ class JobRow(Base):
     start_times          = Column(String(256))   # "06:00,18:00"
     start_mins           = Column(String(128))   # "0,15,30,45"
     days_of_week         = Column(String(64))    # "mo,tu,we,th,fr"
-    run_calendar         = Column(String(128), ForeignKey("calendars.calendar_name"))
-    exclude_calendar     = Column(String(128), ForeignKey("calendars.calendar_name"))
+    # Calendars are validated at runtime, not import time, so no FK here.
+    run_calendar         = Column(String(128))
+    exclude_calendar     = Column(String(128))
     date_conditions      = Column(Boolean, default=False, nullable=False)
     term_run_time        = Column(Integer)       # minutes
+    avg_runtime          = Column(Integer)
+    must_complete_times  = Column(String(256))
+    must_start_times     = Column(String(256))
+    priority             = Column(Integer)
+    timezone             = Column(String(64))
 
     # --- Dependencies ---
     condition            = Column(Text)
 
     # --- Reliability ---
     n_retrys             = Column(Integer, default=0, nullable=False)
+    max_exit_success     = Column(Integer, nullable=True)   # None → only 0 = SUCCESS
     max_run_alarm        = Column(Integer)       # minutes
     min_run_alarm        = Column(Integer)       # minutes
     alarm_if_fail        = Column(Boolean, default=False, nullable=False)
     alarm_if_terminated  = Column(Boolean, default=False, nullable=False)
+    fail_codes           = Column(String(256))
 
     # --- Virtual resources ---
     job_load             = Column(Integer, default=1, nullable=False)
     max_load             = Column(Integer)
+    resources            = Column(Text)
+    auto_hold            = Column(Boolean, default=False, nullable=False)
 
     # --- Notifications ---
     notification_msg          = Column(Text)
@@ -139,9 +153,9 @@ class JobRow(Base):
     watch_file_min_size = Column(Integer, default=0, nullable=False)
     watch_interval      = Column(Integer, default=60, nullable=False)
 
-    # --- Runtime state (written by Scheduler ACE) ---
-    status          = Column(String(32), default="INACTIVE", nullable=False, index=True)
-    last_start      = Column(DateTime)
+    # --- Runtime tracking ---
+    status        = Column(Integer, default=8)   # JobStatus.INACTIVE
+    last_start    = Column(DateTime, nullable=True)
     last_end        = Column(DateTime)
     last_run_date   = Column(String(10))   # "YYYY-MM-DD"
 
@@ -190,14 +204,14 @@ class JobRunRow(Base):
     Important: the ``status`` here is the terminal status of *this run*.
     The live status is on JobRow.status.
     """
-    __tablename__ = "job_runs"
+    __tablename__ = "ujo_job_runs"
     __table_args__ = (
         Index("ix_job_runs_job_date", "job_name", "run_date"),
     )
 
-    run_id       = Column(String(36),  primary_key=True)          # UUID
-    job_name     = Column(String(255), ForeignKey("jobs.job_name"), nullable=False, index=True)
-    status       = Column(String(32),  nullable=False, default="STARTING")
+    run_id      = Column(String(255), primary_key=True)
+    job_name    = Column(String(255), ForeignKey("ujo_job.job_name"), index=True)
+    status      = Column(Integer, nullable=False, index=True)
     start_time   = Column(DateTime)
     end_time     = Column(DateTime)
     exit_code    = Column(Integer)                                 # None until finished
@@ -239,7 +253,7 @@ class EventQueueRow(Base):
       - Scheduler itself (time triggers, retry logic)
       - System Agent callbacks (job completion)
     """
-    __tablename__ = "event_queue"
+    __tablename__ = "ujo_event"
     __table_args__ = (
         Index("ix_event_queue_unprocessed", "processed", "created_at"),
     )
@@ -250,9 +264,11 @@ class EventQueueRow(Base):
     # been imported yet (or have been deleted).  The Event Processor handles
     # "job not found" gracefully.
     job_name      = Column(String(255), index=True)
-    new_status    = Column(String(32))   # for CHANGE_STATUS
+    new_status    = Column(Integer)      # for CHANGE_STATUS
     global_name   = Column(String(128))  # for SET_GLOBAL
     global_value  = Column(Text)         # for SET_GLOBAL
+    comment       = Column(Text)         # for COMMENT
+    resource_name = Column(String(255))  # for RELEASE_RESOURCE
     source        = Column(String(16),  default="internal", nullable=False)
     created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
     processed     = Column(Boolean, default=False, nullable=False)
@@ -276,17 +292,19 @@ class EventHistoryRow(Base):
     This is what ``autosys autorep -E`` or the WCC event history page
     queries.  Rows are never updated or deleted.
     """
-    __tablename__ = "event_history"
+    __tablename__ = "ujo_proc_event"
     __table_args__ = (
-        Index("ix_event_history_job_time", "job_name", "created_at"),
+        Index("ix_event_hist_job_date", "job_name", "created_at"),
     )
 
     event_id      = Column(String(36),  primary_key=True)
-    event_type    = Column(String(32),  nullable=False, index=True)
-    job_name      = Column(String(255), index=True)
-    new_status    = Column(String(32))
+    event_type    = Column(String(32),  nullable=False)
+    job_name      = Column(String(255))
+    status        = Column(Integer)      # was new_status
     global_name   = Column(String(128))
     global_value  = Column(Text)
+    comment       = Column(Text)         # for COMMENT
+    resource_name = Column(String(255))  # for RELEASE_RESOURCE
     source        = Column(String(16),  nullable=False)
     created_at    = Column(DateTime,    nullable=False)
     metadata_json = Column(Text)         # JSON blob with extra context
@@ -309,15 +327,15 @@ class GlobalVariableRow(Base):
     Note: built-in variables (%%DATE%%, %%YYYY%%, etc.) are NOT stored here —
     they are resolved at command-expansion time by variable_substitution.py.
     """
-    __tablename__ = "global_variables"
+    __tablename__ = "ujo_glob_var"
 
-    name        = Column(String(128), primary_key=True)    # always uppercase
+    global_name  = Column(String(128), primary_key=True)    # always uppercase
     value       = Column(Text, nullable=False)
     updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     updated_by  = Column(String(128))
 
     def __repr__(self) -> str:
-        return f"<GlobalVariableRow {self.name}={self.value!r}>"
+        return f"<GlobalVariableRow {self.global_name}={self.value!r}>"
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +351,7 @@ class CalendarRow(Base):
 
     The dates are stored as a JSON array of "YYYY-MM-DD" strings.
     """
-    __tablename__ = "calendars"
+    __tablename__ = "ujo_calendar"
 
     calendar_name = Column(String(128), primary_key=True)
     dates_json    = Column(Text, nullable=False)   # JSON: ["2025-01-01", ...]
@@ -362,8 +380,8 @@ class AlarmRow(Base):
     )
 
     alarm_id            = Column(String(36),  primary_key=True)   # UUID
-    job_name            = Column(String(255), ForeignKey("jobs.job_name"), nullable=False, index=True)
-    run_id              = Column(String(36),  ForeignKey("job_runs.run_id"))
+    job_name            = Column(String(255), ForeignKey("ujo_job.job_name"), nullable=False, index=True)
+    run_id              = Column(String(36),  ForeignKey("ujo_job_runs.run_id"))
     alarm_type          = Column(String(32),  nullable=False, index=True)
     message             = Column(Text,        nullable=False)
     job_status_at_raise = Column(String(32))
@@ -393,9 +411,9 @@ class VirtualResourceRow(Base):
     two such jobs running simultaneously.  Jobs that would exceed max_load
     wait in QUE_WAIT state until a slot is free.
     """
-    __tablename__ = "virtual_resources"
+    __tablename__ = "ujo_resource"
 
-    resource_name = Column(String(128), primary_key=True)
+    resource_name = Column(String(255), primary_key=True)
     max_load      = Column(Integer, nullable=False)
     current_load  = Column(Integer, default=0, nullable=False)
     description   = Column(Text)
@@ -420,7 +438,7 @@ class MachineRow(Base):
     Maps to: CA AutoSys "machine definition" (also defined via JIL with
     insert_machine: syntax in real AutoSys).
     """
-    __tablename__ = "machines"
+    __tablename__ = "ujo_machine"
 
     machine_name    = Column(String(255), primary_key=True)
     host            = Column(String(255), nullable=False)
@@ -479,19 +497,19 @@ class JobOutputRow(Base):
         The raw text of the line (newline stripped).
     """
 
-    __tablename__ = "job_output"
+    __tablename__ = "ujo_job_output"
     __table_args__ = (
         Index("ix_job_output_run",      "run_id", "line_no"),
         Index("ix_job_output_job_name", "job_name"),
     )
 
-    id         = Column(Integer,     primary_key=True, autoincrement=True)
-    run_id     = Column(String(36),  nullable=False, index=True)
-    job_name   = Column(String(255), nullable=False)
-    line_no    = Column(Integer,     nullable=False)
-    stream     = Column(String(6),   nullable=False, default="stdout")
-    content    = Column(Text,        nullable=False, default="")
-    created_at = Column(DateTime,    default=datetime.utcnow, nullable=False)
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    run_id       = Column(String(255), ForeignKey("ujo_job_runs.run_id"), nullable=False, index=True)
+    job_name     = Column(String(255), ForeignKey("ujo_job.job_name"), nullable=False, index=True)
+    line_no      = Column(Integer,     nullable=False)
+    stream       = Column(String(6),   nullable=False, default="stdout")
+    content      = Column(Text,        nullable=False, default="")
+    created_at   = Column(DateTime,    default=datetime.utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return (

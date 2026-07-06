@@ -37,6 +37,7 @@ from typing import Optional
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
+from autosys.models.enums import JobStatus
 from autosys.db.schema import (
     EventHistoryRow,
     EventQueueRow,
@@ -45,6 +46,7 @@ from autosys.db.schema import (
     JobRow,
     JobRunRow,
     MachineRow,
+    CalendarRow,
 )
 from autosys.models.job import Job, parse_job
 from autosys.models.event import Event
@@ -253,7 +255,7 @@ class JobRepository:
         return list(session.scalars(
             select(JobRow)
             .where(JobRow.job_type == "BOX")
-            .where(JobRow.status   == "RUNNING")
+            .where(JobRow.status   == JobStatus.RUNNING.value)
             .order_by(JobRow.job_name)
         ))
 
@@ -308,7 +310,7 @@ class EventRepository:
             job_name   = event.job_name,
             global_name  = event.global_name,
             global_value = event.global_value,
-            new_status   = str(event.new_status) if event.new_status else None,
+            new_status   = event.new_status.value if event.new_status else None,
             source     = str(event.source),
             processed  = False,
         )
@@ -321,7 +323,7 @@ class EventRepository:
             job_name     = event.job_name,
             global_name  = event.global_name,
             global_value = event.global_value,
-            new_status   = str(event.new_status) if event.new_status else None,
+            status       = event.new_status.value if event.new_status else None,
             source       = str(event.source),
             created_at   = event.created_at,
         )
@@ -387,7 +389,7 @@ class GlobalVarRepository:
         row: Optional[GlobalVariableRow] = session.get(GlobalVariableRow, name)
         if row is None:
             session.add(GlobalVariableRow(
-                name=name, value=value,
+                global_name=name, value=value,
             ))
         else:
             row.value      = value
@@ -403,7 +405,7 @@ class GlobalVarRepository:
     def list_all(self, session: Session) -> list[GlobalVariableRow]:
         """Return all global variables ordered by name."""
         return list(session.scalars(
-            select(GlobalVariableRow).order_by(GlobalVariableRow.name)
+            select(GlobalVariableRow).order_by(GlobalVariableRow.global_name)
         ))
 
     def as_dict(self, session: Session) -> dict[str, str]:
@@ -413,7 +415,7 @@ class GlobalVarRepository:
         Convenience for passing to ``substitute()`` in the variable
         substitution engine.
         """
-        return {row.name: row.value for row in self.list_all(session)}
+        return {row.global_name: row.value for row in self.list_all(session)}
 
 
 # ===========================================================================
@@ -450,8 +452,8 @@ class RunRepository:
         row = JobRunRow(
             run_id     = run_id,
             job_name   = job_name,
-            status     = "RUNNING",
-            start_time = _dt.now(),
+            status     = JobStatus.RUNNING.value,
+            start_time = datetime.utcnow(),
             machine    = machine,
             run_date   = run_date,
         )
@@ -462,7 +464,7 @@ class RunRepository:
         self,
         session: Session,
         run_id: str,
-        status: str,
+        status: int,
         exit_code: Optional[int],
         pid: Optional[int] = None,
     ) -> None:
@@ -709,12 +711,39 @@ class MachineRepository:
         row = session.get(MachineRow, machine_name)
         if row:
             row.status = status
+        if row:
+            row.status = status
+
+
+# ---------------------------------------------------------------------------
+# Calendar Repository (Phase 11)
+# ---------------------------------------------------------------------------
+
+class CalendarRepository:
+    def get(self, session: Session, name: str) -> Optional[CalendarRow]:
+        return session.get(CalendarRow, name)
+
+    def list_all(self, session: Session) -> list[CalendarRow]:
+        return list(session.scalars(select(CalendarRow)).all())
+
+    def upsert(self, session: Session, calendar: CalendarRow) -> None:
+        session.merge(calendar)
+        session.flush()
+        
+    def delete(self, session: Session, name: str) -> bool:
+        row = session.get(CalendarRow, name)
+        if row:
+            session.delete(row)
+            session.flush()
+            return True
+        return False
 
 
 #: Default singleton — import and use directly in commands.
-jobs     = JobRepository()
-events   = EventRepository()
-globs    = GlobalVarRepository()
-runs     = RunRepository()
-output   = OutputRepository()
-machines = MachineRepository()
+jobs      = JobRepository()
+events    = EventRepository()
+globs     = GlobalVarRepository()
+runs      = RunRepository()
+output    = OutputRepository()
+machines  = MachineRepository()
+calendars = CalendarRepository()

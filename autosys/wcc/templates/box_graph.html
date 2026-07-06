@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% set page = "jobs" %}
+
+{% block title %}{{ box_name }} Graph — AutoSys WCC{% endblock %}
+
+{% block head %}
+<script src="https://d3js.org/d3.v7.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <a href="/" style="color:#64748b;font-size:14px">← Jobs</a>
+  &nbsp;/&nbsp;
+  <a href="/jobs/{{ box_name }}" class="mono">{{ box_name }}</a>
+  &nbsp;/&nbsp; Dependency Graph
+  <span class="status-badge status-{{ box_status | lower }}" style="margin-left:8px">{{ box_status }}</span>
+  <button class="btn btn-ghost" style="margin-left:auto;font-size:12px" onclick="refresh()">↻ Refresh</button>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Dependency Flow — {{ box_name }}</span>
+    <span style="font-size:12px;color:#64748b">Click a node to open job detail</span>
+  </div>
+  <div id="graph-container">
+    <svg id="graph-svg"></svg>
+    <div class="tooltip" id="tooltip"></div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;padding:0 4px">
+  {% for status, cls in [('SUCCESS','status-success'),('FAILURE','status-failure'),('RUNNING','status-running'),
+                          ('ACTIVATED','status-activated'),('INACTIVE','status-inactive'),('BOX','status-hold')] %}
+  <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8">
+    <span class="status-badge {{ cls }}" style="font-size:10px">{{ status }}</span>
+  </span>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const NODES = {{ nodes_json | safe }};
+const EDGES = {{ edges_json | safe }};
+
+const STATUS_COLOR = {
+  SUCCESS:    { fill: "#14532d", stroke: "#4ade80" },
+  FAILURE:    { fill: "#450a0a", stroke: "#f87171" },
+  RUNNING:    { fill: "#1e3a5f", stroke: "#60a5fa" },
+  STARTING:   { fill: "#1e3a5f", stroke: "#93c5fd" },
+  ACTIVATED:  { fill: "#2e1065", stroke: "#a78bfa" },
+  TERMINATED: { fill: "#713f12", stroke: "#fbbf24" },
+  ON_HOLD:    { fill: "#1e293b", stroke: "#94a3b8" },
+  ON_ICE:     { fill: "#1e293b", stroke: "#475569" },
+  INACTIVE:   { fill: "#1e293b", stroke: "#334155" },
+  BOX:        { fill: "#1a1d2e", stroke: "#6366f1" },
+};
+
+function nodeColor(d) {
+  if (d.type === "BOX") return STATUS_COLOR.BOX;
+  return STATUS_COLOR[d.status] || STATUS_COLOR.INACTIVE;
+}
+
+const container = document.getElementById("graph-container");
+const W = container.clientWidth  || 900;
+const H = container.clientHeight || 520;
+
+const svg = d3.select("#graph-svg")
+  .attr("viewBox", [0, 0, W, H]);
+
+svg.append("defs").append("marker")
+  .attr("id", "arrow")
+  .attr("viewBox", "0 -5 10 10")
+  .attr("refX", 26).attr("refY", 0)
+  .attr("markerWidth", 6).attr("markerHeight", 6)
+  .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("fill", "#475569");
+
+const g = svg.append("g");
+
+svg.call(d3.zoom().scaleExtent([0.3, 3]).on("zoom", e => g.attr("transform", e.transform)));
+
+const sim = d3.forceSimulation(NODES)
+  .force("link", d3.forceLink(EDGES).id(d => d.id).distance(130).strength(1))
+  .force("charge", d3.forceManyBody().strength(-400))
+  .force("center", d3.forceCenter(W / 2, H / 2))
+  .force("collision", d3.forceCollide(48));
+
+const link = g.append("g")
+  .selectAll("line")
+  .data(EDGES)
+  .join("line")
+    .attr("stroke", "#334155")
+    .attr("stroke-width", 2)
+    .attr("marker-end", "url(#arrow)");
+
+const node = g.append("g")
+  .selectAll("g")
+  .data(NODES)
+  .join("g")
+    .attr("cursor", "pointer")
+    .call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    )
+    .on("click", (e, d) => { window.location.href = `/jobs/${d.id}`; })
+    .on("mouseover", (e, d) => {
+      const tt = document.getElementById("tooltip");
+      tt.style.display = "block";
+      tt.style.left = (e.offsetX + 12) + "px";
+      tt.style.top  = (e.offsetY + 12) + "px";
+      tt.innerHTML  = `<b>${d.id}</b><br>${d.type} · ${d.status}`;
+    })
+    .on("mouseout", () => { document.getElementById("tooltip").style.display = "none"; });
+
+node.append("circle")
+  .attr("r", d => d.type === "BOX" ? 22 : 16)
+  .attr("fill",   d => nodeColor(d).fill)
+  .attr("stroke", d => nodeColor(d).stroke)
+  .attr("stroke-width", 2);
+
+node.append("text")
+  .attr("dy", 32)
+  .attr("text-anchor", "middle")
+  .style("font-size", "11px")
+  .style("fill", "#cbd5e1")
+  .text(d => d.id.length > 18 ? d.id.slice(0, 16) + "…" : d.id);
+
+sim.on("tick", () => {
+  link
+    .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+  node.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+async function refresh() {
+  const resp = await fetch(`/api/wcc/boxes/{{ box_name }}`);
+  const data = await resp.json();
+  data.nodes.forEach(n => {
+    const existing = NODES.find(x => x.id === n.id);
+    if (existing) existing.status = n.status;
+  });
+  node.select("circle")
+    .attr("fill",   d => nodeColor(d).fill)
+    .attr("stroke", d => nodeColor(d).stroke);
+}
+
+setInterval(refresh, 3000);
+</script>
+{% endblock %}

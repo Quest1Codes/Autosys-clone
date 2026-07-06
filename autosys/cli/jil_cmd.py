@@ -103,6 +103,13 @@ def jil_import(file: Path, dry_run: bool, quiet: bool) -> None:
                 results.append(("MACHINE", m.machine_name, f"port:{m.port}"))
                 continue
 
+            # ---- unsupported/mocked definitions ----
+            if op.job is None:
+                # E.g. insert_job_type, insert_blob, insert_xinst
+                # Parse was successful, but we don't store them in this clone yet.
+                results.append(("SKIPPED", op.op, "unsupported"))
+                continue
+                
             # ---- job definition ----
             job   = op.job
             name  = job.job_name
@@ -113,6 +120,12 @@ def jil_import(file: Path, dry_run: bool, quiet: bool) -> None:
                     job_repo.delete(session, name)
                 action = "DELETED"
                 n_deleted += 1
+            elif op.op == "override":
+                # AutoSys one-time next-run override.
+                # Since we don't have the override tables, we skip it with a warning
+                # rather than permanently mutating the job definition.
+                action = "SKIPPED"
+                jtype  = "override (unsupported)"
             else:
                 if dry_run:
                     action = "OK"
@@ -133,6 +146,7 @@ def jil_import(file: Path, dry_run: bool, quiet: bool) -> None:
                 "UPDATED":  "yellow",
                 "DELETED":  "red",
                 "MACHINE":  "blue",
+                "SKIPPED":  "magenta",
                 "OK":       "cyan",
             }.get(action, "white")
             _console.print(

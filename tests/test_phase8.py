@@ -70,7 +70,7 @@ def session(isolated_db):
 def _seed_cmd(session: Session, name: str = "test_job", **extra) -> None:
     """Insert a minimal CMD job row directly."""
     from autosys.db.schema import JobRow
-    kwargs = {"status": "INACTIVE", **extra}   # extra can override status
+    kwargs = {"status": 8, **extra}   # extra can override status
     row = JobRow(
         job_name  = name,
         job_type  = "CMD",
@@ -84,7 +84,7 @@ def _seed_cmd(session: Session, name: str = "test_job", **extra) -> None:
 
 def _seed_box(session: Session, name: str = "test_box") -> None:
     from autosys.db.schema import JobRow
-    row = JobRow(job_name=name, job_type="BOX", status="INACTIVE")
+    row = JobRow(job_name=name, job_type="BOX", status=8)
     session.add(row)
     session.commit()
 
@@ -133,8 +133,8 @@ class TestJobsRouter:
         assert names == {"job_a", "job_b"}
 
     def test_list_jobs_filter_by_status(self, client, session):
-        _seed_cmd(session, "run_job", status="RUNNING")
-        _seed_cmd(session, "idle_job", status="INACTIVE")
+        _seed_cmd(session, "run_job", status=1)
+        _seed_cmd(session, "idle_job", status=8)
         resp = client.get("/api/v1/jobs?status=RUNNING")
         names = [j["job_name"] for j in resp.json()]
         assert "run_job" in names
@@ -164,9 +164,9 @@ class TestJobsRouter:
         assert resp.status_code == 404
 
     def test_get_job_response_has_status(self, client, session):
-        _seed_cmd(session, "s_job", status="SUCCESS")
+        _seed_cmd(session, "s_job", status=4)
         body = client.get("/api/v1/jobs/s_job").json()
-        assert body["status"] == "SUCCESS"
+        assert body["status"] == 4
 
     def test_delete_job(self, client, session):
         _seed_cmd(session, "delete_me")
@@ -191,7 +191,7 @@ class TestJobsRouter:
         assert "event_id" in body
 
     def test_sendevent_killjob(self, client, session):
-        _seed_cmd(session, "kill_job", status="RUNNING")
+        _seed_cmd(session, "kill_job", status=1)
         resp = client.post(
             "/api/v1/jobs/kill_job/sendevent",
             json={"event_type": "KILLJOB"},
@@ -379,11 +379,11 @@ class TestRunsRouter:
             run_repo.start(s, rid, "dur_job",
                            command="echo", machine="localhost", run_date="2024-01-15")
             s.flush()   # flush pending INSERT so finish() sees the row
-            run_repo.finish(s, rid, status="SUCCESS", exit_code=0)
+            run_repo.finish(s, rid, status=4, exit_code=0)
             s.commit()
         body = client.get(f"/api/v1/runs/{rid}").json()
         assert body["exit_code"] == 0
-        assert body["status"] == "SUCCESS"
+        assert body["status"] == 4
         assert body["duration_seconds"] is not None
         assert body["duration_seconds"] >= 0
 
@@ -568,7 +568,7 @@ class TestEventBroadcaster:
         from autosys.app_server.broadcaster import EventBroadcaster
         bc = EventBroadcaster()
         # No event loop running — should not raise
-        bc.publish_sync({"type": "STATUS_CHANGE", "job_name": "x", "old": "INACTIVE", "new": "RUNNING", "ts": "now"})
+        bc.publish_sync({"type": "STATUS_CHANGE", "job_name": "x", "old": 8, "new": 1, "ts": "now"})
 
     def test_publish_async_no_connections(self):
         """publish() with no connections should complete without error."""
@@ -599,7 +599,7 @@ class TestStatusChangeBroadcast:
 
         with sync_session() as s:
             s.add(JobRow(job_name="bc_job", job_type="CMD",
-                         command="echo", machine="localhost", status="INACTIVE"))
+                         command="echo", machine="localhost", status=8))
             ev_repo.enqueue(s, Event(event_type="STARTJOB", job_name="bc_job",
                                       source="internal"))
             s.commit()
@@ -612,7 +612,7 @@ class TestStatusChangeBroadcast:
             proc.process_one_tick(s)
 
         assert any(e["job_name"] == "bc_job" for e in received)
-        assert any(e["new"] == "STARTING" for e in received)
+        assert any(e["new"] == 3 for e in received)
 
     def test_on_status_change_called_on_killjob(self, isolated_db):
         """EPS calls on_status_change when a job is killed."""
@@ -626,7 +626,7 @@ class TestStatusChangeBroadcast:
 
         with sync_session() as s:
             s.add(JobRow(job_name="kill_bc", job_type="CMD",
-                         command="sleep 999", machine="localhost", status="RUNNING"))
+                         command="sleep 999", machine="localhost", status=1))
             ev_repo.enqueue(s, Event(event_type="KILLJOB", job_name="kill_bc",
                                       source="internal"))
             s.commit()
@@ -635,7 +635,7 @@ class TestStatusChangeBroadcast:
         with sync_session() as s:
             proc.process_one_tick(s)
 
-        assert any(e["new"] == "TERMINATED" for e in received)
+        assert any(e["new"] == 6 for e in received)
 
     def test_emit_not_called_when_status_unchanged(self, isolated_db):
         """_emit_status_change is a no-op when old == new."""

@@ -27,6 +27,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "httpx",               # async HTTP client (agent callbacks)
+    "jinja2",              # WCC HTML templates (Phase 9)
+    "python-multipart",    # form data (Phase 9)
 
     # CLI
     "click",
@@ -48,6 +50,10 @@ dev = [
     "pytest-cov",
     "ruff",
     "black",
+]
+pg = [
+    "asyncpg",
+    "psycopg2-binary",
 ]
 
 [project.scripts]

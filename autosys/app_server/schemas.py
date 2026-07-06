@@ -169,6 +169,50 @@ class HealthResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# JIL import / validate
+# ---------------------------------------------------------------------------
+
+class JILImportRequest(BaseModel):
+    content: str
+    dry_run: bool = False
+
+
+class JILJobResult(BaseModel):
+    action: str   # OK | INSERTED | UPDATED | DELETED | MACHINE
+    name:   str
+    type:   str
+
+
+class JILImportResponse(BaseModel):
+    success:    bool
+    jobs:       list[JILJobResult] = []
+    n_inserted: int = 0
+    n_updated:  int = 0
+    n_deleted:  int = 0
+    n_machines: int = 0
+    error:      Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Alarms
+# ---------------------------------------------------------------------------
+
+class AlarmResponse(BaseModel):
+    alarm_id:            str
+    job_name:            str
+    run_id:              Optional[str] = None
+    alarm_type:          str
+    message:             str
+    job_status_at_raise: Optional[str] = None
+    raised_at:           datetime
+    cleared_at:          Optional[datetime] = None
+    cleared_by:          Optional[str] = None
+    active:              bool
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # WebSocket event broadcast
 # ---------------------------------------------------------------------------
 

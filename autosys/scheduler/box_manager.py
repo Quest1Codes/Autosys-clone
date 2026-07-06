@@ -200,7 +200,20 @@ class BoxManager:
                     # multiple ticks (one per wave of the dependency chain).
                     changes += 1
 
-        # Step 2: check if all children are terminal → complete the box
+        # Step 2: check box_failure and box_success conditions first
+        if box.box_failure and self._conditions_met(box, snapshot, box.box_failure):
+            box.status = "FAILURE"
+            box.last_end = now
+            logger.info("BOX %r completed → FAILURE (box_failure condition met)", box.job_name)
+            return changes + 1
+
+        if box.box_success and self._conditions_met(box, snapshot, box.box_success):
+            box.status = "SUCCESS"
+            box.last_end = now
+            logger.info("BOX %r completed → SUCCESS (box_success condition met)", box.job_name)
+            return changes + 1
+
+        # Step 3: check if all children are terminal → complete the box
         non_terminal = [c for c in children if c.status not in _TERMINAL]
         if non_terminal:
             return changes   # box is still in progress
@@ -301,14 +314,14 @@ class BoxManager:
     # Condition evaluation helper
     # ------------------------------------------------------------------
 
-    def _conditions_met(self, child: JobRow, snapshot: dict[str, str]) -> bool:
+    def _conditions_met(self, child: JobRow, snapshot: dict[str, str], condition_override: Optional[str] = None) -> bool:
         """
-        Return True if the child's start conditions are satisfied.
+        Return True if the child's start conditions (or overridden condition) are satisfied.
 
         Uses the module-level ``is_satisfied`` function from condition_evaluator.
         Jobs with no condition are always eligible.
         """
-        condition = child.condition
+        condition = condition_override if condition_override is not None else child.condition
         if not condition or condition.strip() == "":
             return True
 

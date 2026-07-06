@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}AutoSys WCC{% endblock %}</title>
+  <link rel="stylesheet" href="/static/wcc.css" />
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <div class="logo">A</div>
+    AutoSys WCC
+  </div>
+  <a href="/"        class="nav-link {% if page == 'jobs'   %}active{% endif %}">Job Monitor</a>
+  <a href="/alarms"  class="nav-link {% if page == 'alarms' %}active{% endif %}">Alarms</a>
+  <a href="http://localhost:9000/docs" target="_blank" class="nav-link">API Docs ↗</a>
+  <a href="http://localhost:9000/ui"   target="_blank" class="nav-link">JIL Runner ↗</a>
+</nav>
+
+<div class="page">
+  {% block content %}{% endblock %}
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

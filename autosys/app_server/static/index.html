@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AutoSys JIL Runner</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #1a1d2e;
+      border-bottom: 1px solid #2d3148;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 900; font-size: 16px; color: #fff;
+    }
+
+    header h1 { font-size: 18px; font-weight: 600; color: #f1f5f9; }
+    header span { font-size: 13px; color: #64748b; margin-left: 8px; }
+
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 28px 32px;
+      gap: 24px;
+    }
+
+    .panel {
+      background: #1a1d2e;
+      border: 1px solid #2d3148;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #2d3148;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-header h2 { font-size: 14px; font-weight: 600; color: #94a3b8; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    .panel-body { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; }
+
+    /* ---- Editor ---- */
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-upload  { background: #1e293b; color: #94a3b8; border: 1px solid #334155; }
+    .btn-upload:hover:not(:disabled) { background: #243047; }
+    .btn-validate { background: #1d4ed8; color: #fff; }
+    .btn-validate:hover:not(:disabled) { background: #2563eb; }
+    .btn-dryrun  { background: #0f766e; color: #fff; }
+    .btn-dryrun:hover:not(:disabled)  { background: #0d9488; }
+    .btn-import  { background: #7c3aed; color: #fff; }
+    .btn-import:hover:not(:disabled)  { background: #8b5cf6; }
+    .btn-run     { background: #059669; color: #fff; }
+    .btn-run:hover:not(:disabled)     { background: #10b981; }
+    .btn-clear   { background: #1e293b; color: #64748b; border: 1px solid #334155; margin-left: auto; }
+    .btn-clear:hover:not(:disabled)   { color: #f87171; border-color: #f87171; }
+
+    #file-input { display: none; }
+
+    textarea {
+      flex: 1;
+      min-height: 420px;
+      background: #0f1117;
+      color: #e2e8f0;
+      border: 1px solid #2d3148;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    textarea:focus { border-color: #6366f1; }
+    textarea::placeholder { color: #3f4a5e; }
+
+    .file-name {
+      font-size: 12px;
+      color: #64748b;
+      padding: 2px 4px;
+    }
+
+    /* ---- Results ---- */
+    #results-panel .panel-body { padding: 0; overflow: hidden; }
+
+    .status-bar {
+      padding: 14px 18px;
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid #2d3148;
+      font-size: 13px;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+    }
+    .badge-success { background: #14532d; color: #4ade80; }
+    .badge-error   { background: #450a0a; color: #f87171; }
+    .badge-idle    { background: #1e293b; color: #64748b; }
+
+    .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-left: auto; font-size: 12px; color: #64748b; }
+    .stat-item strong { color: #94a3b8; }
+
+    .error-box {
+      margin: 16px;
+      padding: 14px 16px;
+      background: #1c0a0a;
+      border: 1px solid #7f1d1d;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #fca5a5;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .table-wrap { overflow: auto; flex: 1; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid #2d3148;
+      position: sticky; top: 0;
+      background: #1a1d2e;
+    }
+    tbody tr { border-bottom: 1px solid #1e2538; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #1e2538; }
+    tbody td { padding: 9px 16px; vertical-align: middle; }
+
+    .action-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+    }
+    .action-INSERTED { background: #14532d; color: #4ade80; }
+    .action-UPDATED  { background: #713f12; color: #fbbf24; }
+    .action-DELETED  { background: #450a0a; color: #f87171; }
+    .action-OK       { background: #1e3a5f; color: #60a5fa; }
+    .action-MACHINE  { background: #2e1065; color: #c4b5fd; }
+
+    .job-name { font-family: monospace; color: #e2e8f0; }
+    .job-type { color: #64748b; font-size: 12px; }
+
+    .placeholder-msg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 300px;
+      color: #334155;
+      gap: 10px;
+      font-size: 14px;
+    }
+    .placeholder-msg svg { opacity: 0.3; }
+
+    .spinner {
+      display: none;
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">A</div>
+  <h1>AutoSys JIL Runner</h1>
+  <span>Validate &amp; import JIL files into the scheduler</span>
+</header>
+
+<main>
+  <!-- LEFT: Input panel -->
+  <div class="panel">
+    <div class="panel-header">
+      <h2>JIL Input</h2>
+      <span id="file-name-label" class="file-name"></span>
+    </div>
+    <div class="panel-body">
+      <div class="toolbar">
+        <label class="btn btn-upload" for="file-input">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Load .jil file
+        </label>
+        <input type="file" id="file-input" accept=".jil,.txt" />
+
+        <button class="btn btn-validate" id="btn-validate">
+          <div class="spinner" id="spin-validate"></div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Validate
+        </button>
+
+        <button class="btn btn-dryrun" id="btn-dryrun">
+          <div class="spinner" id="spin-dryrun"></div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Dry-Run Import
+        </button>
+
+        <button class="btn btn-import" id="btn-import">
+          <div class="spinner" id="spin-import"></div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+          Import to DB
+        </button>
+
+        <button class="btn btn-run" id="btn-run" disabled>
+          <div class="spinner" id="spin-run"></div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Start Jobs
+        </button>
+
+        <button class="btn btn-clear" id="btn-clear">Clear</button>
+      </div>
+
+      <textarea
+        id="jil-input"
+        placeholder="Paste JIL content here, or load a .jil file above…
+
+Example:
+insert_job: my_job   job_type: CMD
+command: echo hello
+machine: localhost"
+      ></textarea>
+    </div>
+  </div>
+
+  <!-- RIGHT: Results panel -->
+  <div class="panel" id="results-panel">
+    <div class="panel-header">
+      <h2>Results</h2>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+      <span class="badge badge-idle" id="status-badge">IDLE</span>
+      <span id="status-msg" style="color:#64748b">Run an action to see results</span>
+      <div class="stats" id="stats" style="display:none"></div>
+    </div>
+
+    <div class="panel-body" id="results-body">
+      <div class="placeholder-msg" id="placeholder">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/>
+          <line x1="9" y1="21" x2="9" y2="9"/>
+        </svg>
+        <span>Results will appear here</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API = '';  // same origin
+
+  const jilInput   = document.getElementById('jil-input');
+  const fileInput  = document.getElementById('file-input');
+  const fileLabel  = document.getElementById('file-name-label');
+  const btnValidate = document.getElementById('btn-validate');
+  const btnDryrun   = document.getElementById('btn-dryrun');
+  const btnImport   = document.getElementById('btn-import');
+  const btnRun      = document.getElementById('btn-run');
+  const btnClear    = document.getElementById('btn-clear');
+
+  let lastImportedJobs = [];
+  const statusBadge = document.getElementById('status-badge');
+  const statusMsg   = document.getElementById('status-msg');
+  const statsEl     = document.getElementById('stats');
+  const resultsBody = document.getElementById('results-body');
+  const placeholder = document.getElementById('placeholder');
+
+  // Load file
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      jilInput.value = e.target.result;
+      fileLabel.textContent = file.name;
+    };
+    reader.readAsText(file);
+    fileInput.value = '';
+  });
+
+  btnClear.addEventListener('click', () => {
+    jilInput.value = '';
+    fileLabel.textContent = '';
+    lastImportedJobs = [];
+    btnRun.disabled = true;
+    resetResults();
+  });
+
+  btnValidate.addEventListener('click', () => runAction('validate', false));
+  btnDryrun.addEventListener('click',   () => runAction('import',   true));
+  btnImport.addEventListener('click',   () => runAction('import',   false));
+
+  btnRun.addEventListener('click', async () => {
+    if (!lastImportedJobs.length) {
+      showError('Import jobs to DB first, then click Start Jobs.');
+      return;
+    }
+    setLoading('run', true);
+    try {
+      const results = [];
+      for (const jobName of lastImportedJobs) {
+        const resp = await fetch(`${API}/api/v1/jobs/${encodeURIComponent(jobName)}/sendevent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event_type: 'STARTJOB' }),
+        });
+        const data = await resp.json();
+        results.push({
+          name: jobName,
+          status: resp.ok ? 'STARTED' : 'FAILED',
+          detail: data.detail || data.event_type || '',
+        });
+      }
+      renderRunResult(results);
+    } catch (err) {
+      showError(`Network error: ${err.message}`);
+    } finally {
+      setLoading('run', false);
+    }
+  });
+
+  function setLoading(actionId, on) {
+    const spinId = { validate: 'spin-validate', import_dry: 'spin-dryrun', import_live: 'spin-import', run: 'spin-run' }[actionId];
+    const spin = document.getElementById(spinId);
+    if (spin) spin.style.display = on ? 'block' : 'none';
+    [btnValidate, btnDryrun, btnImport, btnRun].forEach(b => b.disabled = on);
+  }
+
+  async function runAction(endpoint, dryRun) {
+    const content = jilInput.value.trim();
+    if (!content) {
+      showError('Please enter or load some JIL content first.');
+      return;
+    }
+
+    const actionId = endpoint === 'validate' ? 'validate' : (dryRun ? 'import_dry' : 'import_live');
+    setLoading(actionId, true);
+
+    try {
+      const resp = await fetch(`${API}/api/v1/jil/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content, dry_run: dryRun }),
+      });
+
+      const data = await resp.json();
+      renderResult(data, endpoint, dryRun);
+    } catch (err) {
+      showError(`Network error: ${err.message}`);
+    } finally {
+      setLoading(actionId, false);
+    }
+  }
+
+  function renderResult(data, endpoint, dryRun) {
+    // Status badge
+    if (data.success) {
+      statusBadge.className = 'badge badge-success';
+      statusBadge.textContent = 'OK';
+      const label = endpoint === 'validate' ? 'Validated' : (dryRun ? 'Dry-run complete' : 'Imported');
+      const count = data.jobs.length;
+      statusMsg.textContent = `${label} — ${count} stanza${count !== 1 ? 's' : ''} parsed`;
+    } else {
+      statusBadge.className = 'badge badge-error';
+      statusBadge.textContent = 'ERROR';
+      statusMsg.textContent = 'Parse failed';
+    }
+
+    // Stats row
+    if (data.success && endpoint === 'import' && !dryRun) {
+      lastImportedJobs = data.jobs.map(j => j.name);
+      btnRun.disabled = false;
+      statsEl.style.display = 'flex';
+      statsEl.innerHTML = [
+        ['Inserted', data.n_inserted, '#4ade80'],
+        ['Updated',  data.n_updated,  '#fbbf24'],
+        ['Deleted',  data.n_deleted,  '#f87171'],
+        ['Machines', data.n_machines, '#c4b5fd'],
+      ].map(([k, v, c]) =>
+        `<span class="stat-item"><strong style="color:${c}">${v}</strong> ${k}</span>`
+      ).join('');
+    } else {
+      statsEl.style.display = 'none';
+    }
+
+    // Body
+    placeholder.style.display = 'none';
+
+    // Remove old content except placeholder
+    [...resultsBody.children].forEach(c => { if (c !== placeholder) c.remove(); });
+
+    if (!data.success) {
+      const box = document.createElement('div');
+      box.className = 'error-box';
+      box.textContent = data.error || 'Unknown error';
+      resultsBody.appendChild(box);
+      return;
+    }
+
+    if (data.jobs.length === 0) {
+      const msg = document.createElement('div');
+      msg.className = 'placeholder-msg';
+      msg.textContent = 'No stanzas found in the JIL content.';
+      resultsBody.appendChild(msg);
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th>Job / Machine Name</th>
+            <th>Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.jobs.map(j => `
+            <tr>
+              <td><span class="action-badge action-${j.action}">${j.action}</span></td>
+              <td class="job-name">${escHtml(j.name)}</td>
+              <td class="job-type">${escHtml(j.type)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+    resultsBody.appendChild(wrap);
+  }
+
+  function renderRunResult(results) {
+    statusBadge.className = 'badge badge-success';
+    statusBadge.textContent = 'STARTED';
+    const started = results.filter(r => r.status === 'STARTED').length;
+    statusMsg.textContent = `${started}/${results.length} job(s) event sent`;
+    statsEl.style.display = 'none';
+    placeholder.style.display = 'none';
+    [...resultsBody.children].forEach(c => { if (c !== placeholder) c.remove(); });
+
+    const wrap = document.createElement('div');
+    wrap.className = 'table-wrap';
+    wrap.innerHTML = `
+      <table>
+        <thead>
+          <tr><th>Status</th><th>Job Name</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          ${results.map(r => `
+            <tr>
+              <td><span class="action-badge ${r.status === 'STARTED' ? 'action-INSERTED' : 'action-DELETED'}">${r.status}</span></td>
+              <td class="job-name">${escHtml(r.name)}</td>
+              <td class="job-type">${escHtml(r.detail)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`;
+    resultsBody.appendChild(wrap);
+  }
+
+  function showError(msg) {
+    statusBadge.className = 'badge badge-error';
+    statusBadge.textContent = 'ERROR';
+    statusMsg.textContent = msg;
+    statsEl.style.display = 'none';
+    placeholder.style.display = 'none';
+    [...resultsBody.children].forEach(c => { if (c !== placeholder) c.remove(); });
+    const box = document.createElement('div');
+    box.className = 'error-box';
+    box.textContent = msg;
+    resultsBody.appendChild(box);
+  }
+
+  function resetResults() {
+    statusBadge.className = 'badge badge-idle';
+    statusBadge.textContent = 'IDLE';
+    statusMsg.textContent = 'Run an action to see results';
+    statsEl.style.display = 'none';
+    [...resultsBody.children].forEach(c => { if (c !== placeholder) c.remove(); });
+    placeholder.style.display = 'flex';
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

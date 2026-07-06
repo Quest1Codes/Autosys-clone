@@ -16,6 +16,10 @@ ON_HOLD         Put a job on hold (won't start until taken off hold).
 ON_ICE          Freeze a job (removed from consideration entirely).
 OFF_HOLD        Remove a job from hold.
 OFF_ICE         Unfreeze a job.
+COMMENT         Add an audit comment to the event history.
+REPLY_RESPONSE  Answer a manual intervention prompt (for WAIT_REPLY jobs).
+ALARM           Raise an alarm on a job.
+RELEASE_RESOURCE Manually free up stuck virtual load-balancing resources.
 
 Real AutoSys usage
 ------------------
@@ -25,6 +29,7 @@ Real AutoSys usage
     $ sendevent -E CHANGE_STATUS   -J extract_sales -s INACTIVE
     $ sendevent -E SET_GLOBAL      -G MY_DATE       -v 20260625
     $ sendevent -E ON_HOLD         -J extract_sales
+    $ sendevent -E COMMENT         -J extract_sales -c "User authorized"
 """
 
 from __future__ import annotations
@@ -46,6 +51,7 @@ _err     = Console(stderr=True)
 _NEED_JOB = frozenset({
     "STARTJOB", "FORCE_STARTJOB", "KILLJOB", "CHANGE_STATUS",
     "HOLD_JOB", "JOB_ON_ICE", "JOB_OFF_HOLD", "JOB_OFF_ICE",
+    "COMMENT", "REPLY_RESPONSE", "ALARM",
 })
 
 # Event types that require -G (global_name) and -v (value)
@@ -63,6 +69,8 @@ _VALID_EVENTS = [e.value for e in EventType]
               help="Target job name (required for most event types).")
 @click.option("-s", "--status", "new_status",   default=None,
               help="New status for CHANGE_STATUS events.")
+@click.option("-c", "--comment", "comment_text", default=None,
+              help="Comment text for COMMENT events.")
 @click.option("-G", "--global-name", "global_name", default=None,
               help="Global variable name for SET_GLOBAL events.")
 @click.option("-v", "--value",  "global_value", default=None,
@@ -75,6 +83,7 @@ def sendevent(
     event_type: str,
     job_name:   str | None,
     new_status: str | None,
+    comment_text: str | None,
     global_name: str | None,
     global_value: str | None,
     source: str,
@@ -132,6 +141,7 @@ def sendevent(
         new_status   = new_status,
         global_name  = global_name,
         global_value = global_value,
+        comment      = comment_text,
         source       = source.lower(),
     )
 

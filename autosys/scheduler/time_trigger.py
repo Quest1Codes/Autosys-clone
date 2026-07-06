@@ -30,7 +30,11 @@ Usage
 from __future__ import annotations
 
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from autosys.models.calendar import Calendar
+    from autosys.db.schema import JobRow
 
 from loguru import logger
 
@@ -111,7 +115,7 @@ def _get_matching_start_times(row, now: datetime) -> list[str]:
     return [t for t in times if t == current_hhmm]
 
 
-def is_triggered(row, now: datetime) -> bool:
+def is_triggered(row: 'JobRow', now: datetime, calendars: Optional[dict[str, 'Calendar']] = None) -> bool:
     """
     Return True if this job's schedule should fire right now.
 
@@ -125,6 +129,8 @@ def is_triggered(row, now: datetime) -> bool:
         A ``JobRow`` (or stub with the same attrs).
     now:
         The current datetime.  Injectable for testing.
+    calendars:
+        A dictionary of calendar names to Calendar models.
 
     Returns
     -------
@@ -144,6 +150,18 @@ def is_triggered(row, now: datetime) -> bool:
 
     today = now.date()
 
+    calendars = calendars or {}
+
+    if hasattr(row, "run_calendar") and row.run_calendar:
+        run_cal = calendars.get(row.run_calendar)
+        if not run_cal or not run_cal.contains(today):
+            return False
+
+    if hasattr(row, "exclude_calendar") and row.exclude_calendar:
+        ex_cal = calendars.get(row.exclude_calendar)
+        if ex_cal and ex_cal.contains(today):
+            return False
+
     if not _should_run_today(row, today):
         return False
 
@@ -161,7 +179,7 @@ def is_triggered(row, now: datetime) -> bool:
     return True
 
 
-def get_triggered_jobs(rows: list, now: datetime) -> list:
+def get_triggered_jobs(rows: list, now: datetime, calendars: Optional[dict[str, 'Calendar']] = None) -> list:
     """
     Filter *rows* to those whose schedule fires at *now*.
 
@@ -171,6 +189,8 @@ def get_triggered_jobs(rows: list, now: datetime) -> list:
         A list of ``JobRow`` objects (from ``job_repo.list_all``).
     now:
         Current datetime (injectable for testing).
+    calendars:
+        A dictionary of calendar names to Calendar models.
 
     Returns
     -------
@@ -185,4 +205,4 @@ def get_triggered_jobs(rows: list, now: datetime) -> list:
     >>> [r.job_name for r in to_start]
     ['demo_etl_box']
     """
-    return [row for row in rows if is_triggered(row, now)]
+    return [row for row in rows if is_triggered(row, now, calendars)]

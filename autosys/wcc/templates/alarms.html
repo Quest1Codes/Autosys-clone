@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% set page = "alarms" %}
+
+{% block title %}Alarms — AutoSys WCC{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  Alarm Console
+  {% if n_active > 0 %}
+    <span class="status-badge status-failure" style="margin-left:8px">{{ n_active }} active</span>
+  {% else %}
+    <span class="status-badge status-success" style="margin-left:8px">All clear</span>
+  {% endif %}
+</div>
+
+<!-- Filter -->
+<form method="get" class="filters">
+  <select class="filter-input" name="active" onchange="this.form.submit()">
+    <option value=""      {% if filter_active == '' %}selected{% endif %}>All alarms</option>
+    <option value="true"  {% if filter_active == 'true' %}selected{% endif %}>Active only</option>
+    <option value="false" {% if filter_active == 'false' %}selected{% endif %}>Resolved only</option>
+  </select>
+  <a href="/alarms" class="btn btn-ghost">Clear</a>
+</form>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Alarms ({{ alarms | length }})</span>
+    <span style="font-size:12px;color:#64748b">Resolve via POST /api/v1/alarms/{id}/resolve</span>
+  </div>
+  {% if alarms %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>State</th>
+          <th>Type</th>
+          <th>Job</th>
+          <th>Message</th>
+          <th>Raised At</th>
+          <th>Cleared At</th>
+          <th>Cleared By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in alarms %}
+        <tr>
+          <td>
+            {% if a.active %}
+              <span class="status-badge status-failure">ACTIVE</span>
+            {% else %}
+              <span class="status-badge status-success">RESOLVED</span>
+            {% endif %}
+          </td>
+          <td style="font-weight:600;color:#fbbf24">{{ a.alarm_type }}</td>
+          <td><a href="/jobs/{{ a.job_name }}" class="mono">{{ a.job_name }}</a></td>
+          <td style="color:#94a3b8;font-size:12px;max-width:320px">{{ a.message }}</td>
+          <td style="font-size:12px;color:#64748b">{{ a.raised_at }}</td>
+          <td style="font-size:12px;color:{% if a.cleared_at %}#4ade80{% else %}#334155{% endif %}">
+            {{ a.cleared_at or '—' }}
+          </td>
+          <td style="font-size:12px;color:#94a3b8">{{ a.cleared_by }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="padding:48px;text-align:center;color:#334155">
+    {% if filter_active == 'true' %}No active alarms.{% elif filter_active == 'false' %}No resolved alarms.{% else %}No alarms recorded.{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

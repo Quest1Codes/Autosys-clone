@@ -4,7 +4,7 @@ A full-fidelity clone of **CA Workload Automation AE (AutoSys)** built in Python
 Every component maps 1-to-1 to the real AutoSys architecture. Built phase-by-phase
 so each layer is fully tested before the next is added on top of it.
 
-> **Current status:** Phases 1–7 complete · 496 tests passing · ~11,700 lines of production code
+> **Current status:** Phases 1–10 complete · 665 tests passing · ~14,200 lines of production code
 
 ---
 

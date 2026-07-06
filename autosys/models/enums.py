@@ -8,7 +8,7 @@ human-readable and directly comparable to real AutoSys output.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, IntEnum
 
 
 # ---------------------------------------------------------------------------
@@ -30,13 +30,21 @@ class JobType(str, Enum):
     FTP       = "FTP"
     FILEWATCH = "FILEWATCH"
     CONNECT   = "CONNECT"
+    SAP       = "SAP"
+    PEOPLESOFT = "PEOPLESOFT"
+    INFORMATICA = "INFORMATICA"
+    MICROFOCUS = "MICROFOCUS"
+    WEBSERVICE = "WEBSERVICE"
+    REMOTECMD = "REMOTECMD"
+    WOL       = "WOL"
+    USERDEFINED = "USERDEFINED"
 
 
 # ---------------------------------------------------------------------------
 # Job / Run Status  (the full 12-state AutoSys state machine)
 # ---------------------------------------------------------------------------
 
-class JobStatus(str, Enum):
+class JobStatus(IntEnum):
     """Current runtime state of a job.
 
     Transitions are enforced by state_machine.py (Phase 3).
@@ -63,20 +71,30 @@ class JobStatus(str, Enum):
                             eligible to run.
     QUE_WAIT              - Job is ready to run but is blocked waiting
                             for a virtual resource slot (max_load).
+    PEND_MACH             - Waiting for a machine to become available.
+    RESWAIT               - Waiting for resource.
+    ON_NOEXEC             - Job bypassed execution.
+    SUSPENDED             - Job suspended.
     """
-    INACTIVE             = "INACTIVE"
-    WAIT_REPLY           = "WAIT_REPLY"
-    ON_HOLD              = "ON_HOLD"
-    ON_ICE               = "ON_ICE"
-    STARTING             = "STARTING"
-    RUNNING              = "RUNNING"
-    SUCCESS              = "SUCCESS"
-    FAILURE              = "FAILURE"
-    TERMINATED           = "TERMINATED"
-    RESTART              = "RESTART"
-    REFRESH_DEPENDENCIES = "REFRESH_DEPENDENCIES"
-    ACTIVATED            = "ACTIVATED"
-    QUE_WAIT             = "QUE_WAIT"
+    RUNNING              = 1
+    STARTING             = 3
+    SUCCESS              = 4
+    FAILURE              = 5
+    TERMINATED           = 6
+    ON_ICE               = 7
+    INACTIVE             = 8
+    ACTIVATED            = 9
+    RESTART              = 10
+    ON_HOLD              = 11
+    QUE_WAIT             = 12
+    WAIT_REPLY           = 13
+    PEND_MACH            = 14
+    RESWAIT              = 15
+    ON_NOEXEC            = 16
+    SUSPENDED            = 17
+    
+    # Internal virtual state for state machine transitions
+    REFRESH_DEPENDENCIES = 99
 
 
 # ---------------------------------------------------------------------------
@@ -105,12 +123,16 @@ class EventType(str, Enum):
     STARTJOB        = "STARTJOB"
     FORCE_STARTJOB  = "FORCE_STARTJOB"
     KILLJOB         = "KILLJOB"
-    HOLD_JOB        = "HOLD_JOB"
-    JOB_OFF_HOLD    = "JOB_OFF_HOLD"
-    JOB_ON_ICE      = "JOB_ON_ICE"
-    JOB_OFF_ICE     = "JOB_OFF_ICE"
     CHANGE_STATUS   = "CHANGE_STATUS"
     SET_GLOBAL      = "SET_GLOBAL"
+    HOLD_JOB        = "HOLD_JOB"
+    JOB_ON_ICE      = "JOB_ON_ICE"
+    JOB_OFF_HOLD    = "JOB_OFF_HOLD"
+    JOB_OFF_ICE     = "JOB_OFF_ICE"
+    ALARM           = "ALARM"
+    COMMENT         = "COMMENT"
+    REPLY_RESPONSE  = "REPLY_RESPONSE"
+    RELEASE_RESOURCE = "RELEASE_RESOURCE"
     CHECK_HEARTBEAT = "CHECK_HEARTBEAT"
     SEND_ALERT      = "SEND_ALERT"
 

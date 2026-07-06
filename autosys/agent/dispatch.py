@@ -42,7 +42,7 @@ from __future__ import annotations
 import socket
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from loguru import logger
@@ -53,6 +53,23 @@ from autosys.db.repository import jobs as job_repo, runs as run_repo, output as 
 from autosys.db.schema import JobRow
 from autosys.agent.runner import LocalJobRunner
 from autosys.parser.variable_sub import substitute, UndefinedVariableError
+from autosys.models.event import Event
+
+
+def _now() -> datetime:
+    """Return current time in UTC (matches schema column defaults)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _exit_code_to_status(exit_code: int, max_exit_success: Optional[int]) -> str:
+    """
+    Map a subprocess exit code to 'SUCCESS' or 'FAILURE'.
+
+    If max_exit_success is set, any exit code <= max_exit_success is SUCCESS.
+    Otherwise only exit code 0 is SUCCESS (AutoSys default).
+    """
+    threshold = max_exit_success if max_exit_success is not None else 0
+    return "SUCCESS" if exit_code <= threshold else "FAILURE"
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +126,7 @@ class AgentDispatch:
           - ``row.status``     ← "RUNNING"  (on successful dispatch)
           - ``row.last_start`` ← now
         """
-        now     = datetime.now()
+        now     = _now()
         machine = row.machine or "localhost"
 
         if _is_local_machine(machine):
@@ -154,9 +171,13 @@ class AgentDispatch:
         with self._lock:
             self._active[row.job_name] = (runner, run_id)
 
+        # Capture retry config before session closes
+        n_retrys        = row.n_retrys or 0
+        max_exit_success = row.max_exit_success
+
         t = threading.Thread(
             target = self._run_job,
-            args   = (row.job_name, run_id, runner),
+            args   = (row.job_name, run_id, runner, n_retrys, max_exit_success),
             daemon = True,
             name   = f"agent-{row.job_name}",
         )
@@ -222,55 +243,113 @@ class AgentDispatch:
 
     def _run_job(
         self,
-        job_name: str,
-        run_id:   str,
-        runner:   LocalJobRunner,
+        job_name:         str,
+        run_id:           str,
+        runner:           LocalJobRunner,
+        n_retrys:         int = 0,
+        max_exit_success: Optional[int] = None,
     ) -> None:
         """
         Execute the job and update the DB when it finishes.
+
+        Implements the n_retrys retry loop: if a job fails and retries remain,
+        it transitions FAILURE → RESTART → re-runs the command.
 
         Runs entirely in a background thread so the EPS tick is not blocked.
         Opens its own DB session (separate from the dispatch session which has
         already been committed).
         """
-        was_killed = False
+        was_killed  = False
+        retry_count = 0
 
-        try:
-            exit_code = runner.run()
-        except Exception as exc:
-            logger.error("[agent] unhandled error in %r: %s", job_name, exc)
-            exit_code  = -1
-        finally:
+        while True:
+            try:
+                exit_code = runner.run()
+            except Exception as exc:
+                logger.error("[agent] unhandled error in %r: %s", job_name, exc)
+                exit_code = -1
+
             with self._lock:
                 self._active.pop(job_name, None)
 
-        # Determine terminal status
-        now    = datetime.now()
-        status = "SUCCESS" if exit_code == 0 else "FAILURE"
+            now    = _now()
+            status = _exit_code_to_status(exit_code, max_exit_success)
 
-        with sync_session() as session:
-            # Check if the EPS already set TERMINATED (via KILLJOB event)
-            job_row = job_repo.get_row(session, job_name)
-            if job_row:
-                if job_row.status == "TERMINATED":
-                    # Respect the KILLJOB transition — just update history
-                    status    = "TERMINATED"
+            # Check for KILLJOB (EPS may have set TERMINATED while we ran)
+            with sync_session() as session:
+                job_row = job_repo.get_row(session, job_name)
+                if job_row and job_row.status == "TERMINATED":
+                    status     = "TERMINATED"
                     was_killed = True
-                else:
-                    job_row.status   = status
-                    job_row.last_end = now
 
-            run_repo.finish(
-                session,
-                run_id    = run_id,
-                status    = status,
-                exit_code = exit_code,
-                pid       = runner.pid,
-            )
+            if status == "FAILURE" and not was_killed and retry_count < n_retrys:
+                retry_count += 1
+                logger.info(
+                    "[agent] %r FAILURE — retry %d/%d",
+                    job_name, retry_count, n_retrys,
+                )
+                with sync_session() as session:
+                    job_row = job_repo.get_row(session, job_name)
+                    if job_row:
+                        job_row.status = "RESTART"
+                    run_repo.finish(
+                        session,
+                        run_id    = run_id,
+                        status    = "FAILURE",
+                        exit_code = exit_code,
+                        pid       = runner.pid,
+                    )
+
+                # Re-create a fresh runner for the next attempt
+                import uuid
+                run_id = str(uuid.uuid4())
+                runner = LocalJobRunner(
+                    command         = runner.command,
+                    job_name        = job_name,
+                    run_id          = run_id,
+                    max_run_secs    = runner.max_run_secs,
+                    output_callback = self._on_output_line,
+                )
+                with self._lock:
+                    self._active[job_name] = (runner, run_id)
+
+                with sync_session() as session:
+                    job_row = job_repo.get_row(session, job_name)
+                    if job_row:
+                        job_row.status     = "RUNNING"
+                        job_row.last_start = _now()
+                    run_repo.start(
+                        session,
+                        run_id   = run_id,
+                        job_name = job_name,
+                        command  = runner.command,
+                        machine  = "localhost",
+                        run_date = now.strftime("%Y-%m-%d"),
+                    )
+                continue  # back to top of while loop
+
+            # Terminal: no more retries (or SUCCESS/TERMINATED)
+            with sync_session() as session:
+                job_row = job_repo.get_row(session, job_name)
+                if job_row:
+                    if job_row.status != "TERMINATED":
+                        job_row.status   = status
+                        job_row.last_end = now
+                    else:
+                        status = "TERMINATED"
+
+                run_repo.finish(
+                    session,
+                    run_id    = run_id,
+                    status    = status,
+                    exit_code = exit_code,
+                    pid       = runner.pid,
+                )
+            break
 
         logger.info(
-            "[agent] %r completed  status=%s  exit_code=%d%s",
-            job_name, status, exit_code,
+            "[agent] %r completed  status=%s  exit_code=%d  retries=%d%s",
+            job_name, status, exit_code, retry_count,
             "  (killed)" if was_killed else "",
         )
 

@@ -387,51 +387,51 @@ class TestConditionEvaluate:
 
     def test_success_true_when_job_succeeded(self):
         node = parse_condition("success(a)")
-        assert evaluate(node, {"a": "SUCCESS"}) is True
+        assert evaluate(node, {"a": 4}) is True
 
     def test_success_false_when_job_running(self):
         node = parse_condition("success(a)")
-        assert evaluate(node, {"a": "RUNNING"}) is False
+        assert evaluate(node, {"a": 1}) is False
 
     def test_failure_true_when_job_failed(self):
         node = parse_condition("failure(a)")
-        assert evaluate(node, {"a": "FAILURE"}) is True
+        assert evaluate(node, {"a": 5}) is True
 
     def test_done_true_for_success(self):
         node = parse_condition("done(a)")
-        assert evaluate(node, {"a": "SUCCESS"}) is True
+        assert evaluate(node, {"a": 4}) is True
 
     def test_done_true_for_failure(self):
         node = parse_condition("done(a)")
-        assert evaluate(node, {"a": "FAILURE"}) is True
+        assert evaluate(node, {"a": 5}) is True
 
     def test_done_false_for_running(self):
         node = parse_condition("done(a)")
-        assert evaluate(node, {"a": "RUNNING"}) is False
+        assert evaluate(node, {"a": 1}) is False
 
     def test_notrunning_true_for_inactive(self):
         node = parse_condition("notrunning(a)")
-        assert evaluate(node, {"a": "INACTIVE"}) is True
+        assert evaluate(node, {"a": 8}) is True
 
     def test_notrunning_false_for_running(self):
         node = parse_condition("notrunning(a)")
-        assert evaluate(node, {"a": "RUNNING"}) is False
+        assert evaluate(node, {"a": 1}) is False
 
     def test_and_both_true(self):
         node = parse_condition("success(a) & success(b)")
-        assert evaluate(node, {"a": "SUCCESS", "b": "SUCCESS"}) is True
+        assert evaluate(node, {"a": 4, "b": 4}) is True
 
     def test_and_one_false(self):
         node = parse_condition("success(a) & success(b)")
-        assert evaluate(node, {"a": "SUCCESS", "b": "FAILURE"}) is False
+        assert evaluate(node, {"a": 4, "b": 5}) is False
 
     def test_or_one_true(self):
         node = parse_condition("success(a) | success(b)")
-        assert evaluate(node, {"a": "SUCCESS", "b": "FAILURE"}) is True
+        assert evaluate(node, {"a": 4, "b": 5}) is True
 
     def test_or_both_false(self):
         node = parse_condition("success(a) | success(b)")
-        assert evaluate(node, {"a": "FAILURE", "b": "FAILURE"}) is False
+        assert evaluate(node, {"a": 5, "b": 5}) is False
 
     def test_missing_job_treated_as_inactive(self):
         node = parse_condition("success(missing_job)")
@@ -452,13 +452,13 @@ class TestConditionEvaluate:
     def test_complex_fan_in_all_success(self):
         expr = "success(generate_report) & success(load_to_warehouse)"
         node = parse_condition(expr)
-        statuses = {"generate_report": "SUCCESS", "load_to_warehouse": "SUCCESS"}
+        statuses = {"generate_report": 4, "load_to_warehouse": 4}
         assert evaluate(node, statuses) is True
 
     def test_complex_fan_in_one_not_done(self):
         expr = "success(generate_report) & success(load_to_warehouse)"
         node = parse_condition(expr)
-        statuses = {"generate_report": "SUCCESS", "load_to_warehouse": "RUNNING"}
+        statuses = {"generate_report": 4, "load_to_warehouse": 1}
         assert evaluate(node, statuses) is False
 
 

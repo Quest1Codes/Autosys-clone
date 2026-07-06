@@ -73,9 +73,12 @@ from autosys.db.repository import (
     jobs as job_repo,
     events as event_repo,
     globs as glob_repo,
+    calendars as calendar_repo,
 )
 from autosys.db.schema import EventQueueRow, JobRow
+from autosys.models.calendar import Calendar
 from autosys.models.event import Event
+from autosys.models.enums import JobStatus
 from autosys.scheduler.condition_evaluator import is_satisfied, build_status_snapshot
 from autosys.scheduler.state_machine import (
     validate_transition,
@@ -83,6 +86,34 @@ from autosys.scheduler.state_machine import (
     InvalidTransitionError,
 )
 from autosys.scheduler.time_trigger import get_triggered_jobs
+import json
+
+
+def _in_run_window(run_window: str, now: "datetime") -> bool:
+    """
+    Return True if *now* falls within the HH:MM-HH:MM run_window string.
+
+    AutoSys run_window format: "HH:MM-HH:MM" (e.g. "08:00-18:00").
+    Handles overnight windows (e.g. "22:00-06:00") correctly.
+    If the window string is malformed, returns True (fail-open).
+    """
+    try:
+        parts = run_window.strip().split("-")
+        if len(parts) != 2:
+            return True
+        start_str, end_str = parts
+        start_h, start_m = int(start_str.split(":")[0]), int(start_str.split(":")[1])
+        end_h,   end_m   = int(end_str.split(":")[0]),   int(end_str.split(":")[1])
+        now_mins   = now.hour * 60 + now.minute
+        start_mins = start_h * 60 + start_m
+        end_mins   = end_h   * 60 + end_m
+        if start_mins <= end_mins:
+            return start_mins <= now_mins <= end_mins
+        else:
+            # Overnight window: e.g. 22:00-06:00
+            return now_mins >= start_mins or now_mins <= end_mins
+    except Exception:
+        return True  # fail-open on malformed window
 
 
 # ===========================================================================
@@ -106,7 +137,7 @@ def _stub_dispatch(session: Session, row: JobRow) -> None:
     that ACK happening instantaneously for testing purposes.
     """
     logger.info("[stub] Dispatching %r — simulating RUNNING", row.job_name)
-    row.status     = "RUNNING"
+    row.status = JobStatus.RUNNING.value
     row.last_start = datetime.now()
 
 
@@ -138,6 +169,8 @@ class EventProcessor:
         poll_interval:    float                      = 1.0,
         auto_complete:    bool                       = True,
         on_status_change: Optional[callable]         = None,
+        alarm_manager:    Optional[object]           = None,
+        dispatcher:       Optional[object]           = None,
     ) -> None:
         from autosys.scheduler.box_manager import BoxManager
         self._dispatch_fn      = dispatch_fn or _stub_dispatch
@@ -155,6 +188,8 @@ class EventProcessor:
             kill_fn       = kill_fn,
             auto_complete = auto_complete,
         )
+        self._alarm_manager    = alarm_manager
+        self._dispatcher       = dispatcher
 
     # ------------------------------------------------------------------
     # WebSocket broadcast helper
@@ -246,7 +281,19 @@ class EventProcessor:
 
         # 3. Check time triggers (enqueue STARTJOB events for next tick)
         rows = job_repo.list_all(session)
-        for row in get_triggered_jobs(rows, now):
+        cal_rows = calendar_repo.list_all(session)
+        calendars = {}
+        for r in cal_rows:
+            try:
+                parsed_dates = json.loads(r.dates_json) if r.dates_json else []
+            except json.JSONDecodeError:
+                parsed_dates = []
+            calendars[r.calendar_name] = Calendar(
+                calendar_name=r.calendar_name,
+                dates=parsed_dates,
+                description=r.description,
+            )
+        for row in get_triggered_jobs(rows, now, calendars):
             ev = Event(
                 event_type = "STARTJOB",
                 job_name   = row.job_name,
@@ -258,10 +305,60 @@ class EventProcessor:
                 row.job_name, now.strftime("%H:%M"),
             )
 
+        # 4. Alarm evaluation (Phase 10)
+        if self._alarm_manager is not None:
+            try:
+                new_alarms = self._alarm_manager.evaluate(session, now)
+                if self._dispatcher is not None:
+                    for alarm in new_alarms:
+                        try:
+                            self._dispatcher.send(alarm)
+                        except Exception as exc:
+                            logger.warning("Dispatcher.send error: %s", exc)
+            except Exception as exc:
+                logger.error("AlarmManager.evaluate error: %s", exc)
+
         return n
 
+    def _handle_comment(
+        self,
+        session: Session,
+        ev: EventQueueRow,
+        snapshot: dict[str, str],
+        now: datetime,
+    ) -> None:
+        logger.info("COMMENT: %r - %s", ev.job_name, ev.payload.get("comment", ""))
+        self._emit_status_change(ev.job_name, "COMMENT", ev.payload.get("comment", ""))
+
+    def _handle_reply_response(
+        self,
+        session: Session,
+        ev: EventQueueRow,
+        snapshot: dict[str, str],
+        now: datetime,
+    ) -> None:
+        logger.info("REPLY_RESPONSE: %r", ev.job_name)
+
+    def _handle_alarm(
+        self,
+        session: Session,
+        ev: EventQueueRow,
+        snapshot: dict[str, str],
+        now: datetime,
+    ) -> None:
+        logger.info("ALARM: %r", ev.job_name)
+
+    def _handle_release_resource(
+        self,
+        session: Session,
+        ev: EventQueueRow,
+        snapshot: dict[str, str],
+        now: datetime,
+    ) -> None:
+        logger.info("RELEASE_RESOURCE: %r", ev.job_name)
+
     # ------------------------------------------------------------------
-    # Async daemon loop
+    # Agent Heartbeat
     # ------------------------------------------------------------------
 
     async def run_forever(self) -> None:
@@ -317,6 +414,10 @@ class EventProcessor:
             "CHANGE_STATUS":   self._handle_change_status,
             "SET_GLOBAL":      self._handle_set_global,
             "CHECK_HEARTBEAT": self._handle_check_heartbeat,
+            "COMMENT":         self._handle_comment,
+            "REPLY_RESPONSE":  self._handle_reply_response,
+            "ALARM":           self._handle_alarm,
+            "RELEASE_RESOURCE": self._handle_release_resource,
         }.get(ev.event_type)
 
         if handler is None:
@@ -346,7 +447,7 @@ class EventProcessor:
             logger.warning("STARTJOB: job %r not found", ev.job_name)
             return
 
-        if not is_startable(row.status or "INACTIVE"):
+        if not is_startable(row.status or JobStatus.INACTIVE.value):
             logger.info(
                 "STARTJOB: %r is %s — not startable, skipping",
                 ev.job_name, row.status,
@@ -410,7 +511,7 @@ class EventProcessor:
             logger.warning("KILLJOB: job %r not found", ev.job_name)
             return
 
-        if row.status not in ("RUNNING", "STARTING", "ACTIVATED"):
+        if row.status not in (JobStatus.RUNNING.value, JobStatus.STARTING.value, JobStatus.ACTIVATED.value):
             logger.info(
                 "KILLJOB: %r is %s (not killable) — skipping",
                 ev.job_name, row.status,
@@ -434,8 +535,8 @@ class EventProcessor:
             except Exception as exc:
                 logger.warning("KILLJOB: kill_fn raised %s", exc)
 
-        old_status = row.status or "RUNNING"
-        row.status  = "TERMINATED"
+        old_status = row.status or JobStatus.RUNNING.value
+        row.status = JobStatus.TERMINATED.value
         row.last_end = now
         logger.info("KILLJOB: %r → TERMINATED", ev.job_name)
         self._emit_status_change(ev.job_name, old_status, "TERMINATED")
@@ -459,7 +560,7 @@ class EventProcessor:
         except InvalidTransitionError as exc:
             logger.warning("HOLD_JOB: %s", exc)
             return
-        row.status = "ON_HOLD"
+        row.status = JobStatus.ON_HOLD.value
         logger.info("HOLD_JOB: %r → ON_HOLD", ev.job_name)
 
     def _handle_off_hold(
@@ -474,13 +575,13 @@ class EventProcessor:
         if row is None:
             logger.warning("JOB_OFF_HOLD: job %r not found", ev.job_name)
             return
-        if row.status != "ON_HOLD":
+        if row.status != JobStatus.ON_HOLD.value:
             logger.info(
                 "JOB_OFF_HOLD: %r is %s (not ON_HOLD) — skipping",
                 ev.job_name, row.status,
             )
             return
-        row.status = "INACTIVE"
+        row.status = JobStatus.INACTIVE.value
         logger.info("JOB_OFF_HOLD: %r → INACTIVE", ev.job_name)
 
     # -- JOB_ON_ICE / JOB_OFF_ICE ----------------------------------------
@@ -502,7 +603,7 @@ class EventProcessor:
         except InvalidTransitionError as exc:
             logger.warning("JOB_ON_ICE: %s", exc)
             return
-        row.status = "ON_ICE"
+        row.status = JobStatus.ON_ICE.value
         logger.info("JOB_ON_ICE: %r → ON_ICE", ev.job_name)
 
     def _handle_off_ice(
@@ -517,13 +618,13 @@ class EventProcessor:
         if row is None:
             logger.warning("JOB_OFF_ICE: job %r not found", ev.job_name)
             return
-        if row.status != "ON_ICE":
+        if row.status != JobStatus.ON_ICE.value:
             logger.info(
                 "JOB_OFF_ICE: %r is %s (not ON_ICE) — skipping",
                 ev.job_name, row.status,
             )
             return
-        row.status = "INACTIVE"
+        row.status = JobStatus.INACTIVE.value
         logger.info("JOB_OFF_ICE: %r → INACTIVE", ev.job_name)
 
     # -- CHANGE_STATUS ---------------------------------------------------
@@ -554,11 +655,30 @@ class EventProcessor:
             return
 
         old_status  = row.status
-        row.status  = ev.new_status.upper()
+        row.status = ev.new_status
         logger.info(
             "CHANGE_STATUS: %r  %s → %s  (forced by operator)",
             ev.job_name, old_status, row.status,
         )
+
+        if row.status in (JobStatus.SUCCESS.value, JobStatus.FAILURE.value, JobStatus.TERMINATED.value):
+            import uuid
+            from autosys.db.repository import runs as run_repo
+            run_id = str(uuid.uuid4())
+            run_repo.start(
+                session,
+                run_id=run_id,
+                job_name=row.job_name,
+                command=row.command or "",
+                machine=row.machine or "localhost",
+                run_date=now.strftime("%Y-%m-%d"),
+            )
+            run_repo.finish(
+                session,
+                run_id=run_id,
+                status=row.status,
+                exit_code=0 if row.status == JobStatus.SUCCESS.value else 1,
+            )
 
     # -- SET_GLOBAL ------------------------------------------------------
 
@@ -574,7 +694,8 @@ class EventProcessor:
 
         After setting the variable, re-evaluate all INACTIVE jobs whose
         condition references ``value(VARNAME)`` — one of them might now be
-        unblocked.
+        unblocked.  We enqueue a STARTJOB event for each newly eligible job
+        so the EPS picks it up on the next tick.
         """
         if not ev.global_name or ev.global_value is None:
             logger.warning("SET_GLOBAL: missing global_name or global_value")
@@ -589,15 +710,21 @@ class EventProcessor:
         # Re-evaluate waiting jobs in case this variable change unblocked them.
         # Rebuild snapshot to include updated globals in condition evaluation.
         updated_snapshot = build_status_snapshot(session)
+        all_globals      = glob_repo.as_dict(session)
         rows = job_repo.list_all(session)
         for row in rows:
-            if (row.status or "INACTIVE") == "INACTIVE" and row.condition:
+            if (row.status or JobStatus.INACTIVE.value) == "INACTIVE" and row.condition:
                 if "value(" in row.condition.lower():
-                    if is_satisfied(row.condition, updated_snapshot):
+                    if is_satisfied(row.condition, updated_snapshot, globals_dict=all_globals):
                         logger.info(
-                            "SET_GLOBAL: %r unblocked by %s=%r",
+                            "SET_GLOBAL: %r unblocked by %s=%r — enqueuing STARTJOB",
                             row.job_name, ev.global_name, ev.global_value,
                         )
+                        event_repo.enqueue(session, Event(
+                            event_type = "STARTJOB",
+                            job_name   = row.job_name,
+                            source     = "scheduler",
+                        ))
 
     # -- CHECK_HEARTBEAT -------------------------------------------------
 
@@ -685,6 +812,14 @@ class EventProcessor:
         now: datetime,
     ) -> None:
         """Transition a CMD/FILEWATCH/FTP job to STARTING and dispatch."""
+        # Check run_window before activating
+        if row.run_window and not _in_run_window(row.run_window, now):
+            logger.info(
+                "STARTJOB: %r outside run_window %r at %s — skipping",
+                row.job_name, row.run_window, now.strftime("%H:%M"),
+            )
+            return
+
         try:
             validate_transition(row.job_name, row.status or "INACTIVE", "STARTING")
         except InvalidTransitionError as exc:
@@ -692,18 +827,18 @@ class EventProcessor:
             return
 
         old_status = row.status or "INACTIVE"
-        row.status     = "STARTING"
+        row.status = JobStatus.STARTING.value
         row.last_start = now
         row.last_run_date = now.strftime("%Y-%m-%d")
         logger.info("STARTJOB: %r → STARTING", row.job_name)
         self._emit_status_change(row.job_name, old_status, "STARTING")
 
-        # Call the dispatcher (stub in Phase 4, real in Phase 5)
+        # Call the dispatcher (stub in Phase 4, real AgentDispatch in Phase 5+)
         self._dispatch_fn(session, row)
 
-        if self.auto_complete and row.status == "RUNNING":
+        if self.auto_complete and row.status == JobStatus.RUNNING.value:
             self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
-            row.status  = "SUCCESS"
+            row.status = JobStatus.SUCCESS.value
             row.last_end = now
             logger.info("STARTJOB: %r → SUCCESS (auto-complete stub)", row.job_name)
 
@@ -730,7 +865,7 @@ class EventProcessor:
             return
 
         old_status = row.status or "INACTIVE"
-        row.status     = "ACTIVATED"
+        row.status = JobStatus.ACTIVATED.value
         row.last_start = now
         row.last_run_date = now.strftime("%Y-%m-%d")
         logger.info("STARTJOB: BOX %r → ACTIVATED", row.job_name)
@@ -796,7 +931,7 @@ class EventProcessor:
         if not children:
             # Empty BOX → SUCCESS immediately
             old = box_row.status or "ACTIVATED"
-            box_row.status  = "SUCCESS"
+            box_row.status = JobStatus.SUCCESS.value
             box_row.last_end = now
             self._emit_status_change(box_row.job_name, old, "SUCCESS")
             return
@@ -806,16 +941,16 @@ class EventProcessor:
         old      = box_row.status or "ACTIVATED"
 
         if any(s == "RUNNING" or s == "STARTING" for s in vals):
-            if box_row.status == "ACTIVATED":
-                box_row.status = "RUNNING"
+            if box_row.status == JobStatus.ACTIVATED.value:
+                box_row.status = JobStatus.RUNNING.value
                 self._emit_status_change(box_row.job_name, old, "RUNNING")
         elif any(s == "FAILURE" for s in vals):
-            box_row.status  = "FAILURE"
+            box_row.status = JobStatus.FAILURE.value
             box_row.last_end = now
             logger.info("BOX %r → FAILURE (child failed)", box_row.job_name)
             self._emit_status_change(box_row.job_name, old, "FAILURE")
         elif all(s == "SUCCESS" for s in vals):
-            box_row.status  = "SUCCESS"
+            box_row.status = JobStatus.SUCCESS.value
             box_row.last_end = now
             logger.info("BOX %r → SUCCESS (all children succeeded)", box_row.job_name)
             self._emit_status_change(box_row.job_name, old, "SUCCESS")

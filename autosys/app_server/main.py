@@ -28,7 +28,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
+from pathlib import Path
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -37,7 +41,7 @@ from autosys.app_server.deps        import get_session, get_current_user, Curren
 from autosys.app_server.schemas     import (
     TokenRequest, TokenResponse, HealthResponse,
 )
-from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router
+from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router
 from autosys.db.connection          import sync_session
 
 
@@ -82,9 +86,14 @@ def create_app(
         eps_task: Optional[asyncio.Task] = None
         if start_eps:
             from autosys.scheduler.event_processor import EventProcessor
+            from autosys.agent.dispatch import AgentDispatch
+            agent = AgentDispatch(local_only=False)
             processor = EventProcessor(
                 poll_interval = eps_poll_interval,
                 on_status_change = _broadcaster.publish_sync,
+                dispatch_fn = agent.dispatch,
+                kill_fn = agent.kill,
+                auto_complete = False,
             )
             eps_task = asyncio.create_task(
                 processor.run_forever(),
@@ -126,6 +135,8 @@ def create_app(
     app.include_router(runs.router)
     app.include_router(machines.router)
     app.include_router(globals_router.router)
+    app.include_router(jil_router.router)
+    app.include_router(alarms_router.router)
 
     # --- Auth ---
     _register_auth_routes(app)
@@ -135,6 +146,9 @@ def create_app(
 
     # --- Health ---
     _register_health_routes(app)
+
+    # --- Static UI ---
+    _mount_static(app)
 
     return app
 
@@ -228,3 +242,24 @@ def _register_health_routes(app: FastAPI) -> None:
                 detail      = f"Database unavailable: {exc}",
             )
         return HealthResponse(status="ok", db=db_status)
+
+
+# ---------------------------------------------------------------------------
+# Static UI
+# ---------------------------------------------------------------------------
+
+_STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _mount_static(app: FastAPI) -> None:
+    """Serve the single-page JIL UI at GET /ui and its static assets."""
+
+    if not _STATIC_DIR.exists():
+        logger.warning("Static directory not found: {}", _STATIC_DIR)
+        return
+
+    @app.get("/ui", tags=["ui"], include_in_schema=False)
+    def serve_ui():
+        return FileResponse(str(_STATIC_DIR / "index.html"))
+
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

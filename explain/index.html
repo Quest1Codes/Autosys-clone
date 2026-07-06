@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoSys Clone Documentation</title>
+    <meta name="description" content="Detailed explanation and tutorial of the AutoSys clone codebase.">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>mermaid.initialize({ startOnLoad: false, theme: 'dark' });</script>
+</head>
+<body>
+    
+    <aside class="sidebar">
+        <div class="logo-container">
+            <h1>AutoSys Clone</h1>
+            <p>Interactive Documentation</p>
+            
+            <div class="mode-toggle">
+                <button id="btn-tutorial" class="mode-btn active" onclick="setMode('tutorial')" title="Technical Tutorial">
+                    <i class="ph-chalkboard-teacher"></i> Tutorial
+                </button>
+                <button id="btn-kids" class="mode-btn" onclick="setMode('kids')" title="Teach a 10-Year-Old">
+                    <i class="ph-baby"></i> For Kids
+                </button>
+                <button id="btn-explorer" class="mode-btn" onclick="setMode('explorer')" title="Code Explorer">
+                    <i class="ph-code"></i> Explorer
+                </button>
+            </div>
+        </div>
+        <ul class="nav-links" id="nav-list">
+            <!-- Navigation items injected by JS -->
+        </ul>
+    </aside>
+
+    <main class="main-content">
+        <div class="header-section" id="content-header">
+            <!-- Header injected by JS -->
+        </div>
+        
+        <div class="content-container" id="main-container">
+            <!-- Cards or Tutorial content injected by JS -->
+        </div>
+    </main>
+
+    <script src="data.js"></script>
+    <script src="tutorial.js"></script>
+    <script src="kids.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

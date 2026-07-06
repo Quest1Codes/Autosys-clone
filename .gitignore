@@ -122,3 +122,12 @@ yarn-error.log*
 .npm
 .yarn-integrity
 dist/
+
+# ---------------------------------------------------------------------------
+# Scratch / temp files
+# ---------------------------------------------------------------------------
+test.txt
+tst_fix.txt
+fix_*.py
+run_agent_test.py
+e2e_check.py

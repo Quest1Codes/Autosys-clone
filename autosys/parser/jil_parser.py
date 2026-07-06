@@ -105,6 +105,7 @@ _BOOL_ATTRS: frozenset[str] = frozenset({
 # Attributes whose raw numeric strings should become Python ints.
 _INT_ATTRS: frozenset[str] = frozenset({
     "n_retrys",
+    "max_exit_success",
     "max_run_alarm",
     "min_run_alarm",
     "term_run_time",
@@ -120,7 +121,28 @@ _DIRECTIVE_TO_OP: dict[str, str] = {
     "update_job":      "update",
     "delete_job":      "delete",
     "override_job":    "override",
+    "rename_job":      "rename",
     "insert_machine":  "insert_machine",
+    "update_machine":  "update_machine",
+    "delete_machine":  "delete_machine",
+    "insert_job_type": "insert_job_type",
+    "update_job_type": "update_job_type",
+    "delete_job_type": "delete_job_type",
+    "insert_monbro":   "insert_monbro",
+    "update_monbro":   "update_monbro",
+    "delete_monbro":   "delete_monbro",
+    "insert_blob":     "insert_blob",
+    "delete_blob":     "delete_blob",
+    "insert_glob":     "insert_glob",
+    "delete_glob":     "delete_glob",
+    "insert_xinst":    "insert_xinst",
+    "update_xinst":    "update_xinst",
+    "delete_xinst":    "delete_xinst",
+    "insert_resource": "insert_resource",
+    "update_resource": "update_resource",
+    "delete_resource": "delete_resource",
+    "insert_connectionprofile": "insert_connectionprofile",
+    "delete_connectionprofile": "delete_connectionprofile",
 }
 
 # Machine integer attributes
@@ -261,8 +283,24 @@ class JILParser:
         raw_attrs: dict[str, str]    = {}
         coerced:   dict[str, Any]    = {}
 
-        # machine_name key differs from job_name (machine stanzas use "machine_name")
-        name_key = "machine_name" if op_code == "insert_machine" else "job_name"
+        if "machine" in op_code:
+            name_key = "machine_name"
+        elif "resource" in op_code:
+            name_key = "resource_name"
+        elif "glob" in op_code:
+            name_key = "global_name"
+        elif "blob" in op_code:
+            name_key = "blob_name"
+        elif "xinst" in op_code:
+            name_key = "xinst_name"
+        elif "monbro" in op_code:
+            name_key = "monbro_name"
+        elif "job_type" in op_code:
+            name_key = "job_type_name"
+        elif "connectionprofile" in op_code:
+            name_key = "profile_name"
+        else:
+            name_key = "job_name"
         raw_attrs[name_key] = name_tok.value
         coerced[name_key]   = name_tok.value
 
@@ -288,7 +326,7 @@ class JILParser:
 
         # --- Build the right Pydantic model ---
 
-        if op_code == "insert_machine":
+        if "machine" in op_code:
             # Coerce machine integer attrs separately (port, max_load)
             for attr in _MACHINE_INT_ATTRS:
                 if attr in coerced and isinstance(coerced[attr], str):
@@ -306,24 +344,34 @@ class JILParser:
                 source_line = source_line,
             )
 
-        # insert_job / override_job: full validation required.
-        # delete_job / update_job: may omit required fields.
-        if op_code in ("delete", "update") and "job_type" not in coerced:
-            job: Job = CmdJob.model_construct(
-                job_name=coerced.get("job_name", ""),
-                job_type=coerced.get("job_type", "CMD"),
-                **{k: v for k, v in coerced.items()
-                   if k not in ("job_name", "job_type")},
-            )
-        else:
-            job = parse_job(coerced)
+        elif op_code in ("insert", "update", "delete", "override", "rename"):
+            # insert_job / override_job: full validation required.
+            # delete_job / update_job / rename_job: may omit required fields.
+            if op_code in ("delete", "update", "rename") and "job_type" not in coerced:
+                job: Job = CmdJob.model_construct(
+                    job_name=coerced.get("job_name", ""),
+                    job_type=coerced.get("job_type", "CMD"),
+                    **{k: v for k, v in coerced.items()
+                       if k not in ("job_name", "job_type")},
+                )
+            else:
+                job = parse_job(coerced)
 
-        return JILOperation(
-            op          = op_code,
-            job         = job,
-            raw_attrs   = raw_attrs,
-            source_line = source_line,
-        )
+            return JILOperation(
+                op          = op_code,
+                job         = job,
+                raw_attrs   = raw_attrs,
+                source_line = source_line,
+            )
+        
+        else:
+            # Other directives (monbro, glob, blob, etc.)
+            return JILOperation(
+                op          = op_code,
+                job         = None,
+                raw_attrs   = raw_attrs,
+                source_line = source_line,
+            )
 
     # ------------------------------------------------------------------
     # Token navigation helpers

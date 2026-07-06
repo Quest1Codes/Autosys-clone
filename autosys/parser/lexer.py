@@ -131,14 +131,35 @@ _DIRECTIVES = frozenset({
     "update_job",
     "delete_job",
     "override_job",
-    "insert_machine",   # Phase 7: machine definitions
+    "rename_job",
+    "insert_machine",
+    "update_machine",
+    "delete_machine",
+    "insert_job_type",
+    "update_job_type",
+    "delete_job_type",
+    "insert_monbro",
+    "update_monbro",
+    "delete_monbro",
+    "insert_blob",
+    "delete_blob",
+    "insert_glob",
+    "delete_glob",
+    "insert_xinst",
+    "update_xinst",
+    "delete_xinst",
+    "insert_resource",
+    "update_resource",
+    "delete_resource",
+    "insert_connectionprofile",
+    "delete_connectionprofile",
 })
 
 # Stanza header line:  directive_name: job_name  [attr: val  attr: val  ...]
 # Group 1 = directive, Group 2 = job_name, Group 3 = rest of line (may be empty)
 _STANZA_HEADER_RE = re.compile(
     r'^\s*'
-    r'(insert_job|update_job|delete_job|override_job|insert_machine)'  # directive
+    r'(' + r'|'.join(_DIRECTIVES) + r')'  # directive
     r'\s*:\s*'
     r'(\S+)'                                              # job_name / machine_name
     r'(.*)?$',                                            # rest of line

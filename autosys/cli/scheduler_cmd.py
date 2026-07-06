@@ -58,7 +58,7 @@ def scheduler_group() -> None:
 @scheduler_group.command("start")
 @click.option("--poll-interval", "-p", default=1.0, show_default=True,
               help="Seconds between event queue polls.")
-@click.option("--auto-complete/--no-auto-complete", default=True,
+@click.option("--auto-complete/--no-auto-complete", default=False,
               help="Phase 4 stub: auto-complete jobs immediately after RUNNING.")
 def scheduler_start(poll_interval: float, auto_complete: bool) -> None:
     """
@@ -78,9 +78,13 @@ def scheduler_start(poll_interval: float, auto_complete: bool) -> None:
         Event Processor started (poll interval: 1.0s)
         ^C  Stopped.
     """
+    from autosys.agent.dispatch import AgentDispatch
+    agent = AgentDispatch(local_only=False)
     processor = EventProcessor(
         poll_interval = poll_interval,
         auto_complete = auto_complete,
+        dispatch_fn   = agent.dispatch,
+        kill_fn       = agent.kill,
     )
 
     _console.print(
@@ -264,6 +268,48 @@ def scheduler_serve(port: int, host: str, poll_interval: float) -> None:
     )
 
     app = create_app(start_eps=True, eps_poll_interval=poll_interval)
+
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="warning")
+    except KeyboardInterrupt:
+        _console.print("\n[yellow]Stopped.[/yellow]\n")
+
+
+# ---------------------------------------------------------------------------
+# scheduler wcc
+# ---------------------------------------------------------------------------
+
+@scheduler_group.command("wcc")
+@click.option("--host", default="0.0.0.0", show_default=True, help="Bind host.")
+@click.option("--port", default=8080, show_default=True, help="WCC HTTP port.")
+def scheduler_wcc(host: str, port: int) -> None:
+    """
+    Start the WCC (Workload Control Centre) web dashboard on port 8080.
+
+    The WCC reads directly from the same SQLite database as the scheduler.
+    It provides a live job grid, D3 dependency graphs, alarm console, and
+    run history viewer.
+
+    Example
+    -------
+    \\b
+        $ autosys scheduler wcc --port 8080
+        AutoSys WCC Dashboard starting on http://0.0.0.0:8080
+        Open: http://localhost:8080
+        ^C  Stopped.
+    """
+    import uvicorn
+    from autosys.wcc.app import create_wcc_app
+
+    _console.print(
+        f"\n[bold cyan]AutoSys WCC Dashboard[/bold cyan] starting on "
+        f"[cyan]http://{host}:{port}[/cyan]\n"
+        f"  Job grid:   [bold]http://localhost:{port}/[/bold]\n"
+        f"  Alarms:     [bold]http://localhost:{port}/alarms[/bold]\n"
+        f"[dim]Ctrl+C to stop[/dim]\n"
+    )
+
+    app = create_wcc_app()
 
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning")

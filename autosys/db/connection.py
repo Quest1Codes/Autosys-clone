@@ -65,8 +65,11 @@ def _get_db_url(async_: bool = True) -> str:
     """
     raw = os.environ.get("AUTOSYS_DB_URL")
     if raw:
-        if async_ and raw.startswith("sqlite:///") and "aiosqlite" not in raw:
-            return raw.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+        if async_:
+            if raw.startswith("sqlite:///") and "aiosqlite" not in raw:
+                return raw.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+            elif raw.startswith("postgresql://") and "asyncpg" not in raw:
+                return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
         return raw
 
     _DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)

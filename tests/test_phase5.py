@@ -281,7 +281,7 @@ class TestAgentDispatch:
         with sync_session() as session:
             rows = run_repo.list_runs(session, "hist_job")
         assert len(rows) == 1
-        assert rows[0].status == "SUCCESS"
+        assert rows[0].status == 4
         assert rows[0].exit_code == 0
 
     def test_run_history_has_start_and_end_times(self):
@@ -380,7 +380,7 @@ class TestRunRepository:
             from autosys.db.schema import JobRunRow
             fetched = session.get(JobRunRow, "rid1")
         assert fetched is not None
-        assert fetched.status == "RUNNING"
+        assert fetched.status == 1
 
     def test_finish_updates_row(self):
         _seed_cmd("j")
@@ -391,7 +391,7 @@ class TestRunRepository:
         with sync_session() as session:
             from autosys.db.schema import JobRunRow
             row = session.get(JobRunRow, "rid2")
-        assert row.status    == "SUCCESS"
+        assert row.status    == 4
         assert row.exit_code == 0
         assert row.pid       == 12345
         assert row.end_time is not None
@@ -492,7 +492,7 @@ class TestEventProcessorKillFn:
             proc.process_one_tick(session)
 
         assert "kill_me" in killed
-        assert _get_status("kill_me") == "TERMINATED"
+        assert _get_status("kill_me") == 6
 
     def test_killjob_no_kill_fn_still_terminates(self):
         """KILLJOB without kill_fn still sets status to TERMINATED."""
@@ -502,7 +502,7 @@ class TestEventProcessorKillFn:
         proc = EventProcessor()
         with sync_session() as session:
             proc.process_one_tick(session)
-        assert _get_status("no_fn_job") == "TERMINATED"
+        assert _get_status("no_fn_job") == 6
 
 
 # ===========================================================================
