@@ -1,0 +1,94 @@
+/* ============================================================
+   FILE: 24_securities_lending.jil
+   DOMAIN: Securities Lending & Borrowing
+   STATUS: RUNNING
+   UPSTREAM: 03_trade_capture (trade_capture_box)
+             05_position_management (position_mgmt_box)
+   DOWNSTREAM: 05_position_management (lent positions), 11_gl_posting
+   ============================================================ */
+
+insert_job: sec_lending_box   job_type: BOX
+owner: svc_secfinance
+condition: success(trade_capture_box) & success(position_mgmt_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Match, confirm and settle securities lending and borrowing transactions"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "07:00,20:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: secfinance@bank.com
+
+/* Step 1: Identify available securities inventory for lending */
+insert_job: identify_lendable_inventory   job_type: CMD
+box_name: sec_lending_box
+owner: svc_secfinance
+command: /scripts/seclending/identify_lendable.py --date %%DATE%% --min_size 100000
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+std_out_file: /logs/seclending/%%YEAR%%/%%MM%%/lendable_%%DATE%%.out
+std_err_file: /logs/seclending/%%YEAR%%/%%MM%%/lendable_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Match internal supply and demand before going to agency lender */
+insert_job: match_internal_sec_lending   job_type: CMD
+box_name: sec_lending_box
+owner: svc_secfinance
+command: /scripts/seclending/internal_match.py --date %%DATE%%
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+condition: success(identify_lendable_inventory)
+std_out_file: /logs/seclending/%%YEAR%%/%%MM%%/internal_match_%%DATE%%.out
+std_err_file: /logs/seclending/%%YEAR%%/%%MM%%/internal_match_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Recall securities needed for client settlements */
+insert_job: recall_securities_for_settlement   job_type: CMD
+box_name: sec_lending_box
+owner: svc_secfinance
+command: /scripts/seclending/recall_securities.py --date %%DATE%% --settlement_date %%DATE%%
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+condition: success(match_internal_sec_lending)
+std_out_file: /logs/seclending/%%YEAR%%/%%MM%%/recalls_%%DATE%%.out
+std_err_file: /logs/seclending/%%YEAR%%/%%MM%%/recalls_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 4: Compute rebate fees and lending income for P&L */
+insert_job: compute_lending_fees   job_type: CMD
+box_name: sec_lending_box
+owner: svc_secfinance
+command: /scripts/seclending/compute_fees.py --date %%DATE%% --basis ACTUAL_360
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+condition: success(recall_securities_for_settlement)
+std_out_file: /logs/seclending/%%YEAR%%/%%MM%%/fees_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

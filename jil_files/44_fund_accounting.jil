@@ -1,0 +1,92 @@
+/* ============================================================
+   FILE: 44_fund_accounting.jil
+   DOMAIN: Fund Accounting
+   STATUS: INACTIVE (waiting on NAV + GL)
+   UPSTREAM: 13_portfolio_nav (portfolio_nav_box)
+             11_gl_posting (gl_posting_box)
+             23_dividend_processing (dividend_processing_box)
+   DOWNSTREAM: 45_transfer_agency, 30_client_reporting
+   ============================================================ */
+
+insert_job: fund_accounting_box   job_type: BOX
+owner: svc_fundacct
+condition: success(portfolio_nav_box) & success(gl_posting_box) & success(dividend_processing_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Fund-level accounting: expense accruals, equalization, income distribution"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,02:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: fund-ops@bank.com
+
+insert_job: compute_fund_expenses   job_type: CMD
+box_name: fund_accounting_box
+owner: svc_fundacct
+command: /scripts/fundacct/compute_expenses.py --date %%DATE%% --types MGMT_FEE,ADMIN_FEE,CUSTODY_FEE
+machine: nav-app-02
+profile: /etc/autosys/profiles/svc_fundacct.sh
+std_out_file: /logs/fundacct/%%YEAR%%/%%MM%%/expenses_%%DATE%%.out
+std_err_file: /logs/fundacct/%%YEAR%%/%%MM%%/expenses_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: compute_equalization_ledger   job_type: CMD
+box_name: fund_accounting_box
+owner: svc_fundacct
+command: /scripts/fundacct/equalization.py --date %%DATE%% --method EQUALISATION
+machine: nav-app-02
+profile: /etc/autosys/profiles/svc_fundacct.sh
+condition: success(compute_fund_expenses)
+std_out_file: /logs/fundacct/%%YEAR%%/%%MM%%/equalization_%%DATE%%.out
+std_err_file: /logs/fundacct/%%YEAR%%/%%MM%%/equalization_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: compute_income_distribution   job_type: CMD
+box_name: fund_accounting_box
+owner: svc_fundacct
+command: /scripts/fundacct/income_distribution.py --date %%DATE%% --distribution_type ACCUMULATING,DISTRIBUTING
+machine: nav-app-02
+profile: /etc/autosys/profiles/svc_fundacct.sh
+condition: success(compute_equalization_ledger)
+std_out_file: /logs/fundacct/%%YEAR%%/%%MM%%/income_%%DATE%%.out
+std_err_file: /logs/fundacct/%%YEAR%%/%%MM%%/income_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: sign_off_fund_accounts   job_type: CMD
+box_name: fund_accounting_box
+owner: svc_fundacct
+command: /scripts/fundacct/sign_off.py --date %%DATE%% --approver fund-controller@bank.com
+machine: nav-app-02
+profile: /etc/autosys/profiles/svc_fundacct.sh
+condition: success(compute_income_distribution)
+std_out_file: /logs/fundacct/%%YEAR%%/%%MM%%/sign_off_%%DATE%%.out
+std_err_file: /logs/fundacct/%%YEAR%%/%%MM%%/sign_off_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5

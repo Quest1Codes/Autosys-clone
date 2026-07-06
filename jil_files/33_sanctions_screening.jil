@@ -1,0 +1,88 @@
+/* ============================================================
+   FILE: 33_sanctions_screening.jil
+   DOMAIN: Real-Time Sanctions Screening
+   SCHEDULE: Continuous — runs on each new trade batch (every 15 min during trading hours)
+   STATUS: RUNNING
+   UPSTREAM: 02_reference_data_sync (ref_data_box) for list updates
+   DOWNSTREAM: 14_aml_compliance, 34_fraud_detection
+   ============================================================ */
+
+insert_job: sanctions_screening_box   job_type: BOX
+owner: svc_compliance
+condition: success(ref_data_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 30
+description: "Screen all counterparties, beneficiaries and issuers against OFAC, EU, UN, UK HMT sanctions lists"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "07:00,22:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: compliance@bank.com
+
+insert_job: refresh_sanctions_lists   job_type: CMD
+box_name: sanctions_screening_box
+owner: svc_compliance
+command: /scripts/sanctions/refresh_lists.py --lists OFAC_SDN,EU_CONSOL,UN_CONSOL,UK_HMT --date %%DATE%%
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/sanctions/%%YEAR%%/%%MM%%/refresh_%%DATE%%.out
+std_err_file: /logs/sanctions/%%YEAR%%/%%MM%%/refresh_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 10
+
+insert_job: screen_new_counterparties   job_type: CMD
+box_name: sanctions_screening_box
+owner: svc_compliance
+command: /scripts/sanctions/screen_counterparties.py --date %%DATE%% --fuzzy_match_threshold 85
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(refresh_sanctions_lists)
+std_out_file: /logs/sanctions/%%YEAR%%/%%MM%%/counterparties_%%DATE%%.out
+std_err_file: /logs/sanctions/%%YEAR%%/%%MM%%/counterparties_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 15
+
+insert_job: screen_payment_beneficiaries   job_type: CMD
+box_name: sanctions_screening_box
+owner: svc_compliance
+command: /scripts/sanctions/screen_beneficiaries.py --date %%DATE%%
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(refresh_sanctions_lists)
+std_out_file: /logs/sanctions/%%YEAR%%/%%MM%%/beneficiaries_%%DATE%%.out
+std_err_file: /logs/sanctions/%%YEAR%%/%%MM%%/beneficiaries_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 15
+
+/* FAILURE HANDLER: Hard block any positive sanctions match */
+insert_job: hard_block_sanctions_match   job_type: CMD
+box_name: sanctions_screening_box
+owner: svc_compliance
+command: /scripts/sanctions/hard_block.sh --date %%DATE%% --notify bsa-officer@bank.com,legal@bank.com --page IMMEDIATE
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: failure(screen_new_counterparties) | failure(screen_payment_beneficiaries)
+std_out_file: /logs/sanctions/%%YEAR%%/%%MM%%/hard_block_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

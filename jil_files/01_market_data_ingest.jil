@@ -1,0 +1,143 @@
+/* ============================================================
+   FILE: 01_market_data_ingest.jil
+   DOMAIN: Market Data
+   SCHEDULE: Mon-Fri 17:30 after market close
+   STATUS: RUNNING
+   DOWNSTREAM: 03_trade_capture, 06_risk_engine, 10_pnl_calculation,
+               13_portfolio_nav, 46_benchmark_pricing, 47_volatility_surface
+   ============================================================ */
+
+insert_job: mkt_data_ingest_box   job_type: BOX
+owner: svc_mktdata
+start_times: "17:30"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "EOD market data ingestion — equity prices, FX rates, yield curves"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "17:30,22:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: mktdata-ops@bank.com
+
+/* Step 1A: Fetch Bloomberg EOD equity prices */
+insert_job: fetch_bloomberg_eod_prices   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/mktdata/fetch_bloomberg.sh --type EQUITY --date %%DATE%%
+machine: mktdata-feed-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/bloomberg_eod_%%DATE%%.out
+std_err_file: /logs/mktdata/%%YEAR%%/%%MM%%/bloomberg_eod_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 3
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 5
+
+/* Step 1B: Fetch Reuters FX spot and forward rates */
+insert_job: fetch_reuters_fx_rates   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/mktdata/fetch_reuters_fx.sh --pairs ALL --date %%DATE%%
+machine: mktdata-feed-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/reuters_fx_%%DATE%%.out
+std_err_file: /logs/mktdata/%%YEAR%%/%%MM%%/reuters_fx_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 3
+max_run_alarm: 20
+min_run_alarm: 1
+term_run_time: 25
+job_load: 5
+
+/* Step 1C: Fetch ICE bond yield curves */
+insert_job: fetch_ice_yield_curves   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/mktdata/fetch_ice_curves.sh --tenors ALL --date %%DATE%%
+machine: mktdata-feed-02
+profile: /etc/autosys/profiles/svc_mktdata.sh
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/ice_curves_%%DATE%%.out
+std_err_file: /logs/mktdata/%%YEAR%%/%%MM%%/ice_curves_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 1
+term_run_time: 25
+job_load: 5
+
+/* Step 2: Validate completeness of all received price data */
+insert_job: validate_price_completeness   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/mktdata/validate_prices.py --date %%DATE%% --threshold 0.98
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+condition: success(fetch_bloomberg_eod_prices) & success(fetch_reuters_fx_rates) & success(fetch_ice_yield_curves)
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/validate_%%DATE%%.out
+std_err_file: /logs/mktdata/%%YEAR%%/%%MM%%/validate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5
+
+/* Step 3: Load validated prices into Market Data Store (MDS) */
+insert_job: load_prices_to_mds   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/mktdata/load_mds.sh --date %%DATE%% --publish
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+condition: success(validate_price_completeness)
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/load_mds_%%DATE%%.out
+std_err_file: /logs/mktdata/%%YEAR%%/%%MM%%/load_mds_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Compute derived FX cross rates and interpolated curves */
+insert_job: compute_derived_market_data   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/mktdata/compute_derived.py --date %%DATE%%
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+condition: success(load_prices_to_mds)
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/derived_%%DATE%%.out
+std_err_file: /logs/mktdata/%%YEAR%%/%%MM%%/derived_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 1
+term_run_time: 25
+job_load: 10
+
+/* FAILURE HANDLER: Alert on price validation failure */
+insert_job: mktdata_validation_failure_alert   job_type: CMD
+box_name: mkt_data_ingest_box
+owner: svc_mktdata
+command: /scripts/alerts/send_page.sh "CRITICAL: Market data validation failed for %%DATE%%"
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+condition: failure(validate_price_completeness)
+std_out_file: /logs/mktdata/%%YEAR%%/%%MM%%/alert_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

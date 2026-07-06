@@ -1,0 +1,166 @@
+/* ============================================================
+   FILE: 06_risk_engine.jil
+   DOMAIN: Risk Management — VaR & Market Risk
+   STATUS: RUNNING
+   UPSTREAM: 05_position_management (position_mgmt_box)
+             01_market_data_ingest (mkt_data_ingest_box)
+             47_volatility_surface (vol_surface_box)
+   DOWNSTREAM: 07_stress_testing, 12_regulatory_reporting,
+               17_credit_risk, 18_liquidity_reporting, 19_counterparty_exposure
+   ============================================================ */
+
+insert_job: risk_engine_box   job_type: BOX
+owner: svc_risk
+condition: success(position_mgmt_box) & success(mkt_data_ingest_box) & success(vol_surface_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 120
+description: "Full VaR and market risk calculation engine across all asset classes"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "19:30,23:59"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: risk-ops@bank.com
+
+/* Step 1: Load risk factors, sensitivities and model parameters */
+insert_job: load_risk_factors   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/load_risk_factors.py --date %%DATE%% --model HISTORICAL_SIM
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/load_factors_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/load_factors_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2A: Compute equity portfolio VaR (99% 1-day) */
+insert_job: compute_equity_var   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/compute_var.py --asset_class EQUITY --confidence 0.99 --horizon 1 --date %%DATE%%
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_risk_factors)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/equity_var_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/equity_var_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 30
+
+/* Step 2B: Compute fixed income VaR */
+insert_job: compute_fi_var   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/compute_var.py --asset_class FIXED_INCOME --confidence 0.99 --horizon 1 --date %%DATE%%
+machine: risk-compute-02
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_risk_factors)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/fi_var_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/fi_var_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 30
+
+/* Step 2C: Compute FX and commodities VaR */
+insert_job: compute_fx_var   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/compute_var.py --asset_class FX_COMMODITIES --confidence 0.99 --horizon 1 --date %%DATE%%
+machine: risk-compute-02
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_risk_factors)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/fx_var_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/fx_var_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 30
+
+/* Step 2D: Compute credit derivative VaR — ON HOLD (new desk onboarding Q3) */
+insert_job: compute_credit_deriv_var   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/compute_var.py --asset_class CREDIT_DERIV --confidence 0.99 --horizon 1 --date %%DATE%%
+machine: risk-compute-03
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_risk_factors)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/credit_var_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/credit_var_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 30
+job_on_hold: 1
+
+/* Step 3: Aggregate portfolio-level VaR with diversification benefit */
+insert_job: aggregate_portfolio_var   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/aggregate_var.py --date %%DATE%% --correlation_matrix /data/risk/corr_matrix_%%DATE%%.parquet
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(compute_equity_var) & success(compute_fi_var) & success(compute_fx_var)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/agg_var_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/agg_var_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Check aggregated VaR against board-approved limits */
+insert_job: check_var_limits   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/risk/check_limits.py --date %%DATE%% --limits_file /config/risk/var_limits.yaml
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(aggregate_portfolio_var)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/limits_%%DATE%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/limits_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5
+
+/* FAILURE / BREACH HANDLER: Page CRO if VaR limit breached */
+insert_job: var_limit_breach_alert   job_type: CMD
+box_name: risk_engine_box
+owner: svc_risk
+command: /scripts/alerts/page_cro.sh "VaR LIMIT BREACH on %%DATE%% — immediate review required"
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: failure(check_var_limits)
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/breach_alert_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

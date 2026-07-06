@@ -1,0 +1,40 @@
+/* ============================================================
+   RUNNABLE demo — all jobs target "localhost" (the running machine)
+   Import this JIL, then click a job → Start Job to run it.
+   ============================================================ */
+
+/* BOX: groups the 3 jobs below */
+insert_job: runnable_box   job_type: BOX
+owner: admin
+start_times: "00:00"
+days_of_week: all
+
+/* Job 1 — always succeeds */
+insert_job: step_hello   job_type: CMD
+box_name: runnable_box
+owner: admin
+command: echo "Hello from AutoSys step 1"
+machine: localhost
+condition:
+
+/* Job 2 — depends on step_hello succeeding */
+insert_job: step_date   job_type: CMD
+box_name: runnable_box
+owner: admin
+command: date
+machine: localhost
+condition: success(step_hello)
+
+/* Job 3 — runs after step_date */
+insert_job: step_done   job_type: CMD
+box_name: runnable_box
+owner: admin
+command: echo "Pipeline complete at $(date)"
+machine: localhost
+condition: success(step_date)
+
+/* Standalone: always-running cleanup */
+insert_job: standalone_echo   job_type: CMD
+owner: admin
+command: echo "Standalone job ran at $(date)"
+machine: localhost

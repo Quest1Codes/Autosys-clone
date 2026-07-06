@@ -6,6 +6,8 @@ POST /api/v1/jil/import     Parse JIL text and persist to the database (supports
 """
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -13,7 +15,8 @@ from autosys.app_server.deps    import get_session, get_current_user, CurrentUse
 from autosys.app_server.schemas import (
     JILImportRequest, JILImportResponse, JILJobResult,
 )
-from autosys.db.repository      import jobs as job_repo, machines as machine_repo
+from autosys.db.repository      import jobs as job_repo, machines as machine_repo, globs as glob_repo
+from autosys.db.schema          import CalendarRow
 from autosys.parser.jil_parser  import parse_jil, JILParseError
 
 router = APIRouter(prefix="/api/v1/jil", tags=["jil"])
@@ -51,6 +54,18 @@ def validate_jil(
                 action="MACHINE",
                 name=op.machine.machine_name,
                 type=f"port:{op.machine.port}",
+            ))
+        elif op.op == "insert_glob":
+            results.append(JILJobResult(
+                action="GLOBAL",
+                name=op.raw_attrs.get("global_name", "?"),
+                type=f"value:{op.raw_attrs.get('global_value', '')}",
+            ))
+        elif op.op == "insert_calendar":
+            results.append(JILJobResult(
+                action="CALENDAR",
+                name=op.raw_attrs.get("calendar_name", "?"),
+                type="calendar",
             ))
         else:
             results.append(JILJobResult(
@@ -100,6 +115,43 @@ def import_jil(
                 action="MACHINE",
                 name=op.machine.machine_name,
                 type=f"port:{op.machine.port}",
+            ))
+            continue
+
+        if op.op == "insert_glob":
+            gname = op.raw_attrs.get("global_name", "")
+            gval  = op.raw_attrs.get("global_value", "")
+            if gname and not body.dry_run:
+                glob_repo.set(session, gname.upper(), gval)
+                n_inserted += 1
+            results.append(JILJobResult(
+                action="GLOBAL" if not body.dry_run else "OK",
+                name=gname,
+                type=f"value:{gval}",
+            ))
+            continue
+
+        if op.op == "insert_calendar":
+            cal_name = op.raw_attrs.get("calendar_name", "")
+            dates_raw = op.raw_attrs.get("dates", "")
+            desc = op.raw_attrs.get("description", "")
+            dates_list = [d.strip() for d in dates_raw.split(",") if d.strip()] if dates_raw else []
+            if cal_name and not body.dry_run:
+                existing = session.get(CalendarRow, cal_name)
+                if existing:
+                    existing.dates_json  = json.dumps(dates_list)
+                    existing.description = desc or existing.description
+                else:
+                    session.add(CalendarRow(
+                        calendar_name=cal_name,
+                        dates_json=json.dumps(dates_list),
+                        description=desc,
+                    ))
+                n_inserted += 1
+            results.append(JILJobResult(
+                action="CALENDAR" if not body.dry_run else "OK",
+                name=cal_name,
+                type=f"{len(dates_list)} dates",
             ))
             continue
 

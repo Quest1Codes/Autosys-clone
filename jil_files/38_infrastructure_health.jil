@@ -1,0 +1,94 @@
+/* ============================================================
+   FILE: 38_infrastructure_health.jil
+   DOMAIN: Infrastructure — Health Monitoring
+   SCHEDULE: Every 15 minutes, 24x7
+   STATUS: RUNNING (continuous heartbeat)
+   UPSTREAM: Standalone
+   DOWNSTREAM: Alerts on-call engineering team
+   ============================================================ */
+
+/* Standalone heartbeat — runs every 15 min to verify critical services are up */
+insert_job: check_trade_db_connectivity   job_type: CMD
+owner: svc_infra
+command: /scripts/infra/check_db.sh --host trade-db-01 --port 5432 --timeout 10
+machine: monitor-01
+profile: /etc/autosys/profiles/svc_infra.sh
+days_of_week: all
+timezone: US/Eastern
+std_out_file: /logs/infra/%%YEAR%%/%%MM%%/trade_db_health_%%MINUTE%%.out
+std_err_file: /logs/infra/%%YEAR%%/%%MM%%/trade_db_health_%%MINUTE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 5
+min_run_alarm: 1
+term_run_time: 8
+job_load: 1
+
+insert_job: check_risk_engine_service   job_type: CMD
+owner: svc_infra
+command: /scripts/infra/check_http.sh --url http://risk-engine-api:8080/health --expected_code 200
+machine: monitor-01
+profile: /etc/autosys/profiles/svc_infra.sh
+days_of_week: mo,tu,we,th,fr
+timezone: US/Eastern
+std_out_file: /logs/infra/%%YEAR%%/%%MM%%/risk_engine_health_%%MINUTE%%.out
+std_err_file: /logs/infra/%%YEAR%%/%%MM%%/risk_engine_health_%%MINUTE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 5
+min_run_alarm: 1
+term_run_time: 8
+job_load: 1
+
+insert_job: check_swift_gateway   job_type: CMD
+owner: svc_infra
+command: /scripts/infra/check_swift_gw.sh --host swift-gateway-01 --ping
+machine: monitor-01
+profile: /etc/autosys/profiles/svc_infra.sh
+days_of_week: mo,tu,we,th,fr
+timezone: US/Eastern
+std_out_file: /logs/infra/%%YEAR%%/%%MM%%/swift_gw_%%MINUTE%%.out
+std_err_file: /logs/infra/%%YEAR%%/%%MM%%/swift_gw_%%MINUTE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 5
+min_run_alarm: 1
+term_run_time: 8
+job_load: 1
+
+insert_job: check_disk_space_critical   job_type: CMD
+owner: svc_infra
+command: /scripts/infra/check_disk.sh --hosts ALL_PROD --threshold_pct 85
+machine: monitor-01
+profile: /etc/autosys/profiles/svc_infra.sh
+start_times: "06:00,12:00,18:00,23:00"
+days_of_week: all
+timezone: US/Eastern
+std_out_file: /logs/infra/%%YEAR%%/%%MM%%/disk_%%DATE%%.out
+std_err_file: /logs/infra/%%YEAR%%/%%MM%%/disk_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 2
+
+/* Standalone: Daily infra summary report */
+insert_job: daily_infra_summary   job_type: CMD
+owner: svc_infra
+command: /scripts/infra/daily_summary.py --date %%DATE%% --notify infra-team@bank.com
+machine: monitor-01
+profile: /etc/autosys/profiles/svc_infra.sh
+start_times: "07:00"
+days_of_week: mo,tu,we,th,fr
+timezone: US/Eastern
+std_out_file: /logs/infra/%%YEAR%%/%%MM%%/summary_%%DATE%%.out
+std_err_file: /logs/infra/%%YEAR%%/%%MM%%/summary_%%DATE%%.err
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 15
+job_load: 2

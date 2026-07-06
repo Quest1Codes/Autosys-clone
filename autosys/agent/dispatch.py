@@ -52,6 +52,7 @@ from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo, runs as run_repo, output as output_repo
 from autosys.db.schema import JobRow
 from autosys.agent.runner import LocalJobRunner
+from autosys.models.enums import JobStatus
 from autosys.parser.variable_sub import substitute, UndefinedVariableError
 from autosys.models.event import Event
 
@@ -132,14 +133,25 @@ class AgentDispatch:
         if _is_local_machine(machine):
             self._dispatch_local(session, row, now)
         elif not self.local_only:
-            self._dispatch_remote(session, row, machine)
+            # If the registered machine's host resolves to localhost, run locally.
+            from autosys.db.repository import machines as machine_repo
+            machine_row = machine_repo.get(session, machine)
+            if machine_row and _is_local_machine(machine_row.host):
+                logger.info(
+                    "[agent] %r → %r registered as localhost-equivalent, dispatching locally",
+                    row.job_name, machine,
+                )
+                self._dispatch_local(session, row, now)
+            else:
+                self._dispatch_remote(session, row, machine)
         else:
             logger.warning(
                 "[agent] %r targets %r (not local) — "
                 "use AgentDispatch(local_only=False) for remote dispatch.",
                 row.job_name, machine,
             )
-            # Leave in STARTING; operator can CHANGE_STATUS manually
+            row.status   = JobStatus.FAILURE.value
+            row.last_end = now
 
     def _dispatch_local(self, session: Session, row: JobRow, now: datetime) -> None:
         """Fork the job locally (same machine as the scheduler)."""
@@ -158,7 +170,7 @@ class AgentDispatch:
             run_date = now.strftime("%Y-%m-%d"),
         )
 
-        row.status     = "RUNNING"
+        row.status     = JobStatus.RUNNING.value
         row.last_start = now
 
         runner = LocalJobRunner(
@@ -196,9 +208,11 @@ class AgentDispatch:
         if machine_row is None:
             logger.warning(
                 "[agent] remote dispatch: machine %r not registered — "
-                "run 'autosys machine register %s --host <host>' first.",
-                machine, machine,
+                "job %r → FAILURE. Run 'autosys machine register %s' first.",
+                machine, row.job_name, machine,
             )
+            row.status   = JobStatus.FAILURE.value
+            row.last_end = _now()
             return
 
         rd = RemoteDispatch()
@@ -278,7 +292,7 @@ class AgentDispatch:
             # Check for KILLJOB (EPS may have set TERMINATED while we ran)
             with sync_session() as session:
                 job_row = job_repo.get_row(session, job_name)
-                if job_row and job_row.status == "TERMINATED":
+                if job_row and job_row.status == JobStatus.TERMINATED.value:
                     status     = "TERMINATED"
                     was_killed = True
 
@@ -291,7 +305,7 @@ class AgentDispatch:
                 with sync_session() as session:
                     job_row = job_repo.get_row(session, job_name)
                     if job_row:
-                        job_row.status = "RESTART"
+                        job_row.status = JobStatus.RESTART.value
                     run_repo.finish(
                         session,
                         run_id    = run_id,
@@ -316,7 +330,7 @@ class AgentDispatch:
                 with sync_session() as session:
                     job_row = job_repo.get_row(session, job_name)
                     if job_row:
-                        job_row.status     = "RUNNING"
+                        job_row.status     = JobStatus.RUNNING.value
                         job_row.last_start = _now()
                     run_repo.start(
                         session,
@@ -332,8 +346,8 @@ class AgentDispatch:
             with sync_session() as session:
                 job_row = job_repo.get_row(session, job_name)
                 if job_row:
-                    if job_row.status != "TERMINATED":
-                        job_row.status   = status
+                    if job_row.status != JobStatus.TERMINATED.value:
+                        job_row.status   = JobStatus[status].value
                         job_row.last_end = now
                     else:
                         status = "TERMINATED"

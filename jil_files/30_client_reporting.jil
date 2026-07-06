@@ -1,0 +1,92 @@
+/* ============================================================
+   FILE: 30_client_reporting.jil
+   DOMAIN: Client Reporting
+   STATUS: RUNNING
+   UPSTREAM: 13_portfolio_nav (portfolio_nav_box)
+             10_pnl_calculation (pnl_box)
+             31_performance_attribution (perf_attribution_box)
+             41_esg_reporting (esg_reporting_box)
+   DOWNSTREAM: None (terminal — delivered to clients)
+   ============================================================ */
+
+insert_job: client_reporting_box   job_type: BOX
+owner: svc_clientsvc
+condition: success(portfolio_nav_box) & success(pnl_box) & success(perf_attribution_box) & success(esg_reporting_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Generate and distribute daily account statements and performance reports to clients"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,03:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: client-ops@bank.com
+
+insert_job: generate_account_statements   job_type: CMD
+box_name: client_reporting_box
+owner: svc_clientsvc
+command: /scripts/clientrpt/gen_statements.py --date %%DATE%% --format PDF,CSV
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_clientsvc.sh
+std_out_file: /logs/clientrpt/%%YEAR%%/%%MM%%/statements_%%DATE%%.out
+std_err_file: /logs/clientrpt/%%YEAR%%/%%MM%%/statements_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+insert_job: generate_performance_reports   job_type: CMD
+box_name: client_reporting_box
+owner: svc_clientsvc
+command: /scripts/clientrpt/gen_performance.py --date %%DATE%% --benchmark SP500,MSCI_WORLD
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_clientsvc.sh
+condition: success(generate_account_statements)
+std_out_file: /logs/clientrpt/%%YEAR%%/%%MM%%/performance_%%DATE%%.out
+std_err_file: /logs/clientrpt/%%YEAR%%/%%MM%%/performance_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 25
+min_run_alarm: 3
+term_run_time: 30
+job_load: 20
+
+insert_job: generate_transaction_confirmations   job_type: CMD
+box_name: client_reporting_box
+owner: svc_clientsvc
+command: /scripts/clientrpt/gen_tx_confirms.py --date %%DATE%%
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_clientsvc.sh
+std_out_file: /logs/clientrpt/%%YEAR%%/%%MM%%/tx_confirms_%%DATE%%.out
+std_err_file: /logs/clientrpt/%%YEAR%%/%%MM%%/tx_confirms_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+insert_job: distribute_reports_to_clients   job_type: CMD
+box_name: client_reporting_box
+owner: svc_clientsvc
+command: /scripts/clientrpt/distribute.sh --date %%DATE%% --channels SECURE_EMAIL,PORTAL,SFTP
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_clientsvc.sh
+condition: success(generate_performance_reports) & success(generate_transaction_confirmations)
+std_out_file: /logs/clientrpt/%%YEAR%%/%%MM%%/distribute_%%DATE%%.out
+std_err_file: /logs/clientrpt/%%YEAR%%/%%MM%%/distribute_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15

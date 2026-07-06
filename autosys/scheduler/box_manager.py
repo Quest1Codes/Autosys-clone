@@ -62,7 +62,9 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import JobRow
+from autosys.models.enums import JobStatus
 from autosys.scheduler.condition_evaluator import is_satisfied
+from autosys.scheduler.state_machine import _norm_status
 
 # Reuse the same type aliases as event_processor.py
 DispatchFn = Callable[[Session, JobRow], None]
@@ -77,7 +79,7 @@ _ACTIVE = frozenset({"STARTING", "RUNNING"})
 
 def _stub_dispatch(session: Session, row: JobRow) -> None:
     """Stub dispatcher — immediately marks CMD children SUCCESS (no subprocess)."""
-    row.status     = "SUCCESS"
+    row.status     = JobStatus.SUCCESS.value
     row.last_start = datetime.now()
     row.last_end   = datetime.now()
 
@@ -177,7 +179,7 @@ class BoxManager:
 
         # Step 1: activate INACTIVE children whose conditions are met
         for child in children:
-            if child.status == "INACTIVE":
+            if _norm_status(child.status) == "INACTIVE":
                 if self._conditions_met(child, snapshot):
                     logger.info(
                         "BOX %r: activating child %r → STARTING",
@@ -188,7 +190,7 @@ class BoxManager:
                     snapshot[child.job_name] = "STARTING"
 
                     if self._auto_complete:
-                        child.status     = "SUCCESS"
+                        child.status     = JobStatus.SUCCESS.value
                         child.last_start = now
                         child.last_end   = now
                     else:
@@ -213,20 +215,33 @@ class BoxManager:
             logger.info("BOX %r completed → SUCCESS (box_success condition met)", box.job_name)
             return changes + 1
 
-        # Step 3: check if all children are terminal → complete the box
-        non_terminal = [c for c in children if c.status not in _TERMINAL]
+        # Step 3: default fail-fast — if any child FAILED and there is no custom
+        # box_failure condition, immediately fail the box.  This mirrors real
+        # AutoSys default behaviour: a single child failure aborts the box.
+        if not box.box_failure:
+            if any(_norm_status(c.status) == "FAILURE" for c in children):
+                box.status   = JobStatus.FAILURE.value
+                box.last_end = now
+                logger.info(
+                    "BOX %r → FAILURE (child failed, default fail-fast)",
+                    box.job_name,
+                )
+                return changes + 1
+
+        # All-terminal check
+        non_terminal = [c for c in children if _norm_status(c.status) not in _TERMINAL]
         if non_terminal:
             return changes   # box is still in progress
 
         # All children are terminal — determine box outcome
-        terminal_statuses = {c.status for c in children}
+        terminal_statuses = {_norm_status(c.status) for c in children}
 
         if "TERMINATED" in terminal_statuses:
-            box.status = "TERMINATED"
+            box.status = JobStatus.TERMINATED.value
         elif "FAILURE" in terminal_statuses:
-            box.status = "FAILURE"
+            box.status = JobStatus.FAILURE.value
         else:
-            box.status = "SUCCESS"
+            box.status = JobStatus.SUCCESS.value
 
         box.last_end = now
         logger.info(

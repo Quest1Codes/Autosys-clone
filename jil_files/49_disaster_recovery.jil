@@ -1,0 +1,91 @@
+/* ============================================================
+   FILE: 49_disaster_recovery.jil
+   DOMAIN: Disaster Recovery Testing
+   SCHEDULE: Every Sunday 03:00 (weekly DR rehearsal)
+   STATUS: RUNNING (weekly)
+   UPSTREAM: 37_db_backup (db_backup_box) — uses replicated backup artifacts
+   DOWNSTREAM: None (test environment only)
+   ============================================================ */
+
+insert_job: dr_test_box   job_type: BOX
+owner: svc_infra
+condition: success(db_backup_box)
+start_times: "03:00"
+days_of_week: su
+alarm_if_fail: 1
+max_run_alarm: 180
+description: "Weekly DR failover rehearsal — restore from backup, validate critical systems"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "03:00,12:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: infra-team@bank.com
+
+insert_job: spin_up_dr_environment   job_type: CMD
+box_name: dr_test_box
+owner: svc_infra
+command: /scripts/dr/spin_up_dr.sh --environment DR_NJ --tier CRITICAL
+machine: dr-orchestrator-01
+profile: /etc/autosys/profiles/svc_infra.sh
+std_out_file: /logs/dr/%%YEAR%%/%%MM%%/spin_up_%%DATE%%.out
+std_err_file: /logs/dr/%%YEAR%%/%%MM%%/spin_up_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+insert_job: restore_trade_db_from_backup   job_type: CMD
+box_name: dr_test_box
+owner: svc_infra
+command: /scripts/dr/restore_db.sh --db TRADE_DB --backup_date %%YESTERDAY%% --target DR_DB
+machine: dr-orchestrator-01
+profile: /etc/autosys/profiles/svc_infra.sh
+condition: success(spin_up_dr_environment)
+std_out_file: /logs/dr/%%YEAR%%/%%MM%%/restore_trade_%%DATE%%.out
+std_err_file: /logs/dr/%%YEAR%%/%%MM%%/restore_trade_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 20
+
+insert_job: validate_dr_system_integrity   job_type: CMD
+box_name: dr_test_box
+owner: svc_infra
+command: /scripts/dr/validate_integrity.py --env DR_NJ --checks TRADE_COUNT,POSITION_MATCH,GL_BALANCE
+machine: dr-orchestrator-01
+profile: /etc/autosys/profiles/svc_infra.sh
+condition: success(restore_trade_db_from_backup)
+std_out_file: /logs/dr/%%YEAR%%/%%MM%%/validate_%%DATE%%.out
+std_err_file: /logs/dr/%%YEAR%%/%%MM%%/validate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 10
+
+insert_job: generate_dr_test_report   job_type: CMD
+box_name: dr_test_box
+owner: svc_infra
+command: /scripts/dr/gen_report.py --date %%DATE%% --rto_target 4h --rpo_target 1h --notify cto@bank.com,coo@bank.com
+machine: dr-orchestrator-01
+profile: /etc/autosys/profiles/svc_infra.sh
+condition: success(validate_dr_system_integrity)
+std_out_file: /logs/dr/%%YEAR%%/%%MM%%/report_%%DATE%%.out
+std_err_file: /logs/dr/%%YEAR%%/%%MM%%/report_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 5

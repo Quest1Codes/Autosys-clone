@@ -1,0 +1,93 @@
+/* ============================================================
+   FILE: 16_kyc_refresh.jil
+   DOMAIN: Compliance — KYC (Know Your Customer) Batch Refresh
+   SCHEDULE: Every Saturday 01:00 (weekly refresh cycle)
+   STATUS: RUNNING (weekly)
+   UPSTREAM: Standalone
+   DOWNSTREAM: 32_compliance_monitoring, 17_credit_risk
+   ============================================================ */
+
+insert_job: kyc_refresh_box   job_type: BOX
+owner: svc_compliance
+start_times: "01:00"
+days_of_week: sa
+alarm_if_fail: 1
+max_run_alarm: 240
+description: "Weekly KYC due diligence refresh for all active clients"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "01:00,08:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: kyc-ops@bank.com
+
+/* Step 1: Extract client base due for periodic KYC review */
+insert_job: extract_clients_due_for_kyc   job_type: CMD
+box_name: kyc_refresh_box
+owner: svc_compliance
+command: /scripts/kyc/extract_due_clients.py --review_cycle ANNUAL,QUARTERLY --as_of %%DATE%%
+machine: kyc-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/kyc/%%YEAR%%/%%MM%%/extract_%%DATE%%.out
+std_err_file: /logs/kyc/%%YEAR%%/%%MM%%/extract_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 2: Run automated KYC due diligence checks (Refinitiv World-Check) */
+insert_job: run_kyc_due_diligence   job_type: CMD
+box_name: kyc_refresh_box
+owner: svc_compliance
+command: /scripts/kyc/run_due_diligence.py --source WORLD_CHECK --date %%DATE%%
+machine: kyc-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(extract_clients_due_for_kyc)
+std_out_file: /logs/kyc/%%YEAR%%/%%MM%%/due_diligence_%%DATE%%.out
+std_err_file: /logs/kyc/%%YEAR%%/%%MM%%/due_diligence_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 120
+min_run_alarm: 10
+term_run_time: 125
+job_load: 20
+
+/* Step 3: Update client risk ratings (Low/Medium/High/PEP) */
+insert_job: update_client_risk_ratings   job_type: CMD
+box_name: kyc_refresh_box
+owner: svc_compliance
+command: /scripts/kyc/update_risk_ratings.py --date %%DATE%% --notify compliance@bank.com
+machine: kyc-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(run_kyc_due_diligence)
+std_out_file: /logs/kyc/%%YEAR%%/%%MM%%/ratings_%%DATE%%.out
+std_err_file: /logs/kyc/%%YEAR%%/%%MM%%/ratings_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 10
+
+/* Step 4: Notify relationship managers of clients requiring manual review */
+insert_job: notify_rms_for_manual_review   job_type: CMD
+box_name: kyc_refresh_box
+owner: svc_compliance
+command: /scripts/kyc/notify_rm.sh --date %%DATE%% --channel EMAIL,JIRA
+machine: kyc-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(update_client_risk_ratings)
+std_out_file: /logs/kyc/%%YEAR%%/%%MM%%/notify_rm_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

@@ -1,0 +1,90 @@
+/* ============================================================
+   FILE: 32_compliance_monitoring.jil
+   DOMAIN: Investment Compliance Monitoring
+   STATUS: RUNNING
+   UPSTREAM: 05_position_management (position_mgmt_box)
+             14_aml_compliance (aml_compliance_box)
+             34_fraud_detection (fraud_detection_box)
+             16_kyc_refresh (kyc_refresh_box)
+   DOWNSTREAM: 35_audit_trail
+   ============================================================ */
+
+insert_job: compliance_monitoring_box   job_type: BOX
+owner: svc_compliance
+condition: success(position_mgmt_box) & success(aml_compliance_box) & success(fraud_detection_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Pre/post-trade investment compliance checks against IPS and regulatory mandates"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: compliance@bank.com
+
+insert_job: run_pre_trade_compliance_checks   job_type: CMD
+box_name: compliance_monitoring_box
+owner: svc_compliance
+command: /scripts/compliance/pre_trade_checks.py --date %%DATE%% --rules IPS,UCITS,40ACT
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/compliance/%%YEAR%%/%%MM%%/pre_trade_%%DATE%%.out
+std_err_file: /logs/compliance/%%YEAR%%/%%MM%%/pre_trade_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: run_post_trade_compliance_checks   job_type: CMD
+box_name: compliance_monitoring_box
+owner: svc_compliance
+command: /scripts/compliance/post_trade_checks.py --date %%DATE%% --rules IPS,UCITS,CONCENTRATION
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(run_pre_trade_compliance_checks)
+std_out_file: /logs/compliance/%%YEAR%%/%%MM%%/post_trade_%%DATE%%.out
+std_err_file: /logs/compliance/%%YEAR%%/%%MM%%/post_trade_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: check_concentration_limits   job_type: CMD
+box_name: compliance_monitoring_box
+owner: svc_compliance
+command: /scripts/compliance/concentration_check.py --date %%DATE%% --limit_pct 5.0
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(run_post_trade_compliance_checks)
+std_out_file: /logs/compliance/%%YEAR%%/%%MM%%/concentration_%%DATE%%.out
+std_err_file: /logs/compliance/%%YEAR%%/%%MM%%/concentration_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* FAILURE HANDLER: Freeze breaching accounts pending compliance review */
+insert_job: freeze_breaching_accounts   job_type: CMD
+box_name: compliance_monitoring_box
+owner: svc_compliance
+command: /scripts/compliance/freeze_accounts.sh --date %%DATE%% --notify cco@bank.com,pm-team@bank.com
+machine: compliance-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: failure(check_concentration_limits)
+std_out_file: /logs/compliance/%%YEAR%%/%%MM%%/freeze_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

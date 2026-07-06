@@ -1,0 +1,95 @@
+/* ============================================================
+   FILE: 20_collateral_management.jil
+   DOMAIN: Collateral Management
+   STATUS: RUNNING
+   UPSTREAM: 05_position_management (position_mgmt_box)
+             17_credit_risk (credit_risk_box)
+   DOWNSTREAM: 21_margin_calls, 25_repo_processing
+   ============================================================ */
+
+insert_job: collateral_mgmt_box   job_type: BOX
+owner: svc_collateral
+condition: success(position_mgmt_box) & success(credit_risk_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Manage collateral inventory, eligibility checks, and optimization across CSAs"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:30,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: collateral-ops@bank.com
+
+/* Step 1: Inventory all eligible collateral assets (cash, govvies, IG bonds) */
+insert_job: inventory_collateral_assets   job_type: CMD
+box_name: collateral_mgmt_box
+owner: svc_collateral
+command: /scripts/collateral/inventory.py --date %%DATE%% --eligible_types CASH,GOVVIE,IG_BOND
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+std_out_file: /logs/collateral/%%YEAR%%/%%MM%%/inventory_%%DATE%%.out
+std_err_file: /logs/collateral/%%YEAR%%/%%MM%%/inventory_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Compute collateral requirements per CSA agreement */
+insert_job: compute_collateral_requirements   job_type: CMD
+box_name: collateral_mgmt_box
+owner: svc_collateral
+command: /scripts/collateral/compute_requirements.py --date %%DATE%%
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+condition: success(inventory_collateral_assets)
+std_out_file: /logs/collateral/%%YEAR%%/%%MM%%/requirements_%%DATE%%.out
+std_err_file: /logs/collateral/%%YEAR%%/%%MM%%/requirements_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Optimize collateral allocation to minimize funding cost */
+insert_job: optimize_collateral_allocation   job_type: CMD
+box_name: collateral_mgmt_box
+owner: svc_collateral
+command: /scripts/collateral/optimize.py --date %%DATE%% --solver CHEAPEST_TO_DELIVER
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+condition: success(compute_collateral_requirements)
+std_out_file: /logs/collateral/%%YEAR%%/%%MM%%/optimize_%%DATE%%.out
+std_err_file: /logs/collateral/%%YEAR%%/%%MM%%/optimize_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 4: Generate collateral substitution instructions */
+insert_job: generate_substitution_instructions   job_type: CMD
+box_name: collateral_mgmt_box
+owner: svc_collateral
+command: /scripts/collateral/gen_substitutions.sh --date %%DATE%%
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+condition: success(optimize_collateral_allocation)
+std_out_file: /logs/collateral/%%YEAR%%/%%MM%%/substitutions_%%DATE%%.out
+std_err_file: /logs/collateral/%%YEAR%%/%%MM%%/substitutions_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

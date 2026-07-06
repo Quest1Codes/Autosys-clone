@@ -22,6 +22,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
 from autosys.db.connection import get_async_engine, get_sync_engine
 from autosys.db.schema import Base, CalendarRow, MachineRow
@@ -51,8 +52,14 @@ def create_all_sync(drop_first: bool = False) -> None:
         logger.warning("Dropping all AutoSys tables — all data will be lost!")
         Base.metadata.drop_all(bind=engine)
 
-    Base.metadata.create_all(bind=engine)
-    logger.info("AutoSys schema created (sync) on %s", engine.url)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except OperationalError as exc:
+        if "already exists" in str(exc):
+            logger.debug("Schema already up-to-date (index already exists — skipping)")
+        else:
+            raise
+    logger.info("AutoSys schema ensured (sync) on %s", engine.url)
     _seed_defaults_sync()
 
 
@@ -131,9 +138,15 @@ async def create_all_async(drop_first: bool = False) -> None:
         if drop_first:
             logger.warning("Dropping all AutoSys tables — all data will be lost!")
             await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+        try:
+            await conn.run_sync(Base.metadata.create_all)
+        except OperationalError as exc:
+            if "already exists" in str(exc):
+                logger.debug("Schema already up-to-date (index already exists — skipping)")
+            else:
+                raise
 
-    logger.info("AutoSys schema created (async) on %s", engine.url)
+    logger.info("AutoSys schema ensured (async) on %s", engine.url)
     await _seed_defaults_async()
 
 

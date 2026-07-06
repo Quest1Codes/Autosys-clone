@@ -1,0 +1,124 @@
+/* ============================================================
+   FILE: 02_reference_data_sync.jil
+   DOMAIN: Reference Data
+   SCHEDULE: Mon-Fri 06:00 before trading opens
+   STATUS: SUCCESS
+   DOWNSTREAM: 03_trade_capture, 22_corporate_actions, 33_sanctions_screening
+   ============================================================ */
+
+insert_job: ref_data_box   job_type: BOX
+owner: svc_refdata
+start_times: "06:00"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Security master, counterparty, legal entity, and calendar sync"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "06:00,10:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: refdata-ops@bank.com
+
+/* Step 1A: Sync security master from Bloomberg BBGID feed */
+insert_job: sync_security_master   job_type: CMD
+box_name: ref_data_box
+owner: svc_refdata
+command: /scripts/refdata/sync_security_master.py --source BLOOMBERG --date %%DATE%%
+machine: refdata-app-01
+profile: /etc/autosys/profiles/svc_refdata.sh
+std_out_file: /logs/refdata/%%YEAR%%/%%MM%%/security_master_%%DATE%%.out
+std_err_file: /logs/refdata/%%YEAR%%/%%MM%%/security_master_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 1B: Sync counterparty and legal entity data from DTCC */
+insert_job: sync_counterparty_data   job_type: CMD
+box_name: ref_data_box
+owner: svc_refdata
+command: /scripts/refdata/sync_counterparty.sh --source DTCC --date %%DATE%%
+machine: refdata-app-01
+profile: /etc/autosys/profiles/svc_refdata.sh
+std_out_file: /logs/refdata/%%YEAR%%/%%MM%%/counterparty_%%DATE%%.out
+std_err_file: /logs/refdata/%%YEAR%%/%%MM%%/counterparty_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 1C: Sync trading calendar and holiday data */
+insert_job: sync_calendar_data   job_type: CMD
+box_name: ref_data_box
+owner: svc_refdata
+command: /scripts/refdata/sync_calendars.sh --markets ALL
+machine: refdata-app-01
+profile: /etc/autosys/profiles/svc_refdata.sh
+std_out_file: /logs/refdata/%%YEAR%%/%%MM%%/calendars_%%DATE%%.out
+std_err_file: /logs/refdata/%%YEAR%%/%%MM%%/calendars_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5
+
+/* Step 2: Validate referential integrity across all ref data tables */
+insert_job: validate_ref_data_integrity   job_type: CMD
+box_name: ref_data_box
+owner: svc_refdata
+command: /scripts/refdata/validate_integrity.py --date %%DATE%% --strict
+machine: refdata-app-01
+profile: /etc/autosys/profiles/svc_refdata.sh
+condition: success(sync_security_master) & success(sync_counterparty_data) & success(sync_calendar_data)
+std_out_file: /logs/refdata/%%YEAR%%/%%MM%%/integrity_%%DATE%%.out
+std_err_file: /logs/refdata/%%YEAR%%/%%MM%%/integrity_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Publish golden copy of ref data to downstream consumers */
+insert_job: publish_ref_data_golden_copy   job_type: CMD
+box_name: ref_data_box
+owner: svc_refdata
+command: /scripts/refdata/publish_golden.sh --topic REFDATA_READY --date %%DATE%%
+machine: refdata-app-01
+profile: /etc/autosys/profiles/svc_refdata.sh
+condition: success(validate_ref_data_integrity)
+std_out_file: /logs/refdata/%%YEAR%%/%%MM%%/publish_%%DATE%%.out
+std_err_file: /logs/refdata/%%YEAR%%/%%MM%%/publish_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5
+
+/* FAILURE HANDLER: Rollback to T-1 ref data if sync fails */
+insert_job: rollback_to_prior_ref_data   job_type: CMD
+box_name: ref_data_box
+owner: svc_refdata
+command: /scripts/refdata/rollback_refdata.sh --fallback_date %%YESTERDAY%%
+machine: refdata-app-01
+profile: /etc/autosys/profiles/svc_refdata.sh
+condition: failure(validate_ref_data_integrity)
+std_out_file: /logs/refdata/%%YEAR%%/%%MM%%/rollback_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 5

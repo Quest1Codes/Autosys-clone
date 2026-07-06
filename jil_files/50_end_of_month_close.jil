@@ -1,0 +1,145 @@
+/* ============================================================
+   FILE: 50_end_of_month_close.jil
+   DOMAIN: Month-End Close — Master Orchestrator
+   SCHEDULE: Last business day of month, 21:00
+   STATUS: INACTIVE (waits for all EOD workflows; triggered manually on month-end)
+   UPSTREAM: ALL — requires success of 11_gl_posting, 12_regulatory_reporting,
+             13_portfolio_nav, 10_pnl_calculation, 06_risk_engine,
+             30_client_reporting, 44_fund_accounting, 42_tax_reporting
+   DOWNSTREAM: None (terminal — closes books for the month)
+   ============================================================ */
+
+insert_job: month_end_close_box   job_type: BOX
+owner: svc_accounting
+condition: success(gl_posting_box) & success(regulatory_box) & success(portfolio_nav_box) & success(pnl_box) & success(risk_engine_box) & success(client_reporting_box) & success(fund_accounting_box) & success(tax_reporting_box)
+alarm_if_fail: 1
+max_run_alarm: 300
+description: "Month-end book close: lock accounting periods, produce final P&L, distribute reports"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "21:00,06:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: cfo@bank.com
+
+/* Step 1: Lock the trading period — prevent any further bookings */
+insert_job: lock_accounting_period   job_type: CMD
+box_name: month_end_close_box
+owner: svc_accounting
+command: /scripts/monthend/lock_period.sh --period %%MM%% --gl_system SAP_FICO --confirm
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/lock_%%DATE%%.out
+std_err_file: /logs/monthend/%%YEAR%%/%%MM%%/lock_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 0
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 5
+
+/* Step 2: Run final month-end P&L reconciliation */
+insert_job: month_end_pnl_reconciliation   job_type: CMD
+box_name: month_end_close_box
+owner: svc_accounting
+command: /scripts/monthend/pnl_recon.py --period %%MM%% --sign_off cfo@bank.com
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: success(lock_accounting_period)
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/pnl_recon_%%DATE%%.out
+std_err_file: /logs/monthend/%%YEAR%%/%%MM%%/pnl_recon_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 0
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 20
+
+/* Step 3: Produce month-end management accounts pack */
+insert_job: produce_management_accounts   job_type: CMD
+box_name: month_end_close_box
+owner: svc_accounting
+command: /scripts/monthend/mgmt_accounts.py --period %%MM%% --format PDF --recipients board@bank.com
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: success(month_end_pnl_reconciliation)
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/mgmt_accounts_%%DATE%%.out
+std_err_file: /logs/monthend/%%YEAR%%/%%MM%%/mgmt_accounts_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+/* Step 4: Submit month-end regulatory returns */
+insert_job: submit_month_end_regulatory_returns   job_type: CMD
+box_name: month_end_close_box
+owner: svc_compliance
+command: /scripts/monthend/submit_returns.sh --period %%MM%% --regulators FED,OCC,FCA
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(month_end_pnl_reconciliation)
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/reg_returns_%%DATE%%.out
+std_err_file: /logs/monthend/%%YEAR%%/%%MM%%/reg_returns_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 10
+
+/* Step 5: Publish month-end investor factsheets */
+insert_job: publish_monthly_factsheets   job_type: CMD
+box_name: month_end_close_box
+owner: svc_clientsvc
+command: /scripts/monthend/gen_factsheets.py --period %%MM%% --distribute PORTAL,EMAIL
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_clientsvc.sh
+condition: success(produce_management_accounts)
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/factsheets_%%DATE%%.out
+std_err_file: /logs/monthend/%%YEAR%%/%%MM%%/factsheets_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+/* Step 6: Finalise and archive all month-end artefacts */
+insert_job: archive_month_end_artefacts   job_type: CMD
+box_name: month_end_close_box
+owner: svc_dataeng
+command: /scripts/monthend/archive_artefacts.sh --period %%MM%% --storage WORM_S3
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(submit_month_end_regulatory_returns) & success(publish_monthly_factsheets)
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/archive_%%DATE%%.out
+std_err_file: /logs/monthend/%%YEAR%%/%%MM%%/archive_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+/* FAILURE HANDLER: Escalate to C-suite if month-end close fails */
+insert_job: month_end_close_failure_escalation   job_type: CMD
+box_name: month_end_close_box
+owner: svc_accounting
+command: /scripts/alerts/escalate_ceo.sh "MONTH-END CLOSE FAILURE %%MM%%" --notify cfo@bank.com,coo@bank.com,ceo@bank.com --page
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: failure(month_end_pnl_reconciliation)
+std_out_file: /logs/monthend/%%YEAR%%/%%MM%%/escalation_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

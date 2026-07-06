@@ -1,0 +1,127 @@
+/* ============================================================
+   FILE: 03_trade_capture.jil
+   DOMAIN: Trade Processing
+   SCHEDULE: Triggered after market data + ref data ready
+   STATUS: RUNNING
+   UPSTREAM: 01_market_data_ingest (mkt_data_ingest_box)
+             02_reference_data_sync (ref_data_box)
+   DOWNSTREAM: 04_trade_booking, 29_trade_confirmation, 33_sanctions_screening
+   ============================================================ */
+
+insert_job: trade_capture_box   job_type: BOX
+owner: svc_trade
+condition: success(mkt_data_ingest_box) & success(ref_data_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 120
+description: "Trade capture: OMS + FIS/Murex feed extraction, validation, enrichment"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: trade-ops@bank.com
+
+/* Step 1A: Extract trade feed from Order Management System (OMS) */
+insert_job: extract_oms_trade_feed   job_type: CMD
+box_name: trade_capture_box
+owner: svc_trade
+command: /scripts/trade/extract_oms.sh --date %%DATE%% --output /data/trade/oms_raw_%%DATE%%.csv
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_trade.sh
+std_out_file: /logs/trade/%%YEAR%%/%%MM%%/extract_oms_%%DATE%%.out
+std_err_file: /logs/trade/%%YEAR%%/%%MM%%/extract_oms_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 1B: Extract trade feed from FIS/Murex middle-office system */
+insert_job: extract_murex_trade_feed   job_type: CMD
+box_name: trade_capture_box
+owner: svc_trade
+command: /scripts/trade/extract_murex.sh --date %%DATE%% --output /data/trade/murex_raw_%%DATE%%.csv
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_trade.sh
+std_out_file: /logs/trade/%%YEAR%%/%%MM%%/extract_murex_%%DATE%%.out
+std_err_file: /logs/trade/%%YEAR%%/%%MM%%/extract_murex_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 2: Merge and deduplicate OMS + Murex trade feeds */
+insert_job: merge_trade_feeds   job_type: CMD
+box_name: trade_capture_box
+owner: svc_trade
+command: /scripts/trade/merge_feeds.py --oms /data/trade/oms_raw_%%DATE%%.csv --murex /data/trade/murex_raw_%%DATE%%.csv --output /data/trade/merged_%%DATE%%.csv
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: success(extract_oms_trade_feed) & success(extract_murex_trade_feed)
+std_out_file: /logs/trade/%%YEAR%%/%%MM%%/merge_%%DATE%%.out
+std_err_file: /logs/trade/%%YEAR%%/%%MM%%/merge_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Validate trade records against business rules */
+insert_job: validate_trade_records   job_type: CMD
+box_name: trade_capture_box
+owner: svc_trade
+command: /scripts/trade/validate_trades.py --input /data/trade/merged_%%DATE%%.csv --rules /config/trade_validation_rules.json
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: success(merge_trade_feeds)
+std_out_file: /logs/trade/%%YEAR%%/%%MM%%/validate_%%DATE%%.out
+std_err_file: /logs/trade/%%YEAR%%/%%MM%%/validate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Enrich trades with security master and counterparty ref data */
+insert_job: enrich_trades_with_ref_data   job_type: CMD
+box_name: trade_capture_box
+owner: svc_trade
+command: /scripts/trade/enrich_trades.py --date %%DATE%% --ref_date %%DATE%%
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: success(validate_trade_records)
+std_out_file: /logs/trade/%%YEAR%%/%%MM%%/enrich_%%DATE%%.out
+std_err_file: /logs/trade/%%YEAR%%/%%MM%%/enrich_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 5: Quarantine trades that failed validation for manual review */
+insert_job: quarantine_failed_trades   job_type: CMD
+box_name: trade_capture_box
+owner: svc_trade
+command: /scripts/trade/quarantine_trades.sh --date %%DATE%% --notify ops-team@bank.com
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: failure(validate_trade_records)
+std_out_file: /logs/trade/%%YEAR%%/%%MM%%/quarantine_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

@@ -4,9 +4,9 @@ trigger: always_on
 
 # AutoSys Clone — Reference Rules (Always On)
 
-This project (`autosys-astronomer`) is a clone of Broadcom AutoSys Workload
+This project (`autosys-clone`) is a clone of Broadcom AutoSys Workload
 Automation (AE + WCC). Source manual (3,731 pages, AutoSys WA 12.0):
-`/Users/Raghav/Quest1/autosys-astronomer/auotsys/ca-workload-automation-ae-amp-workload-control-center-validate-source.pdf`
+`/Users/micheal/quest1works/AutosysToAstronomer/autosys-clone/ca-workload-automation-ae-amp-workload-control-center-validate-source.pdf`
 
 For anything beyond this digest, consult the `autosys-manual` skill
 (`.agents/skills/autosys-manual/`) — it loads the relevant chapter on demand

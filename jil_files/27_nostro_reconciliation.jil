@@ -1,0 +1,110 @@
+/* ============================================================
+   FILE: 27_nostro_reconciliation.jil
+   DOMAIN: Nostro / Vostro Reconciliation
+   STATUS: FAILURE handler active (breaks occur daily)
+   UPSTREAM: 09_payments_treasury (payments_box)
+             26_cash_management (cash_management_box)
+             28_swift_messaging (swift_messaging_box)
+   DOWNSTREAM: 11_gl_posting (break entries)
+   ============================================================ */
+
+insert_job: nostro_recon_box   job_type: BOX
+owner: svc_operations
+condition: success(payments_box) & success(cash_management_box) & success(swift_messaging_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Reconcile internal ledger cash positions vs bank statements for all Nostro accounts"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: treasury-ops@bank.com
+
+/* Step 1: Load bank statements via SWIFT MT940/MT942 messages */
+insert_job: load_bank_statements_swift   job_type: CMD
+box_name: nostro_recon_box
+owner: svc_operations
+command: /scripts/nostro/load_statements.py --date %%DATE%% --format MT940,MT942
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/statements_%%DATE%%.out
+std_err_file: /logs/nostro/%%YEAR%%/%%MM%%/statements_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Match internal ledger entries against bank statement lines */
+insert_job: match_ledger_vs_statement   job_type: CMD
+box_name: nostro_recon_box
+owner: svc_operations
+command: /scripts/nostro/match_entries.py --date %%DATE%% --tolerance 0.01
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(load_bank_statements_swift)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/match_%%DATE%%.out
+std_err_file: /logs/nostro/%%YEAR%%/%%MM%%/match_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3: Classify and age outstanding nostro breaks */
+insert_job: classify_nostro_breaks   job_type: CMD
+box_name: nostro_recon_box
+owner: svc_operations
+command: /scripts/nostro/classify_breaks.py --date %%DATE%% --aging_thresholds 1D,3D,5D
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(match_ledger_vs_statement)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/breaks_%%DATE%%.out
+std_err_file: /logs/nostro/%%YEAR%%/%%MM%%/breaks_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 4: Auto-resolve timing differences (in-transit items) */
+insert_job: auto_resolve_timing_differences   job_type: CMD
+box_name: nostro_recon_box
+owner: svc_operations
+command: /scripts/nostro/auto_resolve.py --date %%DATE%% --max_age 2
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(classify_nostro_breaks)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/auto_resolve_%%DATE%%.out
+std_err_file: /logs/nostro/%%YEAR%%/%%MM%%/auto_resolve_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5
+
+/* FAILURE HANDLER: Escalate aged breaks > $100K to treasury ops */
+insert_job: escalate_aged_nostro_breaks   job_type: CMD
+box_name: nostro_recon_box
+owner: svc_operations
+command: /scripts/nostro/escalate_breaks.sh --date %%DATE%% --threshold 100000 --notify treasury-ops@bank.com
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: failure(auto_resolve_timing_differences)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/escalate_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

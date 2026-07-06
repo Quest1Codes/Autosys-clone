@@ -1,0 +1,67 @@
+/* ============================================================
+   FILE: 40_intraday_risk_monitor.jil
+   DOMAIN: Intraday Real-Time Risk Monitoring
+   SCHEDULE: Every 30 minutes during trading hours (07:00-21:00)
+   STATUS: RUNNING (continuous throughout trading day)
+   UPSTREAM: Standalone (reads live positions from in-memory cache)
+   DOWNSTREAM: Alerts to risk desk
+   ============================================================ */
+
+/* Standalone: Compute intraday P&L and risk metrics every 30 min */
+insert_job: intraday_pnl_snapshot   job_type: CMD
+owner: svc_risk
+command: /scripts/risk/intraday_pnl.py --snapshot_time %%TIME%% --positions LIVE_CACHE
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+start_times: "07:00,07:30,08:00,08:30,09:00,09:30,10:00,10:30,11:00,11:30,12:00,12:30,13:00,13:30,14:00,14:30,15:00,15:30,16:00,16:30,17:00,17:30,18:00,18:30,19:00,19:30,20:00,20:30,21:00"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+timezone: US/Eastern
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/intraday_pnl_%%TIME%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/intraday_pnl_%%TIME%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 12
+job_load: 10
+
+/* Standalone: Check intraday VaR — every hour */
+insert_job: intraday_var_check   job_type: CMD
+owner: svc_risk
+command: /scripts/risk/intraday_var.py --time %%TIME%% --confidence 0.99 --alert_threshold 0.80
+machine: risk-compute-02
+profile: /etc/autosys/profiles/svc_risk.sh
+start_times: "07:00,08:00,09:00,10:00,11:00,12:00,13:00,14:00,15:00,16:00,17:00,18:00,19:00,20:00,21:00"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+timezone: US/Eastern
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/intraday_var_%%TIME%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/intraday_var_%%TIME%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 18
+job_load: 20
+
+/* Standalone: Broker credit line utilisation check — every 2 hours */
+insert_job: intraday_credit_line_check   job_type: CMD
+owner: svc_risk
+command: /scripts/risk/credit_line_util.py --time %%TIME%% --threshold_pct 80
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+start_times: "08:00,10:00,12:00,14:00,16:00,18:00"
+days_of_week: mo,tu,we,th,fr
+timezone: US/Eastern
+std_out_file: /logs/risk/%%YEAR%%/%%MM%%/credit_util_%%TIME%%.out
+std_err_file: /logs/risk/%%YEAR%%/%%MM%%/credit_util_%%TIME%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 12
+job_load: 5

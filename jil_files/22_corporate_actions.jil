@@ -1,0 +1,94 @@
+/* ============================================================
+   FILE: 22_corporate_actions.jil
+   DOMAIN: Corporate Actions Processing
+   STATUS: SUCCESS
+   UPSTREAM: 02_reference_data_sync (ref_data_box)
+   DOWNSTREAM: 05_position_management (position adjustments)
+               23_dividend_processing
+   ============================================================ */
+
+insert_job: corporate_actions_box   job_type: BOX
+owner: svc_operations
+condition: success(ref_data_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Process corporate actions: splits, mergers, rights issues, spin-offs"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "07:00,12:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: ops@bank.com
+
+/* Step 1: Fetch pending corporate action announcements from DTCC CA Web */
+insert_job: fetch_corporate_action_announcements   job_type: CMD
+box_name: corporate_actions_box
+owner: svc_operations
+command: /scripts/ca/fetch_announcements.py --date %%DATE%% --source DTCC_CA_WEB,SWIFT_CA
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+std_out_file: /logs/ca/%%YEAR%%/%%MM%%/announcements_%%DATE%%.out
+std_err_file: /logs/ca/%%YEAR%%/%%MM%%/announcements_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Validate and enrich CA events with security master data */
+insert_job: validate_corporate_actions   job_type: CMD
+box_name: corporate_actions_box
+owner: svc_operations
+command: /scripts/ca/validate_ca.py --date %%DATE%%
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(fetch_corporate_action_announcements)
+std_out_file: /logs/ca/%%YEAR%%/%%MM%%/validate_%%DATE%%.out
+std_err_file: /logs/ca/%%YEAR%%/%%MM%%/validate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Apply mandatory corporate actions (splits, name changes) */
+insert_job: apply_mandatory_corporate_actions   job_type: CMD
+box_name: corporate_actions_box
+owner: svc_operations
+command: /scripts/ca/apply_mandatory.py --date %%DATE%% --types SPLIT,MERGER,SPINOFF
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(validate_corporate_actions)
+std_out_file: /logs/ca/%%YEAR%%/%%MM%%/mandatory_%%DATE%%.out
+std_err_file: /logs/ca/%%YEAR%%/%%MM%%/mandatory_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 4: Send voluntary CA election notifications to portfolio managers */
+insert_job: notify_voluntary_ca_elections   job_type: CMD
+box_name: corporate_actions_box
+owner: svc_operations
+command: /scripts/ca/notify_elections.sh --date %%DATE%% --types RIGHTS_ISSUE,TENDER_OFFER --notify pm-team@bank.com
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(validate_corporate_actions)
+std_out_file: /logs/ca/%%YEAR%%/%%MM%%/elections_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

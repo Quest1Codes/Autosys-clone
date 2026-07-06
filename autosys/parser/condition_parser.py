@@ -527,7 +527,19 @@ def evaluate(
 
     def _eval(n: ConditionNode) -> bool:
         if isinstance(n, JobCondNode):
-            status = job_statuses.get(n.job_name, "INACTIVE")
+            raw = job_statuses.get(n.job_name, "INACTIVE")
+            # Normalise to a JobStatus enum so _FUNC_CHECKS lambdas work
+            # regardless of whether the snapshot contains ints or strings.
+            if isinstance(raw, int):
+                try:
+                    status: JobStatus = JobStatus(raw)
+                except ValueError:
+                    status = JobStatus.INACTIVE
+            else:
+                try:
+                    status = JobStatus[str(raw).upper()]
+                except KeyError:
+                    status = JobStatus.INACTIVE
             checker = _FUNC_CHECKS.get(n.func)
             if checker is None:
                 raise ValueError(f"Unknown condition function: {n.func!r}")

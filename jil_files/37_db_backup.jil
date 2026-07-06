@@ -1,0 +1,107 @@
+/* ============================================================
+   FILE: 37_db_backup.jil
+   DOMAIN: Infrastructure — Database Backup
+   SCHEDULE: Daily 01:00 (low-traffic window)
+   STATUS: SUCCESS
+   UPSTREAM: 35_audit_trail (audit_trail_box)
+             15_dw_etl (dw_etl_box)
+   DOWNSTREAM: 49_disaster_recovery (uses backup artifacts)
+   ============================================================ */
+
+insert_job: db_backup_box   job_type: BOX
+owner: svc_infra
+condition: success(audit_trail_box) & success(dw_etl_box)
+start_times: "01:00"
+days_of_week: all
+alarm_if_fail: 1
+max_run_alarm: 120
+description: "Full and incremental database backups for all production systems"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "01:00,06:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: infra-team@bank.com
+
+insert_job: backup_trade_database   job_type: CMD
+box_name: db_backup_box
+owner: svc_infra
+command: /scripts/backup/pg_backup.sh --db TRADE_DB --type INCREMENTAL --compress --encrypt
+machine: db-backup-01
+profile: /etc/autosys/profiles/svc_infra.sh
+std_out_file: /logs/backup/%%YEAR%%/%%MM%%/trade_db_%%DATE%%.out
+std_err_file: /logs/backup/%%YEAR%%/%%MM%%/trade_db_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 20
+
+insert_job: backup_risk_database   job_type: CMD
+box_name: db_backup_box
+owner: svc_infra
+command: /scripts/backup/pg_backup.sh --db RISK_DB --type INCREMENTAL --compress --encrypt
+machine: db-backup-01
+profile: /etc/autosys/profiles/svc_infra.sh
+std_out_file: /logs/backup/%%YEAR%%/%%MM%%/risk_db_%%DATE%%.out
+std_err_file: /logs/backup/%%YEAR%%/%%MM%%/risk_db_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 20
+
+insert_job: backup_gl_database   job_type: CMD
+box_name: db_backup_box
+owner: svc_infra
+command: /scripts/backup/ora_backup.sh --db SAP_FICO --type FULL --compress --encrypt
+machine: db-backup-02
+profile: /etc/autosys/profiles/svc_infra.sh
+std_out_file: /logs/backup/%%YEAR%%/%%MM%%/gl_db_%%DATE%%.out
+std_err_file: /logs/backup/%%YEAR%%/%%MM%%/gl_db_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 20
+
+insert_job: verify_backup_integrity   job_type: CMD
+box_name: db_backup_box
+owner: svc_infra
+command: /scripts/backup/verify_checksums.sh --date %%DATE%%
+machine: db-backup-01
+profile: /etc/autosys/profiles/svc_infra.sh
+condition: success(backup_trade_database) & success(backup_risk_database) & success(backup_gl_database)
+std_out_file: /logs/backup/%%YEAR%%/%%MM%%/verify_%%DATE%%.out
+std_err_file: /logs/backup/%%YEAR%%/%%MM%%/verify_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 5
+
+insert_job: replicate_backups_to_dr_site   job_type: CMD
+box_name: db_backup_box
+owner: svc_infra
+command: /scripts/backup/replicate_to_dr.sh --date %%DATE%% --dr_site DR_DATACENTER_NJ
+machine: db-backup-01
+profile: /etc/autosys/profiles/svc_infra.sh
+condition: success(verify_backup_integrity)
+std_out_file: /logs/backup/%%YEAR%%/%%MM%%/replicate_%%DATE%%.out
+std_err_file: /logs/backup/%%YEAR%%/%%MM%%/replicate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 10

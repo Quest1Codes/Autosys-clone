@@ -153,6 +153,9 @@ _DIRECTIVES = frozenset({
     "delete_resource",
     "insert_connectionprofile",
     "delete_connectionprofile",
+    "insert_calendar",
+    "update_calendar",
+    "delete_calendar",
 })
 
 # Stanza header line:  directive_name: job_name  [attr: val  attr: val  ...]

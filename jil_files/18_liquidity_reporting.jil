@@ -1,0 +1,94 @@
+/* ============================================================
+   FILE: 18_liquidity_reporting.jil
+   DOMAIN: Liquidity Risk Reporting (LCR / NSFR)
+   STATUS: RUNNING
+   UPSTREAM: 06_risk_engine (risk_engine_box)
+             10_pnl_calculation (pnl_box)
+             26_cash_management (cash_management_box)
+   DOWNSTREAM: 12_regulatory_reporting
+   ============================================================ */
+
+insert_job: liquidity_reporting_box   job_type: BOX
+owner: svc_treasury
+condition: success(risk_engine_box) & success(pnl_box) & success(cash_management_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Compute and report LCR, NSFR and intraday liquidity metrics per Basel III"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,23:30"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: treasury-ops@bank.com
+
+/* Step 1: Compute Liquidity Coverage Ratio (LCR) */
+insert_job: compute_lcr   job_type: CMD
+box_name: liquidity_reporting_box
+owner: svc_treasury
+command: /scripts/liquidity/compute_lcr.py --date %%DATE%% --threshold 1.0
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+std_out_file: /logs/liquidity/%%YEAR%%/%%MM%%/lcr_%%DATE%%.out
+std_err_file: /logs/liquidity/%%YEAR%%/%%MM%%/lcr_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 2: Compute Net Stable Funding Ratio (NSFR) */
+insert_job: compute_nsfr   job_type: CMD
+box_name: liquidity_reporting_box
+owner: svc_treasury
+command: /scripts/liquidity/compute_nsfr.py --date %%DATE%% --threshold 1.0
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+std_out_file: /logs/liquidity/%%YEAR%%/%%MM%%/nsfr_%%DATE%%.out
+std_err_file: /logs/liquidity/%%YEAR%%/%%MM%%/nsfr_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3: Produce liquidity gap analysis (30-day and 1-year horizons) */
+insert_job: compute_liquidity_gap   job_type: CMD
+box_name: liquidity_reporting_box
+owner: svc_treasury
+command: /scripts/liquidity/gap_analysis.py --date %%DATE%% --horizons 30D,1Y
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(compute_lcr) & success(compute_nsfr)
+std_out_file: /logs/liquidity/%%YEAR%%/%%MM%%/gap_%%DATE%%.out
+std_err_file: /logs/liquidity/%%YEAR%%/%%MM%%/gap_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Alert treasurer if LCR drops below 110% early-warning threshold */
+insert_job: lcr_early_warning_alert   job_type: CMD
+box_name: liquidity_reporting_box
+owner: svc_treasury
+command: /scripts/liquidity/early_warning.py --date %%DATE%% --lcr_floor 1.10 --notify treasurer@bank.com
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(compute_lcr)
+std_out_file: /logs/liquidity/%%YEAR%%/%%MM%%/early_warning_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

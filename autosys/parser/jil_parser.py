@@ -143,6 +143,9 @@ _DIRECTIVE_TO_OP: dict[str, str] = {
     "delete_resource": "delete_resource",
     "insert_connectionprofile": "insert_connectionprofile",
     "delete_connectionprofile": "delete_connectionprofile",
+    "insert_calendar": "insert_calendar",
+    "update_calendar": "update_calendar",
+    "delete_calendar": "delete_calendar",
 }
 
 # Machine integer attributes
@@ -287,6 +290,8 @@ class JILParser:
             name_key = "machine_name"
         elif "resource" in op_code:
             name_key = "resource_name"
+        elif "calendar" in op_code:
+            name_key = "calendar_name"
         elif "glob" in op_code:
             name_key = "global_name"
         elif "blob" in op_code:

@@ -1,0 +1,123 @@
+/* ============================================================
+   FILE: 04_trade_booking.jil
+   DOMAIN: Trade Processing — Booking
+   STATUS: SUCCESS (normal) / FAILURE path active on booking errors
+   UPSTREAM: 03_trade_capture (trade_capture_box)
+   DOWNSTREAM: 05_position_management, 08_settlement, 29_trade_confirmation
+   ============================================================ */
+
+insert_job: trade_booking_box   job_type: BOX
+owner: svc_trade
+condition: success(trade_capture_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Book all enriched trades into core systems by asset class"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:30,23:30"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: trade-ops@bank.com
+
+/* Step 1A: Book equity and ETF trades */
+insert_job: book_equity_trades   job_type: CMD
+box_name: trade_booking_box
+owner: svc_trade
+command: /scripts/booking/book_equity.sh --date %%DATE%% --asset_class EQUITY
+machine: trade-booking-01
+profile: /etc/autosys/profiles/svc_trade.sh
+std_out_file: /logs/booking/%%YEAR%%/%%MM%%/equity_%%DATE%%.out
+std_err_file: /logs/booking/%%YEAR%%/%%MM%%/equity_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 10
+
+/* Step 1B: Book fixed income and bond trades */
+insert_job: book_fixed_income_trades   job_type: CMD
+box_name: trade_booking_box
+owner: svc_trade
+command: /scripts/booking/book_fi.sh --date %%DATE%% --asset_class FIXED_INCOME
+machine: trade-booking-01
+profile: /etc/autosys/profiles/svc_trade.sh
+std_out_file: /logs/booking/%%YEAR%%/%%MM%%/fi_%%DATE%%.out
+std_err_file: /logs/booking/%%YEAR%%/%%MM%%/fi_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 10
+
+/* Step 1C: Book OTC derivative and structured product trades */
+insert_job: book_derivative_trades   job_type: CMD
+box_name: trade_booking_box
+owner: svc_trade
+command: /scripts/booking/book_derivatives.sh --date %%DATE%% --asset_class DERIVATIVES
+machine: trade-booking-02
+profile: /etc/autosys/profiles/svc_trade.sh
+std_out_file: /logs/booking/%%YEAR%%/%%MM%%/deriv_%%DATE%%.out
+std_err_file: /logs/booking/%%YEAR%%/%%MM%%/deriv_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 45
+min_run_alarm: 3
+term_run_time: 50
+job_load: 15
+
+/* Step 2: Confirm all bookings reconcile to trade capture count */
+insert_job: confirm_trade_bookings   job_type: CMD
+box_name: trade_booking_box
+owner: svc_trade
+command: /scripts/booking/confirm_bookings.py --date %%DATE%% --tolerance 0
+machine: trade-booking-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: success(book_equity_trades) & success(book_fixed_income_trades) & success(book_derivative_trades)
+std_out_file: /logs/booking/%%YEAR%%/%%MM%%/confirm_%%DATE%%.out
+std_err_file: /logs/booking/%%YEAR%%/%%MM%%/confirm_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 5
+
+/* Step 3: Write immutable booking audit log */
+insert_job: trade_booking_audit_log   job_type: CMD
+box_name: trade_booking_box
+owner: svc_trade
+command: /scripts/booking/write_audit.sh --date %%DATE%% --sign HMAC
+machine: trade-booking-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: success(confirm_trade_bookings)
+std_out_file: /logs/booking/%%YEAR%%/%%MM%%/audit_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5
+
+/* FAILURE HANDLER: Auto-retry unmatched bookings then escalate */
+insert_job: retry_unmatched_bookings   job_type: CMD
+box_name: trade_booking_box
+owner: svc_trade
+command: /scripts/booking/retry_unmatched.sh --date %%DATE%% --notify middle-office@bank.com
+machine: trade-booking-01
+profile: /etc/autosys/profiles/svc_trade.sh
+condition: failure(confirm_trade_bookings)
+std_out_file: /logs/booking/%%YEAR%%/%%MM%%/retry_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 15
+job_load: 2

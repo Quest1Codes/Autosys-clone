@@ -52,6 +52,7 @@ from autosys.parser.condition_parser import (
     evaluate,
     ConditionSyntaxError as ConditionParseError,
 )
+from autosys.scheduler.state_machine import _norm_status
 
 
 def is_satisfied(
@@ -163,4 +164,4 @@ def build_status_snapshot(session) -> dict[str, str]:
     """
     from autosys.db.repository import jobs as job_repo
     rows = job_repo.list_all(session)
-    return {row.job_name: (row.status or "INACTIVE") for row in rows}
+    return {row.job_name: _norm_status(row.status) for row in rows}

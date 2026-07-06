@@ -1,0 +1,89 @@
+/* ============================================================
+   FILE: 36_data_quality_checks.jil
+   DOMAIN: Data Quality & Integrity Monitoring
+   SCHEDULE: Nightly after DW ETL completes
+   STATUS: RUNNING
+   UPSTREAM: 15_dw_etl (dw_etl_box)
+   DOWNSTREAM: 39_archival_purge
+   ============================================================ */
+
+insert_job: data_quality_box   job_type: BOX
+owner: svc_dataeng
+condition: success(dw_etl_box)
+days_of_week: mo,tu,we,th,fr
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Run Great Expectations data quality checks across all DW domains"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "04:00,08:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: data-stewards@bank.com
+
+insert_job: dq_check_trade_data   job_type: CMD
+box_name: data_quality_box
+owner: svc_dataeng
+command: /scripts/dq/run_ge_suite.py --suite trade_data_suite --date %%DATE%%
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+std_out_file: /logs/dq/%%YEAR%%/%%MM%%/trade_%%DATE%%.out
+std_err_file: /logs/dq/%%YEAR%%/%%MM%%/trade_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: dq_check_risk_data   job_type: CMD
+box_name: data_quality_box
+owner: svc_dataeng
+command: /scripts/dq/run_ge_suite.py --suite risk_data_suite --date %%DATE%%
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(dq_check_trade_data)
+std_out_file: /logs/dq/%%YEAR%%/%%MM%%/risk_%%DATE%%.out
+std_err_file: /logs/dq/%%YEAR%%/%%MM%%/risk_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: dq_check_ref_data   job_type: CMD
+box_name: data_quality_box
+owner: svc_dataeng
+command: /scripts/dq/run_ge_suite.py --suite ref_data_suite --date %%DATE%%
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+std_out_file: /logs/dq/%%YEAR%%/%%MM%%/ref_%%DATE%%.out
+std_err_file: /logs/dq/%%YEAR%%/%%MM%%/ref_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: publish_dq_scorecard   job_type: CMD
+box_name: data_quality_box
+owner: svc_dataeng
+command: /scripts/dq/publish_scorecard.py --date %%DATE%% --notify data-stewards@bank.com
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(dq_check_risk_data) & success(dq_check_ref_data)
+std_out_file: /logs/dq/%%YEAR%%/%%MM%%/scorecard_%%DATE%%.out
+std_err_file: /logs/dq/%%YEAR%%/%%MM%%/scorecard_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

@@ -279,6 +279,23 @@ class EventProcessor:
         # Refresh again after box changes (children may have been activated)
         snapshot = build_status_snapshot(session)
 
+        # 2.5 Re-dispatch CMD jobs stuck in STARTING from a previous run/restart.
+        # Calling dispatch_fn again lets unregistered-machine jobs resolve to
+        # FAILURE (via AgentDispatch) and auto_complete stubs go to SUCCESS.
+        from autosys.scheduler.state_machine import _norm_status as _ns
+        for row in job_repo.list_all(session):
+            if row.job_type != "BOX" and _ns(row.status) == "STARTING":
+                logger.info("stuck-STARTING recovery: re-dispatching %r", row.job_name)
+                try:
+                    self._dispatch_fn(session, row)
+                except Exception as exc:
+                    logger.warning("re-dispatch error for %r: %s", row.job_name, exc)
+                if self.auto_complete and _ns(row.status) == "RUNNING":
+                    row.status   = JobStatus.SUCCESS.value
+                    row.last_end = now
+                    self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
+        snapshot = build_status_snapshot(session)
+
         # 3. Check time triggers (enqueue STARTJOB events for next tick)
         rows = job_repo.list_all(session)
         cal_rows = calendar_repo.list_all(session)
@@ -886,6 +903,7 @@ class EventProcessor:
         """Start all INACTIVE children of *box_name* whose conditions are met."""
         from sqlalchemy import select
         from autosys.db.schema import JobRow as JR
+        from autosys.scheduler.state_machine import _norm_status as _ns
 
         children = list(session.scalars(
             select(JR).where(JR.box_name == box_name)
@@ -898,7 +916,7 @@ class EventProcessor:
         snapshot = build_status_snapshot(session)
 
         for child in children:
-            if not is_startable(child.status or "INACTIVE"):
+            if not is_startable(child.status or JobStatus.INACTIVE.value):
                 continue
             if is_satisfied(child.condition, snapshot):
                 logger.info(
@@ -907,7 +925,7 @@ class EventProcessor:
                 )
                 self._activate_cmd(session, child, now)
                 # Update snapshot so subsequent siblings see this child's new status
-                snapshot[child.job_name] = child.status or "INACTIVE"
+                snapshot[child.job_name] = _ns(child.status)
 
     def _update_box_status(
         self,
@@ -936,9 +954,10 @@ class EventProcessor:
             self._emit_status_change(box_row.job_name, old, "SUCCESS")
             return
 
-        statuses = {c.job_name: (c.status or "INACTIVE") for c in children}
+        from autosys.scheduler.state_machine import _norm_status as _ns
+        statuses = {c.job_name: _ns(c.status) for c in children}
         vals     = list(statuses.values())
-        old      = box_row.status or "ACTIVATED"
+        old      = _ns(box_row.status) if box_row.status else "ACTIVATED"
 
         if any(s == "RUNNING" or s == "STARTING" for s in vals):
             if box_row.status == JobStatus.ACTIVATED.value:

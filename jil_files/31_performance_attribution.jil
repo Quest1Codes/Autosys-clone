@@ -1,0 +1,91 @@
+/* ============================================================
+   FILE: 31_performance_attribution.jil
+   DOMAIN: Performance Attribution & Analytics
+   STATUS: SUCCESS
+   UPSTREAM: 13_portfolio_nav (portfolio_nav_box)
+             46_benchmark_pricing (benchmark_pricing_box)
+   DOWNSTREAM: 30_client_reporting
+   ============================================================ */
+
+insert_job: perf_attribution_box   job_type: BOX
+owner: svc_portfolio
+condition: success(portfolio_nav_box) & success(benchmark_pricing_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Brinson-Hood-Beebower attribution, factor decomposition and risk-adjusted metrics"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,01:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: pm-team@bank.com
+
+insert_job: compute_bhb_attribution   job_type: CMD
+box_name: perf_attribution_box
+owner: svc_portfolio
+command: /scripts/perf/bhb_attribution.py --date %%DATE%% --model BRINSON_HOOD_BEEBOWER
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+std_out_file: /logs/perf/%%YEAR%%/%%MM%%/bhb_%%DATE%%.out
+std_err_file: /logs/perf/%%YEAR%%/%%MM%%/bhb_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+insert_job: compute_factor_attribution   job_type: CMD
+box_name: perf_attribution_box
+owner: svc_portfolio
+command: /scripts/perf/factor_attribution.py --date %%DATE%% --model BARRA_FACTOR
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(compute_bhb_attribution)
+std_out_file: /logs/perf/%%YEAR%%/%%MM%%/factor_%%DATE%%.out
+std_err_file: /logs/perf/%%YEAR%%/%%MM%%/factor_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 25
+min_run_alarm: 2
+term_run_time: 30
+job_load: 15
+
+insert_job: compute_risk_adjusted_metrics   job_type: CMD
+box_name: perf_attribution_box
+owner: svc_portfolio
+command: /scripts/perf/risk_metrics.py --date %%DATE%% --metrics SHARPE,INFORMATION_RATIO,MAX_DRAWDOWN
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(compute_bhb_attribution)
+std_out_file: /logs/perf/%%YEAR%%/%%MM%%/risk_metrics_%%DATE%%.out
+std_err_file: /logs/perf/%%YEAR%%/%%MM%%/risk_metrics_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: publish_attribution_report   job_type: CMD
+box_name: perf_attribution_box
+owner: svc_portfolio
+command: /scripts/perf/publish_report.sh --date %%DATE%% --recipients pm-team@bank.com,risk@bank.com
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(compute_factor_attribution) & success(compute_risk_adjusted_metrics)
+std_out_file: /logs/perf/%%YEAR%%/%%MM%%/publish_%%DATE%%.out
+std_err_file: /logs/perf/%%YEAR%%/%%MM%%/publish_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

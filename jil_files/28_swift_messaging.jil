@@ -1,0 +1,90 @@
+/* ============================================================
+   FILE: 28_swift_messaging.jil
+   DOMAIN: SWIFT Messaging Gateway
+   STATUS: RUNNING
+   UPSTREAM: 08_settlement (settlement_box)
+             09_payments_treasury (payments_box)
+   DOWNSTREAM: 27_nostro_reconciliation
+   ============================================================ */
+
+insert_job: swift_messaging_box   job_type: BOX
+owner: svc_operations
+condition: success(settlement_box) & success(payments_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Dispatch and receive SWIFT FIN and ISO 20022 messages via Alliance Gateway"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "07:00,22:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: ops@bank.com
+
+insert_job: dispatch_mt103_payments   job_type: CMD
+box_name: swift_messaging_box
+owner: svc_operations
+command: /scripts/swift/send_mt103.sh --date %%DATE%% --priority NORMAL,URGENT
+machine: swift-gateway-01
+profile: /etc/autosys/profiles/svc_operations.sh
+std_out_file: /logs/swift/%%YEAR%%/%%MM%%/mt103_%%DATE%%.out
+std_err_file: /logs/swift/%%YEAR%%/%%MM%%/mt103_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: dispatch_mt202_cover_payments   job_type: CMD
+box_name: swift_messaging_box
+owner: svc_operations
+command: /scripts/swift/send_mt202.sh --date %%DATE%%
+machine: swift-gateway-01
+profile: /etc/autosys/profiles/svc_operations.sh
+std_out_file: /logs/swift/%%YEAR%%/%%MM%%/mt202_%%DATE%%.out
+std_err_file: /logs/swift/%%YEAR%%/%%MM%%/mt202_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: process_inbound_swift_messages   job_type: CMD
+box_name: swift_messaging_box
+owner: svc_operations
+command: /scripts/swift/process_inbound.py --date %%DATE%% --types MT900,MT910,MT950
+machine: swift-gateway-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(dispatch_mt103_payments) & success(dispatch_mt202_cover_payments)
+std_out_file: /logs/swift/%%YEAR%%/%%MM%%/inbound_%%DATE%%.out
+std_err_file: /logs/swift/%%YEAR%%/%%MM%%/inbound_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+insert_job: validate_swift_ack_nack   job_type: CMD
+box_name: swift_messaging_box
+owner: svc_operations
+command: /scripts/swift/check_acks.py --date %%DATE%% --notify ops@bank.com
+machine: swift-gateway-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(process_inbound_swift_messages)
+std_out_file: /logs/swift/%%YEAR%%/%%MM%%/acks_%%DATE%%.out
+std_err_file: /logs/swift/%%YEAR%%/%%MM%%/acks_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

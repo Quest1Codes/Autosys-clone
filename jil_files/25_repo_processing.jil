@@ -1,0 +1,95 @@
+/* ============================================================
+   FILE: 25_repo_processing.jil
+   DOMAIN: Repo / Reverse Repo Processing
+   STATUS: RUNNING
+   UPSTREAM: 03_trade_capture (trade_capture_box)
+             20_collateral_management (collateral_mgmt_box)
+   DOWNSTREAM: 09_payments_treasury, 26_cash_management
+   ============================================================ */
+
+insert_job: repo_processing_box   job_type: BOX
+owner: svc_secfinance
+condition: success(trade_capture_box) & success(collateral_mgmt_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Process repo, reverse repo, and tri-party repo transactions"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "07:00,20:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: secfinance@bank.com
+
+/* Step 1: Extract repo and reverse repo trade confirmations */
+insert_job: extract_repo_confirmations   job_type: CMD
+box_name: repo_processing_box
+owner: svc_secfinance
+command: /scripts/repo/extract_confirms.sh --date %%DATE%% --types REPO,REVERSE_REPO,TRI_PARTY
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+std_out_file: /logs/repo/%%YEAR%%/%%MM%%/confirms_%%DATE%%.out
+std_err_file: /logs/repo/%%YEAR%%/%%MM%%/confirms_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Process repo opening legs (cash out, collateral in) */
+insert_job: process_repo_opening_legs   job_type: CMD
+box_name: repo_processing_box
+owner: svc_secfinance
+command: /scripts/repo/process_openings.py --date %%DATE%%
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+condition: success(extract_repo_confirmations)
+std_out_file: /logs/repo/%%YEAR%%/%%MM%%/openings_%%DATE%%.out
+std_err_file: /logs/repo/%%YEAR%%/%%MM%%/openings_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Process repo closing legs (cash in + interest, collateral return) */
+insert_job: process_repo_closing_legs   job_type: CMD
+box_name: repo_processing_box
+owner: svc_secfinance
+command: /scripts/repo/process_closings.py --date %%DATE%% --accrual_basis ACT_360
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+condition: success(extract_repo_confirmations)
+std_out_file: /logs/repo/%%YEAR%%/%%MM%%/closings_%%DATE%%.out
+std_err_file: /logs/repo/%%YEAR%%/%%MM%%/closings_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 4: Reconcile repo book with tri-party agent (BNY/Clearstream) */
+insert_job: reconcile_repo_with_triparty   job_type: CMD
+box_name: repo_processing_box
+owner: svc_secfinance
+command: /scripts/repo/reconcile_triparty.py --date %%DATE%% --agent BNY_MELLON
+machine: sec-lending-app-01
+profile: /etc/autosys/profiles/svc_secfinance.sh
+condition: success(process_repo_opening_legs) & success(process_repo_closing_legs)
+std_out_file: /logs/repo/%%YEAR%%/%%MM%%/reconcile_%%DATE%%.out
+std_err_file: /logs/repo/%%YEAR%%/%%MM%%/reconcile_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10

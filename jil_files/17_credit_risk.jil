@@ -1,0 +1,109 @@
+/* ============================================================
+   FILE: 17_credit_risk.jil
+   DOMAIN: Credit Risk — Counterparty Credit Exposure
+   STATUS: RUNNING
+   UPSTREAM: 06_risk_engine (risk_engine_box)
+             16_kyc_refresh (kyc_refresh_box)
+   DOWNSTREAM: 12_regulatory_reporting, 19_counterparty_exposure, 20_collateral_management
+   ============================================================ */
+
+insert_job: credit_risk_box   job_type: BOX
+owner: svc_risk
+condition: success(risk_engine_box) & success(kyc_refresh_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Compute counterparty credit exposure, PD/LGD, IFRS9 ECL provisions"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,02:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: credit-risk@bank.com
+
+/* Step 1: Load counterparty credit ratings and PD curves */
+insert_job: load_credit_ratings   job_type: CMD
+box_name: credit_risk_box
+owner: svc_risk
+command: /scripts/credit/load_ratings.py --date %%DATE%% --agencies MOODYS,SP,FITCH
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+std_out_file: /logs/credit/%%YEAR%%/%%MM%%/load_ratings_%%DATE%%.out
+std_err_file: /logs/credit/%%YEAR%%/%%MM%%/load_ratings_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Compute Potential Future Exposure (PFE) and CVA for OTC derivatives */
+insert_job: compute_pfe_cva   job_type: CMD
+box_name: credit_risk_box
+owner: svc_risk
+command: /scripts/credit/compute_pfe_cva.py --date %%DATE%% --method MONTE_CARLO --simulations 10000
+machine: risk-compute-02
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_credit_ratings)
+std_out_file: /logs/credit/%%YEAR%%/%%MM%%/pfe_cva_%%DATE%%.out
+std_err_file: /logs/credit/%%YEAR%%/%%MM%%/pfe_cva_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 30
+
+/* Step 3: Compute IFRS9 Expected Credit Loss (ECL) provisions */
+insert_job: compute_ifrs9_ecl   job_type: CMD
+box_name: credit_risk_box
+owner: svc_risk
+command: /scripts/credit/compute_ecl.py --date %%DATE%% --stages 1,2,3
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_credit_ratings)
+std_out_file: /logs/credit/%%YEAR%%/%%MM%%/ecl_%%DATE%%.out
+std_err_file: /logs/credit/%%YEAR%%/%%MM%%/ecl_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 4: Check credit limits and flag breaches */
+insert_job: check_credit_limits   job_type: CMD
+box_name: credit_risk_box
+owner: svc_risk
+command: /scripts/credit/check_limits.py --date %%DATE%% --limits_file /config/risk/credit_limits.yaml
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(compute_pfe_cva) & success(compute_ifrs9_ecl)
+std_out_file: /logs/credit/%%YEAR%%/%%MM%%/limits_%%DATE%%.out
+std_err_file: /logs/credit/%%YEAR%%/%%MM%%/limits_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* FAILURE HANDLER: Alert credit committee on limit breach */
+insert_job: credit_limit_breach_alert   job_type: CMD
+box_name: credit_risk_box
+owner: svc_risk
+command: /scripts/alerts/credit_breach.sh "CREDIT LIMIT BREACH %%DATE%%" --notify credit-committee@bank.com
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: failure(check_credit_limits)
+std_out_file: /logs/credit/%%YEAR%%/%%MM%%/breach_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

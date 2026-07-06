@@ -1,0 +1,337 @@
+/* ============================================================
+   FILE: 00_machines.jil
+   PURPOSE: System Agent (machine) registry — MUST be imported first.
+   All logical machine names referenced in jobs 01-50 are defined here.
+   Real hosts/ports should be updated to match your actual infrastructure
+   before importing to production.
+   ============================================================ */
+
+/* ── Market Data ─────────────────────────────────────────── */
+insert_machine: mktdata-feed-01
+type: a
+host: mktdata-feed-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Bloomberg/Reuters feed server — primary"
+
+insert_machine: mktdata-feed-02
+type: a
+host: mktdata-feed-02.prod.bank.com
+port: 7520
+max_load: 20
+description: "ICE/exchange feed server — secondary"
+
+insert_machine: mktdata-app-01
+type: a
+host: mktdata-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "Market data processing application server"
+
+/* ── Reference Data ──────────────────────────────────────── */
+insert_machine: refdata-app-01
+type: a
+host: refdata-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Reference data synchronisation server"
+
+/* ── Trade Processing ────────────────────────────────────── */
+insert_machine: trade-booking-01
+type: a
+host: trade-booking-01.prod.bank.com
+port: 7520
+max_load: 40
+description: "Trade booking engine — primary (equity and fixed income)"
+
+insert_machine: trade-booking-02
+type: a
+host: trade-booking-02.prod.bank.com
+port: 7520
+max_load: 40
+description: "Trade booking engine — secondary (derivatives)"
+
+insert_machine: payments-gateway-01
+type: a
+host: payments-gateway-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Payments gateway — Fedwire/CHIPS (USD) and CHAPS (GBP)"
+
+insert_machine: payments-gateway-02
+type: a
+host: payments-gateway-02.prod.bank.com
+port: 7520
+max_load: 20
+description: "Payments gateway — SEPA (EUR, pending EU entity setup)"
+
+insert_machine: trade-app-01
+type: a
+host: trade-app-01.prod.bank.com
+port: 7520
+max_load: 40
+description: "Trade capture / booking application server — primary"
+
+insert_machine: trade-app-02
+type: a
+host: trade-app-02.prod.bank.com
+port: 7520
+max_load: 40
+description: "Trade capture / booking application server — secondary"
+
+/* ── Position & P&L ─────────────────────────────────────── */
+insert_machine: position-app-01
+type: a
+host: position-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "Position management and computation server"
+
+insert_machine: pnl-app-01
+type: a
+host: pnl-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "P&L calculation server"
+
+/* ── Risk ────────────────────────────────────────────────── */
+insert_machine: risk-compute-01
+type: a
+host: risk-compute-01.prod.bank.com
+port: 7520
+max_load: 50
+description: "Risk engine compute node — primary (VaR, aggregation)"
+
+insert_machine: risk-compute-02
+type: a
+host: risk-compute-02.prod.bank.com
+port: 7520
+max_load: 50
+description: "Risk engine compute node — secondary (FI/FX VaR)"
+
+insert_machine: risk-compute-03
+type: a
+host: risk-compute-03.prod.bank.com
+port: 7520
+max_load: 50
+description: "Risk engine compute node — tertiary (credit derivatives)"
+
+insert_machine: risk-app-01
+type: a
+host: risk-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "Credit risk / liquidity / counterparty application server"
+
+/* ── Settlement & Payments ───────────────────────────────── */
+insert_machine: settlement-app-01
+type: a
+host: settlement-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "Settlement instructions and SWIFT dispatch server"
+
+insert_machine: treasury-app-01
+type: a
+host: treasury-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "Payments, treasury and cash management server"
+
+insert_machine: swift-gateway-01
+type: a
+host: swift-gateway-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "SWIFT Alliance Gateway — certified production node"
+
+/* ── Operations ──────────────────────────────────────────── */
+insert_machine: ops-app-01
+type: a
+host: ops-app-01.prod.bank.com
+port: 7520
+max_load: 40
+description: "Operations application server (nostro, confirms, collateral)"
+
+insert_machine: collateral-app-01
+type: a
+host: collateral-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Collateral management and margin call server"
+
+insert_machine: corp-actions-app-01
+type: a
+host: corp-actions-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Corporate actions and dividend processing server"
+
+insert_machine: sec-lending-app-01
+type: a
+host: sec-lending-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Securities lending and repo processing server"
+
+/* ── Accounting & Reporting ──────────────────────────────── */
+insert_machine: gl-app-01
+type: a
+host: gl-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "General ledger (SAP FICO) integration server"
+
+insert_machine: reporting-app-01
+type: a
+host: reporting-app-01.prod.bank.com
+port: 7520
+max_load: 40
+description: "Client and regulatory reporting server"
+
+insert_machine: reg-app-01
+type: a
+host: reg-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Regulatory submission gateway — primary"
+
+insert_machine: reg-app-02
+type: a
+host: reg-app-02.prod.bank.com
+port: 7520
+max_load: 20
+description: "Regulatory report generation — secondary (Basel/MiFID II)"
+
+insert_machine: aml-app-01
+type: a
+host: aml-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "AML transaction screening server (Actimize)"
+
+/* ── Portfolio & NAV ─────────────────────────────────────── */
+insert_machine: nav-app-01
+type: a
+host: nav-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "Portfolio NAV and performance server — primary"
+
+insert_machine: nav-app-02
+type: a
+host: nav-app-02.prod.bank.com
+port: 7520
+max_load: 30
+description: "Fund accounting and NAV server — secondary"
+
+/* ── Compliance & Legal ──────────────────────────────────── */
+insert_machine: compliance-app-01
+type: a
+host: compliance-app-01.prod.bank.com
+port: 7520
+max_load: 30
+description: "AML, KYC, sanctions screening server — primary"
+
+insert_machine: compliance-app-02
+type: a
+host: compliance-app-02.prod.bank.com
+port: 7520
+max_load: 30
+description: "Fraud detection and market surveillance server"
+
+insert_machine: kyc-app-01
+type: a
+host: kyc-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "KYC due diligence and client risk rating server"
+
+/* ── Data / ETL ──────────────────────────────────────────── */
+insert_machine: etl-server-01
+type: a
+host: etl-server-01.prod.bank.com
+port: 7520
+max_load: 50
+description: "Data warehouse ETL and DQ server — primary"
+
+insert_machine: etl-server-02
+type: a
+host: etl-server-02.prod.bank.com
+port: 7520
+max_load: 50
+description: "Data archive and purge server — secondary"
+
+/* ── Quant / Model ───────────────────────────────────────── */
+insert_machine: quant-compute-01
+type: a
+host: quant-compute-01.prod.bank.com
+port: 7520
+max_load: 40
+description: "Quantitative compute node — vol surfaces, model validation"
+
+insert_machine: quant-compute-02
+type: a
+host: quant-compute-02.prod.bank.com
+port: 7520
+max_load: 40
+description: "Quantitative compute node — secondary"
+
+/* ── Client Services ─────────────────────────────────────── */
+insert_machine: ta-app-01
+type: a
+host: ta-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Transfer agency — subscription, redemption processing"
+
+insert_machine: custody-app-01
+type: a
+host: custody-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Custody reporting and asset segregation server"
+
+insert_machine: tax-app-01
+type: a
+host: tax-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Tax reporting (FATCA, CRS, 1099) server"
+
+/* ── Audit ───────────────────────────────────────────────── */
+insert_machine: audit-app-01
+type: a
+host: audit-app-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Immutable audit trail and WORM archive server"
+
+/* ── Infrastructure ──────────────────────────────────────── */
+insert_machine: db-backup-01
+type: a
+host: db-backup-01.prod.bank.com
+port: 7520
+max_load: 20
+description: "Database backup server — PostgreSQL/Oracle"
+
+insert_machine: db-backup-02
+type: a
+host: db-backup-02.prod.bank.com
+port: 7520
+max_load: 20
+description: "Database backup server — SAP FICO / Oracle"
+
+insert_machine: monitor-01
+type: a
+host: monitor-01.prod.bank.com
+port: 7520
+max_load: 50
+description: "Infrastructure health monitoring server (24x7)"
+
+insert_machine: dr-orchestrator-01
+type: a
+host: dr-orchestrator-01.dr.bank.com
+port: 7520
+max_load: 30
+description: "Disaster recovery test orchestration server (DR site)"

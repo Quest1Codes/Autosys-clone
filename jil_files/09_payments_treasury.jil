@@ -1,0 +1,132 @@
+/* ============================================================
+   FILE: 09_payments_treasury.jil
+   DOMAIN: Payments & Treasury
+   STATUS: PARTIAL — SEPA job ON HOLD (EU rollout pending Q4)
+   UPSTREAM: 08_settlement (settlement_box)
+             21_margin_calls (margin_calls_box)
+             23_dividend_processing (dividend_processing_box)
+   DOWNSTREAM: 26_cash_management, 27_nostro_reconciliation, 28_swift_messaging
+   ============================================================ */
+
+insert_job: payments_box   job_type: BOX
+owner: svc_treasury
+condition: success(settlement_box) & success(margin_calls_box) & success(dividend_processing_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Net cash positions, generate and dispatch payment orders via Fedwire/SEPA/CHAPS"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "06:00,22:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: treasury-ops@bank.com
+
+/* Step 1: Compute end-of-day net cash positions per currency */
+insert_job: compute_net_cash_positions   job_type: CMD
+box_name: payments_box
+owner: svc_treasury
+command: /scripts/treasury/net_cash.py --date %%DATE%% --currencies USD,EUR,GBP,JPY,CHF
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+std_out_file: /logs/treasury/%%YEAR%%/%%MM%%/net_cash_%%DATE%%.out
+std_err_file: /logs/treasury/%%YEAR%%/%%MM%%/net_cash_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 2: Generate payment orders for settled trades */
+insert_job: generate_payment_orders   job_type: CMD
+box_name: payments_box
+owner: svc_treasury
+command: /scripts/treasury/gen_payment_orders.sh --date %%DATE%%
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(compute_net_cash_positions)
+std_out_file: /logs/treasury/%%YEAR%%/%%MM%%/payment_orders_%%DATE%%.out
+std_err_file: /logs/treasury/%%YEAR%%/%%MM%%/payment_orders_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 3A: Send USD payments via Fedwire / CHIPS */
+insert_job: send_fedwire_payments   job_type: CMD
+box_name: payments_box
+owner: svc_treasury
+command: /scripts/treasury/send_fedwire.sh --date %%DATE%% --currency USD
+machine: payments-gateway-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(generate_payment_orders)
+std_out_file: /logs/treasury/%%YEAR%%/%%MM%%/fedwire_%%DATE%%.out
+std_err_file: /logs/treasury/%%YEAR%%/%%MM%%/fedwire_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3B: Send GBP payments via CHAPS */
+insert_job: send_chaps_payments   job_type: CMD
+box_name: payments_box
+owner: svc_treasury
+command: /scripts/treasury/send_chaps.sh --date %%DATE%% --currency GBP
+machine: payments-gateway-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(generate_payment_orders)
+std_out_file: /logs/treasury/%%YEAR%%/%%MM%%/chaps_%%DATE%%.out
+std_err_file: /logs/treasury/%%YEAR%%/%%MM%%/chaps_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3C: Send EUR payments via SEPA — ON HOLD pending EU entity setup */
+insert_job: send_sepa_payments   job_type: CMD
+box_name: payments_box
+owner: svc_treasury
+command: /scripts/treasury/send_sepa.sh --date %%DATE%% --currency EUR --scheme SEPA_CREDIT
+machine: payments-gateway-02
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(generate_payment_orders)
+std_out_file: /logs/treasury/%%YEAR%%/%%MM%%/sepa_%%DATE%%.out
+std_err_file: /logs/treasury/%%YEAR%%/%%MM%%/sepa_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+job_on_hold: 1
+
+/* Step 4: Verify all payment dispatches completed within cut-off times */
+insert_job: verify_payment_cutoffs   job_type: CMD
+box_name: payments_box
+owner: svc_treasury
+command: /scripts/treasury/verify_cutoffs.py --date %%DATE%% --notify treasury-ops@bank.com
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(send_fedwire_payments) & success(send_chaps_payments)
+std_out_file: /logs/treasury/%%YEAR%%/%%MM%%/cutoff_verify_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

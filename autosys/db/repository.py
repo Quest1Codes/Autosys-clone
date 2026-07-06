@@ -247,15 +247,19 @@ class JobRepository:
 
     def get_running_boxes(self, session: Session) -> list[JobRow]:
         """
-        Return all BOX jobs currently in RUNNING state.
+        Return all BOX jobs currently in RUNNING or ACTIVATED state.
 
-        Called each tick by BoxManager to find boxes that need child evaluation
-        and completion checking.
+        ACTIVATED = BOX has been started, children not yet running.
+        RUNNING   = at least one child is running.
+        Both states need BoxManager to evaluate/cascade children.
         """
         return list(session.scalars(
             select(JobRow)
             .where(JobRow.job_type == "BOX")
-            .where(JobRow.status   == JobStatus.RUNNING.value)
+            .where(JobRow.status.in_([
+                JobStatus.RUNNING.value,
+                JobStatus.ACTIVATED.value,
+            ]))
             .order_by(JobRow.job_name)
         ))
 
