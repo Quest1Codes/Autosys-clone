@@ -41,7 +41,7 @@ from autosys.app_server.deps        import get_session, get_current_user, Curren
 from autosys.app_server.schemas     import (
     TokenRequest, TokenResponse, HealthResponse,
 )
-from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router
+from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment
 from autosys.db.connection          import sync_session
 
 
@@ -64,6 +64,7 @@ def get_broadcaster() -> EventBroadcaster:
 def create_app(
     start_eps: bool = False,
     eps_poll_interval: float = 1.0,
+    dry_run: bool = False,
 ) -> FastAPI:
     """
     Create and return the FastAPI application.
@@ -75,6 +76,11 @@ def create_app(
         the lifespan hook.  Used by ``autosys scheduler serve``.
     eps_poll_interval:
         EPS tick interval in seconds (only relevant when start_eps=True).
+    dry_run:
+        If True, use the stub dispatcher (no real subprocess / no remote
+        agent required).  Jobs transition STARTING → RUNNING → SUCCESS
+        instantly so the full state machine can be exercised without any
+        target machines.  Intended for local dev and migration analysis.
     """
 
     @asynccontextmanager
@@ -85,16 +91,25 @@ def create_app(
 
         eps_task: Optional[asyncio.Task] = None
         if start_eps:
-            from autosys.scheduler.event_processor import EventProcessor
-            from autosys.agent.dispatch import AgentDispatch
-            agent = AgentDispatch(local_only=False)
-            processor = EventProcessor(
-                poll_interval = eps_poll_interval,
-                on_status_change = _broadcaster.publish_sync,
-                dispatch_fn = agent.dispatch,
-                kill_fn = agent.kill,
-                auto_complete = False,
-            )
+            from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
+            if dry_run:
+                processor = EventProcessor(
+                    poll_interval    = eps_poll_interval,
+                    on_status_change = _broadcaster.publish_sync,
+                    dispatch_fn      = _stub_dispatch,
+                    auto_complete    = True,
+                )
+                logger.info("Event Processor running in DRY-RUN mode (stub dispatcher)")
+            else:
+                from autosys.agent.dispatch import AgentDispatch
+                agent = AgentDispatch(local_only=False)
+                processor = EventProcessor(
+                    poll_interval    = eps_poll_interval,
+                    on_status_change = _broadcaster.publish_sync,
+                    dispatch_fn      = agent.dispatch,
+                    kill_fn          = agent.kill,
+                    auto_complete    = False,
+                )
             eps_task = asyncio.create_task(
                 processor.run_forever(),
                 name="eps-background",
@@ -137,6 +152,7 @@ def create_app(
     app.include_router(globals_router.router)
     app.include_router(jil_router.router)
     app.include_router(alarms_router.router)
+    app.include_router(assessment.router)
 
     # --- Auth ---
     _register_auth_routes(app)

@@ -58,37 +58,53 @@ def scheduler_group() -> None:
 @scheduler_group.command("start")
 @click.option("--poll-interval", "-p", default=1.0, show_default=True,
               help="Seconds between event queue polls.")
+@click.option("--dry-run", is_flag=True, default=False,
+              help=(
+                  "Use the stub dispatcher: jobs transition STARTING → RUNNING → SUCCESS "
+                  "instantly without executing any scripts or contacting remote agents. "
+                  "Ideal for local development and migration complexity analysis."
+              ))
 @click.option("--auto-complete/--no-auto-complete", default=False,
-              help="Phase 4 stub: auto-complete jobs immediately after RUNNING.")
-def scheduler_start(poll_interval: float, auto_complete: bool) -> None:
+              help="(Non-dry-run) Auto-complete jobs immediately after RUNNING.")
+def scheduler_start(poll_interval: float, dry_run: bool, auto_complete: bool) -> None:
     """
     Run the Event Processor in the foreground.
 
     Polls the event queue every POLL_INTERVAL seconds and drives the job
     state machine.  Press Ctrl+C to stop.
 
-    In Phase 4 the dispatcher is a stub that transitions RUNNING → SUCCESS
-    immediately (no real subprocess is launched).  Phase 5 adds real System
-    Agent dispatch.
+    Use --dry-run to exercise the full state machine (BOX cascading,
+    condition evaluation, alarms) without needing any System Agents running.
+    This is the recommended mode for migration analysis.
 
     Example
     -------
     \\b
-        $ autosys scheduler start
-        Event Processor started (poll interval: 1.0s)
+        $ autosys scheduler start --dry-run
+        Event Processor starting [DRY-RUN] (poll interval: 1.0s)
         ^C  Stopped.
     """
-    from autosys.agent.dispatch import AgentDispatch
-    agent = AgentDispatch(local_only=False)
-    processor = EventProcessor(
-        poll_interval = poll_interval,
-        auto_complete = auto_complete,
-        dispatch_fn   = agent.dispatch,
-        kill_fn       = agent.kill,
-    )
+    from autosys.scheduler.event_processor import _stub_dispatch
+    if dry_run:
+        processor = EventProcessor(
+            poll_interval = poll_interval,
+            dispatch_fn   = _stub_dispatch,
+            auto_complete = True,
+        )
+        mode_label = "[bold yellow][DRY-RUN][/bold yellow] "
+    else:
+        from autosys.agent.dispatch import AgentDispatch
+        agent = AgentDispatch(local_only=False)
+        processor = EventProcessor(
+            poll_interval = poll_interval,
+            auto_complete = auto_complete,
+            dispatch_fn   = agent.dispatch,
+            kill_fn       = agent.kill,
+        )
+        mode_label = ""
 
     _console.print(
-        f"\n[bold green]Event Processor starting[/bold green] "
+        f"\n[bold green]Event Processor starting[/bold green] {mode_label}"
         f"(poll interval: {poll_interval:.1f}s)  "
         f"[dim]Ctrl+C to stop[/dim]\n"
     )
@@ -239,7 +255,13 @@ def scheduler_status() -> None:
               help="Host to bind the REST API server to.")
 @click.option("--poll-interval", default=1.0, show_default=True,
               help="EPS tick interval in seconds.")
-def scheduler_serve(port: int, host: str, poll_interval: float) -> None:
+@click.option("--dry-run", is_flag=True, default=False,
+              help=(
+                  "Use the stub dispatcher: jobs transition STARTING → RUNNING → SUCCESS "
+                  "instantly without executing any scripts or contacting remote agents. "
+                  "Ideal for local development and migration complexity analysis."
+              ))
+def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool) -> None:
     """
     Run the Event Processor and REST API server together.
 
@@ -247,27 +269,32 @@ def scheduler_serve(port: int, host: str, poll_interval: float) -> None:
     asyncio task inside the same event loop as the API server.  All REST
     endpoints and the WebSocket live feed are available immediately.
 
+    Pass --dry-run to exercise the full state machine without needing any
+    System Agents.  Jobs complete instantly via the stub dispatcher, making
+    it easy to walk through every BOX in the WCC dashboard during migration
+    analysis.
+
     Example
     -------
     \\b
-        $ autosys scheduler serve --port 9000
-        AutoSys App Server starting on http://0.0.0.0:9000
-        Docs: http://localhost:9000/docs
+        $ autosys scheduler serve --port 9000 --dry-run
+        AutoSys App Server starting on http://0.0.0.0:9000  [DRY-RUN]
         ^C  Stopped.
     """
     import uvicorn
     from autosys.app_server.main import create_app
 
+    dry_label = "  [bold yellow][DRY-RUN — stub dispatcher][/bold yellow]" if dry_run else ""
     _console.print(
         f"\n[bold green]AutoSys App Server[/bold green] starting on "
-        f"[cyan]http://{host}:{port}[/cyan]\n"
+        f"[cyan]http://{host}:{port}[/cyan]{dry_label}\n"
         f"  API docs:  [bold]http://localhost:{port}/docs[/bold]\n"
         f"  Live feed: [bold]ws://localhost:{port}/api/v1/ws/events[/bold]\n"
         f"  EPS poll:  {poll_interval:.1f}s\n"
         f"[dim]Ctrl+C to stop[/dim]\n"
     )
 
-    app = create_app(start_eps=True, eps_poll_interval=poll_interval)
+    app = create_app(start_eps=True, eps_poll_interval=poll_interval, dry_run=dry_run)
 
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning")

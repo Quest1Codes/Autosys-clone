@@ -223,3 +223,73 @@ class WsStatusChange(BaseModel):
     old:      str
     new:      str
     ts:       str      # ISO 8601
+
+
+# ---------------------------------------------------------------------------
+# Assessment — Phase 1 migration complexity report (consumed by Shinro)
+# ---------------------------------------------------------------------------
+
+class AssessmentJobRecord(BaseModel):
+    job_name: str
+    job_type: str
+    box_name: str
+    size:     str
+    effort_h: int
+    drivers:  str
+
+
+class AssessmentSummaryResponse(BaseModel):
+    counts:     dict[str, int]
+    hours:      dict[str, int]
+    total_jobs: int
+    raw_hours:  int
+    platform_h: int
+    testing_h:  int
+    pm_h:       int
+    training_h: int
+    total_h:    int
+    total_days: int
+
+
+class AssessmentReportResponse(BaseModel):
+    """GET /api/v1/assessment/report — full T-shirt-size complexity report."""
+    generated_at: datetime
+    box_filter:   Optional[str] = None
+    job_count:    int
+    jobs:         list[AssessmentJobRecord]
+    summary:      AssessmentSummaryResponse
+
+
+class BoxTraceRequest(BaseModel):
+    max_ticks:         int  = Field(50, ge=1, le=500)
+    ignore_run_window: bool = False
+    ignore_calendar:   bool = False
+
+
+class BoxTraceTransitionEntry(BaseModel):
+    tick:     int
+    job_name: str
+    old:      str
+    new:      str
+    ts:       str
+
+
+class BoxTraceJobEntry(BaseModel):
+    job_name:       str
+    job_type:       str
+    condition:      Optional[str] = None
+    wave:           Optional[int] = None
+    activated_tick: Optional[int] = None
+    final_status:   str
+
+
+class BoxTraceResponse(BaseModel):
+    """POST /api/v1/assessment/boxes/{box_name}/trace — dry-run state-machine export."""
+    box_name:     str
+    triggered_at: str
+    completed_at: Optional[str] = None
+    outcome:      str
+    tick_count:   int
+    wave_count:   int
+    jobs:         list[BoxTraceJobEntry]
+    transitions:  list[BoxTraceTransitionEntry]
