@@ -236,6 +236,10 @@ class AssessmentJobRecord(BaseModel):
     size:     str
     effort_h: int
     drivers:  str
+    risk:         str = "NO_DATA"
+    risk_drivers: str = ""
+    blast_radius: int = 0
+    gap_tags:     str = ""
 
 
 class AssessmentSummaryResponse(BaseModel):
@@ -249,6 +253,8 @@ class AssessmentSummaryResponse(BaseModel):
     training_h: int
     total_h:    int
     total_days: int
+    risk_counts:         dict[str, int] = {}
+    gap_severity_counts: dict[str, int] = {}
 
 
 class AssessmentReportResponse(BaseModel):

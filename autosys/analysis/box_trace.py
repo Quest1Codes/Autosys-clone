@@ -31,13 +31,13 @@ real dependency gating without any bypass needed.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
+from autosys.analysis.dependency_graph import dependency_wave
 from autosys.db.repository import jobs as job_repo, events as event_repo
 from autosys.db.schema import JobRow
 from autosys.models.event import Event
@@ -82,57 +82,6 @@ class BoxTrace:
     wave_count:   int
     jobs:         list[BoxTraceJob] = field(default_factory=list)
     transitions:  list[BoxTraceTransition] = field(default_factory=list)
-
-
-# Predicates recognised by autosys.scheduler.condition_evaluator — used here
-# only to extract *which job names* a condition string references, not to
-# evaluate it.
-_CONDITION_REF_RE = re.compile(
-    r"\b(?:success|failure|terminated|done|running|notrunning)\(\s*"
-    r"([A-Za-z0-9_.:-]+)"
-)
-
-
-def _referenced_jobs(condition: Optional[str], scope: set[str]) -> set[str]:
-    """Return the in-scope job names referenced by a condition expression."""
-    if not condition:
-        return set()
-    return {m for m in _CONDITION_REF_RE.findall(condition) if m in scope}
-
-
-def _dependency_wave(
-    job_name: str,
-    condition_by_name: dict[str, Optional[str]],
-    scope: set[str],
-    memo: dict[str, int],
-    _visiting: Optional[set[str]] = None,
-) -> int:
-    """
-    Depth of *job_name* in the box's dependency graph (1 = no in-scope deps).
-
-    This is the real complexity signal: a box where children chain
-    success(a) -> success(b) -> success(c) is deeper (harder to migrate as
-    parallel Airflow tasks) than one where all children are independent,
-    even though this simulator's cascade may resolve both in the same tick
-    under the dry-run stub dispatcher (ticks alone can't distinguish them).
-    """
-    if job_name in memo:
-        return memo[job_name]
-    _visiting = _visiting or set()
-    if job_name in _visiting:
-        return 1  # dependency cycle guard — shouldn't happen, fail safe
-    _visiting.add(job_name)
-
-    deps = _referenced_jobs(condition_by_name.get(job_name), scope) - {job_name}
-    if not deps:
-        memo[job_name] = 1
-    else:
-        memo[job_name] = 1 + max(
-            _dependency_wave(d, condition_by_name, scope, memo, _visiting)
-            for d in deps
-        )
-    _visiting.discard(job_name)
-    return memo[job_name]
 
 
 def _collect_descendants(session: Session, box_name: str) -> list[JobRow]:
@@ -239,15 +188,16 @@ def run_box_trace(
 
     # Wave = dependency-graph depth, computed only for children that were
     # actually activated during this trace (skipped/blocked children get
-    # wave=None). See _dependency_wave for why this — not tick number — is
-    # the meaningful complexity signal under the instant stub dispatcher.
+    # wave=None). See dependency_graph.dependency_wave for why this — not
+    # tick number — is the meaningful complexity signal under the instant
+    # stub dispatcher.
     condition_by_name = {d.job_name: d.condition for d in descendants}
     wave_memo: dict[str, int] = {}
     jobs: list[BoxTraceJob] = []
     for d in descendants:
         tick_act = activated_tick.get(d.job_name)
         wave = (
-            _dependency_wave(d.job_name, condition_by_name, scope, wave_memo)
+            dependency_wave(d.job_name, condition_by_name, scope, wave_memo)
             if tick_act is not None else None
         )
         jobs.append(BoxTraceJob(

@@ -21,6 +21,9 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+from autosys.analysis.dependency_graph import dependency_wave, fan_in_counts
+from autosys.analysis.gap_analysis import GAP_CATALOGUE, compute_gap_tags
+from autosys.analysis.operational_risk import RISK_LEVELS, RunStats, score_operational_risk
 from autosys.db.schema import JobRow
 
 # ---------------------------------------------------------------------------
@@ -59,6 +62,12 @@ _DT_BUILTINS: frozenset[str] = frozenset({
     "TIMESTAMP", "UNIX_TIMESTAMP",
 })
 
+# Dependency-chain depth thresholds (see dependency_graph.dependency_wave).
+# A chain this deep can't be trivially parallelised into independent Airflow
+# tasks, regardless of how many boolean operators its conditions use.
+WAVE_DEPTH_L_THRESHOLD  = 4
+WAVE_DEPTH_XL_THRESHOLD = 7
+
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -72,6 +81,17 @@ class JobAssessment:
     size:     str
     effort_h: int
     drivers:  str
+    # Operational risk (FSM current state + JobRunRow/AlarmRow history) —
+    # orthogonal to size/effort_h, see operational_risk.py. Defaults to
+    # NO_DATA so existing positional-construction call sites (e.g. tests)
+    # keep working when a caller doesn't supply run_stats.
+    risk:         str = "NO_DATA"
+    risk_drivers: str = ""
+    # Cross-job blast radius — how many other jobs' conditions reference
+    # this one (see dependency_graph.fan_in_counts).
+    blast_radius: int = 0
+    # Airflow gap tags — see gap_analysis.GAP_CATALOGUE.
+    gap_tags:     str = ""
 
 
 @dataclass
@@ -86,6 +106,8 @@ class AssessmentSummary:
     training_h:  int
     total_h:     int
     total_days:  int
+    risk_counts:          dict[str, int] = field(default_factory=dict)
+    gap_severity_counts:  dict[str, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -114,11 +136,21 @@ def _business_globals(command: Optional[str]) -> list[str]:
     return [v for v in all_vars if v not in _DT_BUILTINS]
 
 
-def score_job(row: JobRow, all_rows: dict[str, "JobRow"]) -> tuple[str, list[str]]:
+def score_job(
+    row: JobRow,
+    all_rows: dict[str, "JobRow"],
+    wave_depth: int = 1,
+) -> tuple[str, list[str]]:
     """
     Assign a T-shirt size to *row* and return (size, [driver_strings]).
 
     Priority: XL -> L -> M -> S -> XS.
+
+    *wave_depth* is the job's dependency-chain depth within its box (see
+    dependency_graph.dependency_wave), precomputed once per box by
+    build_report — a box where success(a)->success(b)->success(c) chains
+    deep can't be trivially parallelised into independent Airflow tasks,
+    which the &/| operator count below can't see on its own.
     """
     xl: list[str] = []
     l:  list[str] = []
@@ -126,6 +158,11 @@ def score_job(row: JobRow, all_rows: dict[str, "JobRow"]) -> tuple[str, list[str
     s:  list[str] = []
 
     jt = (row.job_type or "CMD").upper()
+
+    if wave_depth >= WAVE_DEPTH_XL_THRESHOLD:
+        xl.append(f"dependency chain depth={wave_depth}")
+    elif wave_depth >= WAVE_DEPTH_L_THRESHOLD:
+        l.append(f"dependency chain depth={wave_depth}")
 
     # ---- XL signals -------------------------------------------------------
     if jt == "FTP":
@@ -170,8 +207,8 @@ def score_job(row: JobRow, all_rows: dict[str, "JobRow"]) -> tuple[str, list[str
         m.append(f"exclude_calendar={row.exclude_calendar}")
     if row.date_conditions:
         m.append("date_conditions=1")
-    if jt == "FILEWATCHER":
-        m.append(f"FILEWATCHER ({row.watch_file or '?'})")
+    if jt == "FILEWATCH":
+        m.append(f"FILEWATCH ({row.watch_file or '?'})")
     if row.start_times:
         m.append(f"start_times={row.start_times}")
     if row.start_mins:
@@ -223,14 +260,24 @@ def score_job(row: JobRow, all_rows: dict[str, "JobRow"]) -> tuple[str, list[str
 def build_report(
     rows: list[JobRow],
     box_pattern: Optional[str] = None,
+    run_stats: Optional[dict[str, RunStats]] = None,
 ) -> list[JobAssessment]:
     """
     Score every job and return a list of JobAssessment results.
 
     When *box_pattern* is given (SQL LIKE syntax with %-wildcards), restrict
     to BOX jobs matching the pattern and their children.
+
+    *run_stats* is an optional {job_name: RunStats} map (see
+    operational_risk.fetch_run_stats) used to score operational risk. This
+    function itself stays DB-session-free — callers that want risk scoring
+    fetch run_stats themselves and pass it in; omitting it scores every job
+    as NO_DATA risk.
     """
     all_by_name: dict[str, JobRow] = {r.job_name: r for r in rows}
+    # Blast radius is a global-graph property — computed once over the full,
+    # unfiltered job set before any box_pattern narrowing below.
+    blast_radius = fan_in_counts(all_by_name)
     results: list[JobAssessment] = []
 
     if box_pattern:
@@ -266,8 +313,40 @@ def build_report(
             orphans.append(r)
     ordered.extend(sorted(orphans, key=lambda r: r.job_name))
 
+    # Dependency-chain depth (see dependency_graph.dependency_wave), computed
+    # once per scope group rather than per-row: the root scope (top-level
+    # jobs referencing each other) and one scope per BOX (its own children).
+    # Orphans (children whose parent box fell outside a box_pattern filter)
+    # get a conservative depth of 1 — there isn't enough context to walk
+    # their chain.
+    wave_depth_by_name: dict[str, int] = {}
+    root_scope = {b.job_name for b in boxes}
+    root_conditions = {name: all_by_name[name].condition for name in root_scope}
+    root_memo: dict[str, int] = {}
+    for b in boxes:
+        wave_depth_by_name[b.job_name] = dependency_wave(
+            b.job_name, root_conditions, root_scope, root_memo
+        )
+        children = child_map.get(b.job_name, [])
+        if not children:
+            continue
+        child_scope = {b.job_name} | {c.job_name for c in children}
+        child_conditions = {name: all_by_name[name].condition for name in child_scope}
+        child_memo: dict[str, int] = {}
+        for c in children:
+            wave_depth_by_name[c.job_name] = dependency_wave(
+                c.job_name, child_conditions, child_scope, child_memo
+            )
+    for r in orphans:
+        wave_depth_by_name[r.job_name] = 1
+
     for r in ordered:
-        size, drivers = score_job(r, all_by_name)
+        size, drivers = score_job(
+            r, all_by_name, wave_depth_by_name.get(r.job_name, 1)
+        )
+        risk, risk_drivers = score_operational_risk(
+            r, (run_stats or {}).get(r.job_name)
+        )
         results.append(JobAssessment(
             job_name = r.job_name,
             job_type = (r.job_type or "CMD").upper(),
@@ -275,6 +354,10 @@ def build_report(
             size     = size,
             effort_h = EFFORT_HOURS[size],
             drivers  = "; ".join(drivers),
+            risk         = risk,
+            risk_drivers = "; ".join(risk_drivers),
+            blast_radius = blast_radius.get(r.job_name, 0),
+            gap_tags     = ", ".join(compute_gap_tags(r)),
         ))
 
     return results
@@ -284,9 +367,15 @@ def compute_summary(results: list[JobAssessment]) -> AssessmentSummary:
     """Compute the T-shirt size breakdown + effort estimate for *results*."""
     counts: dict[str, int] = {s: 0 for s in SIZES}
     hours:  dict[str, int] = {s: 0 for s in SIZES}
+    risk_counts: dict[str, int] = {r: 0 for r in RISK_LEVELS}
+    gap_severity_counts: dict[str, int] = {"RED": 0, "YELLOW": 0, "GREEN": 0}
     for rec in results:
         counts[rec.size] += 1
         hours[rec.size]  += rec.effort_h
+        risk_counts[rec.risk] += 1
+        for tag in (t for t in rec.gap_tags.split(", ") if t):
+            severity = GAP_CATALOGUE[tag][0]
+            gap_severity_counts[severity] += 1
 
     total_jobs = sum(counts.values())
     raw_hours  = sum(hours.values())
@@ -309,4 +398,6 @@ def compute_summary(results: list[JobAssessment]) -> AssessmentSummary:
         training_h = training_h,
         total_h    = total_h,
         total_days = total_days,
+        risk_counts         = risk_counts,
+        gap_severity_counts = gap_severity_counts,
     )

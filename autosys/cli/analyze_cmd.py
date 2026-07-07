@@ -40,6 +40,7 @@ from autosys.analysis.complexity import (
     build_report,
     compute_summary,
 )
+from autosys.analysis.operational_risk import RISK_LEVELS as _RISK_LEVELS, fetch_run_stats
 from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo
 
@@ -54,6 +55,21 @@ _SIZE_COLOURS = {
     "XL": "bold red",
 }
 
+_RISK_COLOURS = {
+    "NO_DATA": "dim",
+    "NONE":    "green",
+    "LOW":     "cyan",
+    "MEDIUM":  "yellow",
+    "HIGH":    "bold red",
+}
+_RISK_ABBREV = {
+    "NO_DATA": "--",
+    "NONE":    "NO",
+    "LOW":     "LO",
+    "MEDIUM":  "ME",
+    "HIGH":    "HI",
+}
+
 
 # ---------------------------------------------------------------------------
 # Report builder — thin wrapper returning plain dicts for this module's own
@@ -61,7 +77,7 @@ _SIZE_COLOURS = {
 # so the CLI and the REST API can never drift apart.
 # ---------------------------------------------------------------------------
 
-def _build_report(rows, box_pattern: Optional[str]) -> list[dict]:
+def _build_report(rows, box_pattern: Optional[str], run_stats=None) -> list[dict]:
     return [
         {
             "job_name": r.job_name,
@@ -70,8 +86,12 @@ def _build_report(rows, box_pattern: Optional[str]) -> list[dict]:
             "size":     r.size,
             "effort_h": r.effort_h,
             "drivers":  r.drivers,
+            "risk":         r.risk,
+            "risk_drivers": r.risk_drivers,
+            "blast_radius": r.blast_radius,
+            "gap_tags":     r.gap_tags,
         }
-        for r in build_report(rows, box_pattern)
+        for r in build_report(rows, box_pattern, run_stats=run_stats)
     ]
 
 
@@ -87,16 +107,19 @@ def _print_detail_table(results: list[dict]) -> None:
     table.add_column("Type",        min_width=12, no_wrap=True)
     table.add_column("Size",        min_width=4,  no_wrap=True, justify="center")
     table.add_column("Est. Hours",  min_width=9,  no_wrap=True, justify="right")
+    table.add_column("Risk",        min_width=4,  no_wrap=True, justify="center")
     table.add_column("Key Drivers", min_width=40)
 
     for rec in results:
-        colour = _SIZE_COLOURS[rec["size"]]
+        colour      = _SIZE_COLOURS[rec["size"]]
+        risk_colour = _RISK_COLOURS[rec["risk"]]
         indent = "  " if rec["box_name"] else ""
         table.add_row(
             indent + rec["job_name"],
             f"[dim]{rec['job_type']}[/dim]",
             f"[{colour}]{rec['size']}[/{colour}]",
             str(rec["effort_h"]),
+            f"[{risk_colour}]{_RISK_ABBREV[rec['risk']]}[/{risk_colour}]",
             f"[dim]{rec['drivers'][:80]}[/dim]",
         )
 
@@ -112,6 +135,8 @@ def _print_summary(results: list[dict]) -> None:
         JobAssessment(
             job_name=r["job_name"], job_type=r["job_type"], box_name=r["box_name"],
             size=r["size"], effort_h=r["effort_h"], drivers=r["drivers"],
+            risk=r["risk"], risk_drivers=r["risk_drivers"],
+            blast_radius=r["blast_radius"], gap_tags=r["gap_tags"],
         )
         for r in results
     ])
@@ -148,6 +173,35 @@ def _print_summary(results: list[dict]) -> None:
     _console.print()
     _console.print(table)
 
+    # Risk breakdown (operational — FSM current state + run/alarm history)
+    risk_table = Table(
+        box=rich_box.SIMPLE_HEAD,
+        show_header=True,
+        header_style="bold",
+        padding=(0, 1),
+        title="Risk Breakdown  (operational — separate from complexity/effort)",
+    )
+    risk_table.add_column("Risk", min_width=8)
+    risk_table.add_column("Jobs", min_width=5, justify="right")
+    for level in _RISK_LEVELS:
+        if summary.risk_counts.get(level, 0) == 0:
+            continue
+        colour = _RISK_COLOURS[level]
+        risk_table.add_row(f"[{colour}]{level}[/{colour}]", str(summary.risk_counts[level]))
+
+    _console.print()
+    _console.print(risk_table)
+
+    # Gap severity (AutoSys -> Astronomer heatmap, docs/strategy-and-approach.md)
+    gsc = summary.gap_severity_counts
+    _console.print()
+    _console.print(
+        f"[bold]Gap Severity[/bold]  "
+        f"[bold red]RED={gsc.get('RED', 0)}[/bold red]  "
+        f"[yellow]YELLOW={gsc.get('YELLOW', 0)}[/yellow]  "
+        f"[green]GREEN={gsc.get('GREEN', 0)}[/green]"
+    )
+
     # Effort breakdown
     _console.print()
     _console.print("[bold]Effort Estimate  (strategy-and-approach.md overhead model)[/bold]")
@@ -164,7 +218,10 @@ def _print_summary(results: list[dict]) -> None:
 
 def _export_csv(results: list[dict], path: str) -> None:
     """Write results to a CSV file."""
-    fields = ["job_name", "job_type", "box_name", "size", "effort_h", "drivers"]
+    fields = [
+        "job_name", "job_type", "box_name", "size", "effort_h", "drivers",
+        "risk", "risk_drivers", "blast_radius", "gap_tags",
+    ]
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields)
         writer.writeheader()
@@ -217,6 +274,7 @@ def analyze(
     """
     with sync_session() as session:
         rows = job_repo.list_all(session)
+        run_stats = fetch_run_stats(session, [r.job_name for r in rows])
 
     if not rows:
         _err.print(
@@ -225,7 +283,7 @@ def analyze(
         )
         sys.exit(0)
 
-    results = _build_report(rows, box_pattern)
+    results = _build_report(rows, box_pattern, run_stats)
 
     _console.print(
         f"\n[bold]AutoSys → Astronomer  Migration Complexity Assessment[/bold]"

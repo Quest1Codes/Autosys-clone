@@ -19,6 +19,7 @@ from autosys.analysis.box_trace import (
     BoxNotFoundError, NotABoxError, run_box_trace,
 )
 from autosys.analysis.complexity import build_report, compute_summary
+from autosys.analysis.operational_risk import fetch_run_stats
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas import (
     AssessmentJobRecord, AssessmentReportResponse, AssessmentSummaryResponse,
@@ -36,9 +37,10 @@ def get_report(
     _user:   CurrentUser    = Depends(get_current_user),
 ):
     """T-shirt-size every job (optionally filtered to a BOX pattern) and estimate effort."""
-    rows    = job_repo.list_all(session)
-    results = build_report(rows, box)
-    summary = compute_summary(results)
+    rows      = job_repo.list_all(session)
+    run_stats = fetch_run_stats(session, [r.job_name for r in rows])
+    results   = build_report(rows, box, run_stats=run_stats)
+    summary   = compute_summary(results)
 
     return AssessmentReportResponse(
         generated_at = datetime.now(),
@@ -48,6 +50,8 @@ def get_report(
             AssessmentJobRecord(
                 job_name=r.job_name, job_type=r.job_type, box_name=r.box_name,
                 size=r.size, effort_h=r.effort_h, drivers=r.drivers,
+                risk=r.risk, risk_drivers=r.risk_drivers,
+                blast_radius=r.blast_radius, gap_tags=r.gap_tags,
             )
             for r in results
         ],
@@ -56,6 +60,7 @@ def get_report(
             raw_hours=summary.raw_hours, platform_h=summary.platform_h,
             testing_h=summary.testing_h, pm_h=summary.pm_h, training_h=summary.training_h,
             total_h=summary.total_h, total_days=summary.total_days,
+            risk_counts=summary.risk_counts, gap_severity_counts=summary.gap_severity_counts,
         ),
     )
 
