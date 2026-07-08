@@ -89,13 +89,9 @@ body {
 }
 
 .wcc-header-logo .ca-badge {
-  background: var(--wcc-gold);
-  color: #003D7C;
-  font-weight: 700;
-  font-size: 13px;
-  padding: 2px 6px;
-  border-radius: 3px;
-  letter-spacing: 0.5px;
+  height: 28px;
+  width: auto;
+  display: block;
 }
 
 .wcc-header-logo .wcc-title {
@@ -689,14 +685,10 @@ body {
 }
 
 .login-header .ca-badge-lg {
-  background: var(--wcc-gold);
-  color: #003D7C;
-  font-weight: 700;
-  font-size: 18px;
-  padding: 4px 10px;
-  border-radius: 3px;
-  display: inline-block;
-  margin-bottom: 8px;
+  height: 48px;
+  width: auto;
+  display: block;
+  margin: 0 auto 8px;
 }
 
 .login-header h2 {

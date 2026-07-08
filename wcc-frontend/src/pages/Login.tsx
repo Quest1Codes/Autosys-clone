@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import quest1Logo from '../assets/quest1-logo.svg';
 
 const Login: React.FC = () => {
   const { login } = useAuth();
@@ -28,7 +29,7 @@ const Login: React.FC = () => {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="ca-badge-lg">CA</div>
+          <img src={quest1Logo} alt="Quest1 Logo" className="ca-badge-lg" />
           <h2>Workload Control Center</h2>
           <div style={{ color: '#A8C8E8', fontSize: 10, marginTop: 4 }}>AutoSys Simulator v1.0</div>
         </div>

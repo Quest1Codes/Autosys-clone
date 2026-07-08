@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { SSEStatus } from '../hooks/useSSE';
+import quest1Logo from '../assets/quest1-logo.svg';
 
 interface Props {
   sseStatus?: SSEStatus;
@@ -20,7 +21,7 @@ const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
     <>
       <header className="wcc-header">
         <div className="wcc-header-logo">
-          <span className="ca-badge">CA</span>
+          <img src={quest1Logo} alt="Quest1 Logo" className="ca-badge" />
           <span className="wcc-title">Workload Control Center</span>
         </div>
         <div className="wcc-header-spacer" />
