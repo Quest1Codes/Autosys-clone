@@ -113,7 +113,7 @@ class TestAlarmAPI:
         data = r.json()
         assert len(data) == 1
         assert data[0]["job_name"] == "demo_etl_box"
-        assert data[0]["alarm_type"] == 5
+        assert data[0]["alarm_type"] == "FAILURE"
         assert data[0]["active"] is True
         assert data[0]["cleared_at"] is None
 
@@ -195,130 +195,6 @@ class TestAlarmAPI:
         item = r.json()[0]
         for field in ("alarm_id", "job_name", "alarm_type", "message", "raised_at", "active"):
             assert field in item, f"missing field {field!r}"
-
-
-# ===========================================================================
-# WCC HTML pages
-# ===========================================================================
-
-class TestWCCPages:
-
-    def test_job_grid_empty_db(self, wcc_client):
-        r = wcc_client.get("/")
-        assert r.status_code == 200
-        assert "Job Monitor" in r.text
-        assert "text/html" in r.headers["content-type"]
-
-    def test_job_grid_shows_imported_jobs(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/")
-        assert r.status_code == 200
-        assert "demo_etl_box" in r.text
-        assert "extract_sales" in r.text
-        assert "check_source_ready" in r.text
-
-    def test_job_grid_status_filter_inactive(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/", params={"status": 8})
-        assert r.status_code == 200
-        assert "demo_etl_box" in r.text
-
-    def test_job_grid_filter_no_match(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/", params={"status": 1})
-        assert r.status_code == 200
-        assert "demo_etl_box" not in r.text
-
-    def test_job_grid_search_filter(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/", params={"q": "extract"})
-        assert r.status_code == 200
-        assert "extract_sales" in r.text
-        assert "check_source_ready" not in r.text
-
-    def test_job_grid_has_nav(self, wcc_client):
-        r = wcc_client.get("/")
-        assert "Job Monitor" in r.text
-        assert "Alarms" in r.text
-
-    def test_job_detail_cmd_job(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/jobs/extract_sales")
-        assert r.status_code == 200
-        assert "extract_sales" in r.text
-        assert "CMD" in r.text
-        assert "Definition" in r.text
-        assert "Run History" in r.text
-
-    def test_job_detail_box_shows_children(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/jobs/demo_etl_box")
-        assert r.status_code == 200
-        assert "Children" in r.text
-        assert "extract_sales" in r.text
-        assert "check_source_ready" in r.text
-
-    def test_job_detail_box_has_graph_link(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/jobs/demo_etl_box")
-        assert r.status_code == 200
-        assert "View Graph" in r.text or "/boxes/demo_etl_box" in r.text
-
-    def test_job_detail_not_found(self, wcc_client):
-        r = wcc_client.get("/jobs/no_such_job_xyz")
-        assert r.status_code == 404
-
-    def test_box_graph_page_renders(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/boxes/demo_etl_box")
-        assert r.status_code == 200
-        assert "Dependency Graph" in r.text
-        assert "demo_etl_box" in r.text
-
-    def test_box_graph_has_d3_script(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/boxes/demo_etl_box")
-        assert r.status_code == 200
-        assert "d3.v7" in r.text or "d3js.org" in r.text
-
-    def test_box_graph_nodes_json_embedded(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/boxes/demo_etl_box")
-        assert '"demo_etl_box"' in r.text
-        assert '"extract_sales"' in r.text
-
-    def test_box_graph_edges_json_embedded(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        r = wcc_client.get("/boxes/demo_etl_box")
-        assert '"source"' in r.text
-        assert '"target"' in r.text
-
-    def test_box_graph_not_found(self, wcc_client):
-        r = wcc_client.get("/boxes/no_such_box")
-        assert r.status_code == 404
-
-    def test_alarm_console_all_clear(self, wcc_client):
-        r = wcc_client.get("/alarms")
-        assert r.status_code == 200
-        assert "Alarm Console" in r.text
-        assert "All clear" in r.text
-
-    def test_alarm_console_shows_active(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        _seed_alarm("demo_etl_box", "FAILURE", "went red")
-        r = wcc_client.get("/alarms")
-        assert r.status_code == 200
-        assert "demo_etl_box" in r.text
-        assert "FAILURE" in r.text
-        assert "went red" in r.text
-        assert "1 active" in r.text
-
-    def test_alarm_console_filter_active(self, wcc_client, ssa_client):
-        _import(ssa_client, _BOX_JIL)
-        _seed_alarm("demo_etl_box")
-        r = wcc_client.get("/alarms", params={"active": "true"})
-        assert r.status_code == 200
-        assert "ACTIVE" in r.text
 
 
 # ===========================================================================

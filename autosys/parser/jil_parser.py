@@ -100,6 +100,8 @@ _BOOL_ATTRS: frozenset[str] = frozenset({
     "box_terminator",
     "send_report",
     "date_conditions",
+    "auto_delete",
+    "continuous",
 })
 
 # Attributes whose raw numeric strings should become Python ints.
@@ -113,6 +115,11 @@ _INT_ATTRS: frozenset[str] = frozenset({
     "max_load",
     "watch_file_min_size",
     "watch_interval",
+    "command_timeout",
+    "cpu_usage",
+    "disk_space",
+    "connection_retry",
+    "connection_timeout",
 })
 
 # Map JIL directive keyword → short op code stored in JILOperation.op
@@ -350,8 +357,8 @@ class JILParser:
             )
 
         elif op_code in ("insert", "update", "delete", "override", "rename"):
-            # insert_job / override_job: full validation required.
-            # delete_job / update_job / rename_job: may omit required fields.
+            # insert_job: full validation required.
+            # delete_job / update_job / override_job / rename_job: may omit required fields.
             if op_code in ("delete", "update", "rename") and "job_type" not in coerced:
                 job: Job = CmdJob.model_construct(
                     job_name=coerced.get("job_name", ""),
@@ -359,6 +366,16 @@ class JILParser:
                     **{k: v for k, v in coerced.items()
                        if k not in ("job_name", "job_type")},
                 )
+            elif op_code == "override":
+                try:
+                    job = parse_job(coerced)
+                except Exception:
+                    job = CmdJob.model_construct(
+                        job_name=coerced.get("job_name", ""),
+                        job_type=coerced.get("job_type", "CMD"),
+                        **{k: v for k, v in coerced.items()
+                           if k not in ("job_name", "job_type")},
+                    )
             else:
                 job = parse_job(coerced)
 

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1/globals", tags=["globals"])
 
 def _row_to_resp(row: GlobalVarRow) -> GlobalVarResponse:
     return GlobalVarResponse(
-        name  = row.name,
+        name  = row.global_name,
         value = row.value or "",
     )
 
@@ -28,7 +28,7 @@ def list_globals(
 ):
     """List all global variables."""
     from sqlalchemy import select
-    rows = session.scalars(select(GlobalVarRow).order_by(GlobalVarRow.name)).all()
+    rows = session.scalars(select(GlobalVarRow).order_by(GlobalVarRow.global_name)).all()
     return [_row_to_resp(r) for r in rows]
 
 

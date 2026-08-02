@@ -357,6 +357,7 @@ class TestRunsRouter:
         with sync_session() as s:
             run_repo.start(s, rid, "out2_job",
                            command="echo", machine="localhost", run_date="2024-01-15")
+            s.flush()
             output_repo.append(s, rid, "out2_job", line_no=1, content="hello world", stream="stdout")
             s.commit()
         resp = client.get(f"/api/v1/runs/{rid}/output")

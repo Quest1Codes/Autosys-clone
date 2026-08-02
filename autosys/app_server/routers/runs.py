@@ -13,6 +13,7 @@ from autosys.app_server.deps    import get_session, get_current_user, CurrentUse
 from autosys.app_server.schemas import RunResponse, OutputLineResponse
 from autosys.db.schema          import JobRunRow, JobOutputRow
 from autosys.db.repository      import runs as run_repo, output as output_repo
+from autosys.models.job         import JobStatus
 
 router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
@@ -24,7 +25,7 @@ def _run_to_resp(row: JobRunRow) -> RunResponse:
     return RunResponse(
         run_id           = row.run_id,
         job_name         = row.job_name,
-        status           = row.status or "RUNNING",
+        status           = row.status if row.status is not None else JobStatus.RUNNING.value,
         exit_code        = row.exit_code,
         machine          = row.machine,
         run_date         = row.run_date,

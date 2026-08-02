@@ -181,6 +181,8 @@ def _print_table(rows: list[JobRow], *, no_children: bool) -> None:
     table.add_column("Last End",   style="dim",     min_width=19, no_wrap=True)
     table.add_column("ST",         style="",        min_width=2,  no_wrap=True)
     table.add_column("Run",        style="",        min_width=3,  no_wrap=True, justify="right")
+    table.add_column("Type",       style="dim",     min_width=6,  no_wrap=True)
+    table.add_column("Application", style="dim",    min_width=12, no_wrap=True)
 
     def _add_row(r: JobRow, indent: int = 0) -> None:
         status = r.status if r.status is not None else JobStatus.INACTIVE.value
@@ -193,6 +195,8 @@ def _print_table(rows: list[JobRow], *, no_children: bool) -> None:
             _fmt_ts(r.last_end),
             f"[{colour}]{abbrev}[/{colour}]",
             str(_run_count(r)),
+            str(r.job_type or ""),
+            str(r.application or ""),
         )
 
     if no_children:
@@ -232,6 +236,8 @@ def _print_tsv(rows: list[JobRow]) -> None:
             _fmt_ts(r.last_end),
             _abbrev(status),
             str(_run_count(r)),
+            str(r.job_type or ""),
+            str(r.application or ""),
             sep="\t",
         )
 

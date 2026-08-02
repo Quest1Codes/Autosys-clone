@@ -45,6 +45,15 @@ class NotificationConfig:
         self.slack_url:     str | None = os.getenv("SLACK_WEBHOOK_URL")
         self.pd_routing_key: str | None = os.getenv("PD_ROUTING_KEY")
 
+        # SNMP (Phase 5)
+        self.snmp_host:      str | None = os.getenv("AUTOSYS_SNMP_HOST")
+        self.snmp_port:      int        = int(os.getenv("AUTOSYS_SNMP_PORT", "162"))
+        self.snmp_community: str        = os.getenv("AUTOSYS_SNMP_COMMUNITY", "public")
+
+        # Remedy (Phase 5)
+        self.remedy_url:     str | None = os.getenv("AUTOSYS_REMEDY_API_URL")
+        self.remedy_token:   str | None = os.getenv("AUTOSYS_REMEDY_API_TOKEN")
+
     @property
     def any_enabled(self) -> bool:
         """Return True if at least one channel is configured."""
@@ -53,4 +62,6 @@ class NotificationConfig:
             or self.smtp_host
             or self.slack_url
             or self.pd_routing_key
+            or self.snmp_host
+            or self.remedy_url
         )

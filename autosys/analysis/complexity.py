@@ -18,6 +18,7 @@ Complexity sizes (from docs/strategy-and-approach.md)
 from __future__ import annotations
 
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -92,6 +93,16 @@ class JobAssessment:
     blast_radius: int = 0
     # Airflow gap tags — see gap_analysis.GAP_CATALOGUE.
     gap_tags:     str = ""
+    # Migration signals from JIL structural analysis (A1-A10)
+    machine_concentration: str = ""
+    command_dialect:       str = ""
+    box_nesting_depth:     int = 0
+    has_cross_box_dep:     bool = False
+    schedule_burst_count:  int = 0
+    has_notifications:     bool = False
+    has_hardcoded_logs:    bool = False
+    timezone:              str = ""
+    migration_signals:     str = ""
 
 
 @dataclass
@@ -108,6 +119,15 @@ class AssessmentSummary:
     total_days:  int
     risk_counts:          dict[str, int] = field(default_factory=dict)
     gap_severity_counts:  dict[str, int] = field(default_factory=dict)
+    # Migration signal summary (A1-A10)
+    machine_count:            int = 0
+    cross_box_dep_count:      int = 0
+    max_box_nesting:          int = 0
+    max_schedule_burst:       int = 0
+    notification_job_count:    int = 0
+    hardcoded_log_job_count:  int = 0
+    timezone_count:           int = 0
+    dialect_counts:           dict[str, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +281,7 @@ def build_report(
     rows: list[JobRow],
     box_pattern: Optional[str] = None,
     run_stats: Optional[dict[str, RunStats]] = None,
+    migration_signals: Optional[dict] = None,
 ) -> list[JobAssessment]:
     """
     Score every job and return a list of JobAssessment results.
@@ -273,6 +294,12 @@ def build_report(
     function itself stays DB-session-free — callers that want risk scoring
     fetch run_stats themselves and pass it in; omitting it scores every job
     as NO_DATA risk.
+
+    *migration_signals* is an optional dict from
+    migration_signals.run_all_structural_analyses() — when provided, each
+    JobAssessment is enriched with machine concentration, command dialect,
+    box nesting depth, cross-box deps, schedule burst, notifications, log
+    paths, and timezone signals.
     """
     all_by_name: dict[str, JobRow] = {r.job_name: r for r in rows}
     # Blast radius is a global-graph property — computed once over the full,
@@ -358,7 +385,68 @@ def build_report(
             risk_drivers = "; ".join(risk_drivers),
             blast_radius = blast_radius.get(r.job_name, 0),
             gap_tags     = ", ".join(compute_gap_tags(r)),
+            machine_concentration = (
+                migration_signals.get("machine_concentration", {})
+                .get("by_job", {}).get(r.job_name, {}).get("score", "")
+                if migration_signals else ""
+            ),
+            command_dialect = (
+                migration_signals.get("command_analysis", {})
+                .get(r.job_name, {}).get("dialect", "")
+                if migration_signals else ""
+            ),
+            box_nesting_depth = (
+                migration_signals.get("box_nesting_depth", {})
+                .get(r.job_name, {}).get("depth", 0)
+                if migration_signals else 0
+            ),
+            has_cross_box_dep = (
+                migration_signals.get("cross_box_dependencies", {})
+                .get("by_job", {}).get(r.job_name, {}).get("has_cross_box", False)
+                if migration_signals else False
+            ),
+            schedule_burst_count = (
+                migration_signals.get("schedule_burst_analysis", {})
+                .get("by_job", {}).get(r.job_name, {}).get("burst_count", 0)
+                if migration_signals else 0
+            ),
+            has_notifications = (
+                r.job_name in (migration_signals or {}).get("notification_mapping", {})
+                if migration_signals else False
+            ),
+            has_hardcoded_logs = (
+                migration_signals.get("log_path_analysis", {})
+                .get(r.job_name, {}).get("hardcoded", False)
+                if migration_signals else False
+            ),
+            timezone = (
+                migration_signals.get("timezone_analysis", {})
+                .get(r.job_name, {}).get("timezone", "")
+                if migration_signals else ""
+            ),
+            migration_signals = "; ".join([
+                f"machine={migration_signals.get('machine_concentration', {}).get('by_job', {}).get(r.job_name, {}).get('score', '')}" if migration_signals else "",
+                f"dialect={migration_signals.get('command_analysis', {}).get(r.job_name, {}).get('dialect', '')}" if migration_signals else "",
+                f"nesting={migration_signals.get('box_nesting_depth', {}).get(r.job_name, {}).get('depth', 0)}" if migration_signals else "",
+            ]) if migration_signals else "",
         ))
+
+    # BOX risk aggregation: BOX jobs inherit the worst risk from their children
+    # instead of showing NO_DATA (boxes don't have their own run history).
+    _risk_order = {"HIGH": 4, "MEDIUM": 3, "LOW": 2, "NONE": 1, "NO_DATA": 0}
+    by_name = {a.job_name: a for a in results}
+    for a in results:
+        if a.job_type != "BOX":
+            continue
+        # Look up children from all_by_name (full unfiltered set)
+        children_rows = [r for r in all_by_name.values() if r.box_name == a.job_name]
+        children = [by_name[c.job_name] for c in children_rows if c.job_name in by_name]
+        if not children:
+            continue
+        worst = max(children, key=lambda c: _risk_order.get(c.risk, 0))
+        if _risk_order.get(worst.risk, 0) > _risk_order.get(a.risk, 0):
+            a.risk = worst.risk
+            a.risk_drivers = f"inherited from child {worst.job_name}: {worst.risk_drivers}"
 
     return results
 
@@ -369,6 +457,15 @@ def compute_summary(results: list[JobAssessment]) -> AssessmentSummary:
     hours:  dict[str, int] = {s: 0 for s in SIZES}
     risk_counts: dict[str, int] = {r: 0 for r in RISK_LEVELS}
     gap_severity_counts: dict[str, int] = {"RED": 0, "YELLOW": 0, "GREEN": 0}
+    dialect_counts: dict[str, int] = {}
+    machine_names: set = set()
+    cross_box_count = 0
+    max_nesting = 0
+    max_burst = 0
+    notification_count = 0
+    hardcoded_log_count = 0
+    timezone_count = 0
+
     for rec in results:
         counts[rec.size] += 1
         hours[rec.size]  += rec.effort_h
@@ -376,6 +473,21 @@ def compute_summary(results: list[JobAssessment]) -> AssessmentSummary:
         for tag in (t for t in rec.gap_tags.split(", ") if t):
             severity = GAP_CATALOGUE[tag][0]
             gap_severity_counts[severity] += 1
+        # Migration signal aggregation
+        if rec.command_dialect:
+            dialect_counts[rec.command_dialect] = dialect_counts.get(rec.command_dialect, 0) + 1
+        if rec.has_cross_box_dep:
+            cross_box_count += 1
+        if rec.box_nesting_depth > max_nesting:
+            max_nesting = rec.box_nesting_depth
+        if rec.schedule_burst_count > max_burst:
+            max_burst = rec.schedule_burst_count
+        if rec.has_notifications:
+            notification_count += 1
+        if rec.has_hardcoded_logs:
+            hardcoded_log_count += 1
+        if rec.timezone:
+            timezone_count += 1
 
     total_jobs = sum(counts.values())
     raw_hours  = sum(hours.values())
@@ -400,4 +512,139 @@ def compute_summary(results: list[JobAssessment]) -> AssessmentSummary:
         total_days = total_days,
         risk_counts         = risk_counts,
         gap_severity_counts = gap_severity_counts,
+        machine_count           = len(machine_names),
+        cross_box_dep_count     = cross_box_count,
+        max_box_nesting         = max_nesting,
+        max_schedule_burst      = max_burst,
+        notification_job_count  = notification_count,
+        hardcoded_log_job_count = hardcoded_log_count,
+        timezone_count          = timezone_count,
+        dialect_counts          = dialect_counts,
     )
+
+
+# ---------------------------------------------------------------------------
+# Astronomer mapping recommendations
+# ---------------------------------------------------------------------------
+
+def astronomer_mapping(a: JobAssessment) -> str:
+    """
+    Recommend an Astronomer/Airflow construct for this job.
+    """
+    if a.job_type == "BOX":
+        child_count = a.drivers.count("children") if "children" in a.drivers else 0
+        if a.has_cross_box_dep:
+            return "DAG with ExternalTaskSensor for cross-box dependencies"
+        return "TaskGroup (nested DAG)"
+    parts = []
+    if a.command_dialect == "python":
+        parts.append("PythonOperator / @task decorator")
+    elif a.command_dialect in ("bash", "ksh"):
+        parts.append("BashOperator")
+    elif a.command_dialect == "perl":
+        parts.append("BashOperator (wrap perl script)")
+    else:
+        parts.append("BashOperator (generic)")
+    if a.has_cross_box_dep:
+        parts.append("ExternalTaskSensor for cross-box dep")
+    if a.has_notifications:
+        parts.append("on_failure_callback / SlackNotifier")
+    if a.has_hardcoded_logs:
+        parts.append("remap log paths to S3/GCS")
+    if a.timezone:
+        parts.append(f"timezone-aware schedule ({a.timezone} → UTC)")
+    if a.schedule_burst_count > 10:
+        parts.append("stagger start times to avoid worker saturation")
+    return " + ".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Risk mitigation suggestions
+# ---------------------------------------------------------------------------
+
+def risk_mitigation(a: JobAssessment) -> str:
+    """
+    Suggest mitigation actions based on risk level and drivers.
+    """
+    if a.risk == "NO_DATA":
+        return "Run simulation with more cycles to generate runtime history"
+    actions = []
+    if a.risk == "HIGH":
+        actions.append("PRIORITY: migrate early with extra testing")
+    if "failure rate" in (a.risk_drivers or "").lower():
+        actions.append("add Airflow retries + retry_delay_exponential")
+    if "retry rate" in (a.risk_drivers or "").lower():
+        actions.append("tune retry_count and retry_delay in Airflow")
+    if "active alarms" in (a.risk_drivers or "").lower():
+        actions.append("set up Airflow alerts + PagerDuty integration")
+    if "termination" in (a.risk_drivers or "").lower():
+        actions.append("add timeout + on_failure_callback")
+    if a.has_hardcoded_logs:
+        actions.append("replace hardcoded paths with Airflow templates / XCom")
+    if a.timezone:
+        actions.append(f"convert {a.timezone} schedule to UTC")
+    if a.has_cross_box_dep:
+        actions.append("use ExternalTaskSensor with poke_interval tuning")
+    if not actions:
+        actions.append("standard migration — no special handling needed")
+    return "; ".join(actions)
+
+
+# ---------------------------------------------------------------------------
+# Per-box effort breakdown
+# ---------------------------------------------------------------------------
+
+def box_effort_breakdown(assessments: list[JobAssessment]) -> list[dict]:
+    """
+    Group assessments by box and compute per-box effort totals.
+    """
+    by_box: dict[str, list[JobAssessment]] = defaultdict(list)
+    for a in assessments:
+        box = a.box_name or "(top-level)"
+        by_box[box].append(a)
+
+    result = []
+    for box, jobs in sorted(by_box.items()):
+        total_h = sum(j.effort_h for j in jobs)
+        sizes = {s: sum(1 for j in jobs if j.size == s) for s in SIZES}
+        risks = {r: sum(1 for j in jobs if j.risk == r) for r in RISK_LEVELS}
+        result.append({
+            "box_name": box,
+            "job_count": len(jobs),
+            "total_effort_h": total_h,
+            "sizes": sizes,
+            "risks": risks,
+            "high_risk_jobs": [j.job_name for j in jobs if j.risk == "HIGH"],
+        })
+    return result
+
+
+# ---------------------------------------------------------------------------
+# CSV export
+# ---------------------------------------------------------------------------
+
+def export_csv(assessments: list[JobAssessment]) -> str:
+    """
+    Export assessments as CSV string.
+    """
+    import csv, io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow([
+        "job_name", "job_type", "box_name", "size", "effort_h",
+        "risk", "risk_drivers", "blast_radius", "gap_tags",
+        "command_dialect", "machine_concentration", "box_nesting_depth",
+        "has_cross_box_dep", "schedule_burst_count", "has_notifications",
+        "has_hardcoded_logs", "timezone", "drivers",
+        "astronomer_mapping", "risk_mitigation",
+    ])
+    for a in assessments:
+        w.writerow([
+            a.job_name, a.job_type, a.box_name, a.size, a.effort_h,
+            a.risk, a.risk_drivers, a.blast_radius, a.gap_tags,
+            a.command_dialect, a.machine_concentration, a.box_nesting_depth,
+            a.has_cross_box_dep, a.schedule_burst_count, a.has_notifications,
+            a.has_hardcoded_logs, a.timezone, a.drivers,
+            astronomer_mapping(a), risk_mitigation(a),
+        ])
+    return buf.getvalue()

@@ -1015,3 +1015,34 @@ body {
   opacity: 0.6;
   font-size: 9px;
 }
+
+/* =========================================================
+   Responsive Design
+   ========================================================= */
+
+@media (max-width: 768px) {
+  .wcc-shell { font-size: 11px; }
+  .wcc-toolbar { flex-wrap: wrap; gap: 2px; }
+  .toolbar-btn { padding: 3px 6px; font-size: 10px; }
+  .toolbar-btn span:last-child { display: none; }
+  .wcc-filter-bar { flex-wrap: wrap; gap: 4px; }
+  .wcc-input, .wcc-select { width: 100px !important; }
+  .wcc-table { font-size: 10px; }
+  .wcc-table th, .wcc-table td { padding: 3px 4px; }
+  .detail-two-col { flex-direction: column; }
+  .detail-panel { width: 100% !important; }
+  .graph-legend { flex-wrap: wrap; gap: 4px; }
+  .legend-item { font-size: 9px; }
+  .wcc-status-bar { flex-wrap: wrap; gap: 2px; }
+  .status-bar-item { padding: 2px 4px; font-size: 10px; }
+}
+
+@media (max-width: 480px) {
+  .wcc-shell { font-size: 10px; }
+  .toolbar-btn { padding: 2px 4px; }
+  .wcc-table th:nth-child(5), .wcc-table td:nth-child(5),
+  .wcc-table th:nth-child(6), .wcc-table td:nth-child(6) { display: none; }
+  .context-menu { min-width: 140px; }
+  .job-monitor-grid { overflow-x: auto; }
+  .box-graph-canvas { min-height: 300px; }
+}

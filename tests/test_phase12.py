@@ -93,7 +93,18 @@ def app_server(isolated_db, monkeypatch):
     env["AUTOSYS_DB_URL"] = isolated_db
     env["AUTOSYS_START_SCHEDULER"] = "true"  # Ensure lifespan task starts EPS
 
+    # Find the autosys CLI binary — could be next to sys.executable, in the
+    # user scripts dir, or on PATH (depending on how it was installed).
+    import shutil, site
     autosys_bin = str(Path(sys.executable).parent / "autosys")
+    if not Path(autosys_bin).exists():
+        for d in site.getuserbase() and [Path(site.getuserbase()) / "bin"] or []:
+            cand = str(d / "autosys")
+            if Path(cand).exists():
+                autosys_bin = cand
+                break
+        else:
+            autosys_bin = shutil.which("autosys") or autosys_bin
     proc = subprocess.Popen(
         [autosys_bin, "scheduler", "serve", "--port", str(port), "--host", "127.0.0.1"],
         env=env,

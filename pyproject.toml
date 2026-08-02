@@ -64,6 +64,9 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = ["-s", "--tb=short", "--no-header"]
+markers = [
+    "postgresql: requires a real PostgreSQL instance (skipped if unavailable)",
+]
 
 [tool.ruff]
 line-length = 100

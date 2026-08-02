@@ -291,6 +291,55 @@ class Job(BaseModel):
     auto_hold: bool = Field(False, description="Automatically place job ON_HOLD when created.")
 
     # ------------------------------------------------------------------
+    # Extended attributes (Phase 4)
+    # ------------------------------------------------------------------
+    auto_delete: bool = Field(
+        False,
+        description="If True, auto-delete the job definition after it reaches a terminal state.",
+    )
+    application: Optional[str] = Field(
+        None,
+        description="Associate this job with an application name for grouping and filtering.",
+    )
+    sub_application: Optional[str] = Field(
+        None,
+        description="Sub-grouping within the application.",
+    )
+    command_timeout: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Kill the command after this many seconds (distinct from max_run_alarm which only raises an alarm).",
+    )
+    continuous: bool = Field(
+        False,
+        description="If True, the job monitors continuously (e.g. FILEWATCH loops instead of one-shot).",
+    )
+    cpu_usage: Optional[int] = Field(
+        None,
+        ge=0,
+        description="CPU usage threshold for monitoring (percentage).",
+    )
+    disk_space: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Minimum disk space in MB required before running.",
+    )
+    auth_string: Optional[str] = Field(
+        None,
+        description="Authorization string passed to the agent for execution.",
+    )
+    connection_retry: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Number of times to retry connection for CONNECT/WEBSERVICE jobs.",
+    )
+    connection_timeout: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Connection timeout in seconds for CONNECT/WEBSERVICE jobs.",
+    )
+
+    # ------------------------------------------------------------------
     # Notifications
     # ------------------------------------------------------------------
     notification_msg: Optional[str] = Field(

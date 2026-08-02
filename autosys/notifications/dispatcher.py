@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import smtplib
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -32,9 +33,14 @@ from email.mime.text import MIMEText
 from typing import Optional
 
 from loguru import logger
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from autosys.db.schema import AlarmRow
+from autosys.db.schema import AlarmRow, JobRow
+from autosys.db.connection import sync_session
 from autosys.notifications.config import NotificationConfig
+from autosys.notifications.snmp_notifier import SnmpNotifier
+from autosys.notifications.remedy_notifier import RemedyNotifier
 
 
 class Dispatcher:
@@ -59,10 +65,33 @@ class Dispatcher:
         config:       Optional[NotificationConfig] = None,
         http_post_fn: Optional[callable]            = None,
         smtp_send_fn: Optional[callable]            = None,
+        snmp_send_fn: Optional[callable]            = None,
+        remedy_post_fn: Optional[callable]          = None,
+        max_retries:  int                            = 3,
     ) -> None:
         self._cfg         = config or NotificationConfig()
         self._http_post   = http_post_fn or _default_http_post
         self._smtp_send   = smtp_send_fn or _default_smtp_send
+        self._max_retries = max_retries
+
+        # Build SNMP notifier if configured
+        self._snmp_notifier: Optional[SnmpNotifier] = None
+        if self._cfg.snmp_host:
+            self._snmp_notifier = SnmpNotifier(
+                host=self._cfg.snmp_host,
+                port=self._cfg.snmp_port,
+                community=self._cfg.snmp_community,
+                send_fn=snmp_send_fn,
+            )
+
+        # Build Remedy notifier if configured
+        self._remedy_notifier: Optional[RemedyNotifier] = None
+        if self._cfg.remedy_url and self._cfg.remedy_token:
+            self._remedy_notifier = RemedyNotifier(
+                api_url=self._cfg.remedy_url,
+                api_token=self._cfg.remedy_token,
+                http_post_fn=remedy_post_fn,
+            )
 
     # ------------------------------------------------------------------
     # Public API
@@ -70,7 +99,11 @@ class Dispatcher:
 
     def send(self, alarm: AlarmRow) -> int:
         """
-        Send the alarm to all configured channels.
+        Send the alarm to notification channels.
+
+        If the job has a ``notification_type`` set, only the matching
+        channel is used.  Otherwise all configured channels are tried
+        (backward-compatible behaviour).
 
         Returns the number of channels that successfully delivered.
         Also sets ``alarm.notified = True`` if at least one channel
@@ -79,26 +112,96 @@ class Dispatcher:
         n = 0
         payload = self._build_payload(alarm)
 
-        if self._cfg.nsm_url:
-            if self._send_nsm(alarm, payload):
-                n += 1
+        # Look up job's notification_type for routing
+        job_type = self._get_job_notification_type(alarm.job_name)
 
-        if self._cfg.smtp_host and self._cfg.smtp_from and self._cfg.smtp_to_list:
-            if self._send_email(alarm):
-                n += 1
+        if job_type == "EMAIL":
+            if self._cfg.smtp_host and self._cfg.smtp_from:
+                if self._send_with_retry(lambda: self._send_email(alarm)):
+                    n += 1
+        elif job_type == "SNMP":
+            if self._snmp_notifier:
+                if self._send_with_retry(lambda: self._snmp_notifier.send(alarm)):
+                    n += 1
+        elif job_type == "NSM":
+            if self._cfg.nsm_url:
+                if self._send_with_retry(lambda: self._send_nsm(alarm, payload)):
+                    n += 1
+        elif job_type == "REMEDY":
+            if self._remedy_notifier:
+                if self._send_with_retry(lambda: self._remedy_notifier.send(alarm)):
+                    n += 1
+        else:
+            # No notification_type on job → send to all configured channels
+            if self._cfg.nsm_url:
+                if self._send_with_retry(lambda: self._send_nsm(alarm, payload)):
+                    n += 1
 
-        if self._cfg.slack_url:
-            if self._send_slack(alarm):
-                n += 1
+            if self._cfg.smtp_host and self._cfg.smtp_from and self._cfg.smtp_to_list:
+                if self._send_with_retry(lambda: self._send_email(alarm)):
+                    n += 1
 
-        if self._cfg.pd_routing_key:
-            if self._send_pagerduty(alarm):
-                n += 1
+            if self._cfg.slack_url:
+                if self._send_with_retry(lambda: self._send_slack(alarm)):
+                    n += 1
+
+            if self._cfg.pd_routing_key:
+                if self._send_with_retry(lambda: self._send_pagerduty(alarm)):
+                    n += 1
+
+            if self._snmp_notifier:
+                if self._send_with_retry(lambda: self._snmp_notifier.send(alarm)):
+                    n += 1
+
+            if self._remedy_notifier:
+                if self._send_with_retry(lambda: self._remedy_notifier.send(alarm)):
+                    n += 1
 
         if n > 0:
             alarm.notified = True
 
         return n
+
+    # ------------------------------------------------------------------
+    # Retry logic
+    # ------------------------------------------------------------------
+
+    def _send_with_retry(self, send_fn: callable) -> bool:
+        """
+        Call *send_fn* with exponential backoff retry.
+
+        3 attempts: immediate, 1s, 2s.
+        Returns True if any attempt succeeds.
+        """
+        for attempt in range(self._max_retries):
+            try:
+                if send_fn():
+                    return True
+            except Exception as exc:
+                logger.warning(
+                    "Dispatcher: attempt %d/%d failed: %s",
+                    attempt + 1, self._max_retries, exc,
+                )
+            if attempt < self._max_retries - 1:
+                backoff = 2 ** attempt  # 1s, 2s, 4s...
+                time.sleep(backoff)
+        return False
+
+    # ------------------------------------------------------------------
+    # Job notification_type lookup
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _get_job_notification_type(job_name: str) -> Optional[str]:
+        """Look up the job's notification_type from the DB."""
+        try:
+            with sync_session() as session:
+                row = session.get(JobRow, job_name)
+                if row and row.notification_type:
+                    return str(row.notification_type).upper()
+        except Exception:
+            pass
+        return None
 
     # ------------------------------------------------------------------
     # Channel implementations

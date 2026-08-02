@@ -298,3 +298,166 @@ def analyze(
 
     if csv_path:
         _export_csv(results, csv_path)
+
+
+# ---------------------------------------------------------------------------
+# Migration report command — JIL-only complexity with simulation
+# ---------------------------------------------------------------------------
+
+@click.command(name="migration-report")
+@click.option("--cycles", default=20, show_default=True, type=int,
+              help="Number of simulation cycles for runtime data generation.")
+@click.option("--export", "csv_path", default=None, metavar="FILE",
+              help="Write per-job results to a CSV file.")
+@click.option("--summary", "summary_only", is_flag=True, default=False,
+              help="Print only the summary table (no per-job rows).")
+def migration_report(
+    cycles:      int,
+    csv_path:    Optional[str],
+    summary_only: bool,
+) -> None:
+    """
+    JIL-only migration complexity report with simulated runtime data.
+
+    Runs a multi-cycle dry-run simulation to generate JobRunRow/AlarmRow
+    history, then combines structural JIL signals (A1-A10) with the
+    complexity scoring model to produce a comprehensive assessment.
+
+    Example
+    -------
+    \\b
+        $ autosys jil import jil_files/*.jil
+        $ autosys migration-report --cycles 20 --export migration.csv
+    """
+    from autosys.analysis.migration_signals import run_all_structural_analyses
+    from autosys.scheduler.simulation_runner import run_simulation
+
+    with sync_session() as session:
+        rows = job_repo.list_all(session)
+        if not rows:
+            _err.print(
+                "[yellow]No jobs found in the DB.[/yellow]  "
+                "Run [bold]autosys jil import <file.jil>[/bold] first."
+            )
+            sys.exit(0)
+
+        # Run simulation to generate runtime data
+        _console.print(f"\n[bold cyan]Running {cycles}-cycle dry-run simulation...[/bold cyan]")
+        sim_result = run_simulation(session, cycles=cycles, ticks_per_cycle=10, seed=42)
+        _console.print(
+            f"  [dim]Runs: {sim_result['total_runs']}  "
+            f"Failures: {sim_result['total_failures']}  "
+            f"Alarms: {sim_result['total_alarms']}  "
+            f"Failure rate: {sim_result['failure_rate']:.1%}[/dim]"
+        )
+
+        # Fetch run stats from simulated history
+        run_stats = fetch_run_stats(session, [r.job_name for r in rows])
+
+        # Run structural analyses
+        signals = run_all_structural_analyses(session)
+
+    # Build enriched report
+    assessments = build_report(rows, run_stats=run_stats, migration_signals=signals)
+    results = [
+        {
+            "job_name": a.job_name,
+            "job_type": a.job_type,
+            "box_name": a.box_name,
+            "size":     a.size,
+            "effort_h": a.effort_h,
+            "drivers":  a.drivers,
+            "risk":         a.risk,
+            "risk_drivers": a.risk_drivers,
+            "blast_radius": a.blast_radius,
+            "gap_tags":     a.gap_tags,
+            "machine_concentration": a.machine_concentration,
+            "command_dialect":       a.command_dialect,
+            "box_nesting_depth":     a.box_nesting_depth,
+            "has_cross_box_dep":     a.has_cross_box_dep,
+            "schedule_burst_count":  a.schedule_burst_count,
+            "has_notifications":     a.has_notifications,
+            "has_hardcoded_logs":    a.has_hardcoded_logs,
+            "timezone":              a.timezone,
+        }
+        for a in assessments
+    ]
+
+    _console.print(
+        f"\n[bold]AutoSys → Astronomer  JIL-Only Migration Complexity Report[/bold]"
+        f"\n[dim]Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}  |  "
+        f"Jobs analysed: {len(results)}  |  "
+        f"Simulation cycles: {cycles}[/dim]"
+    )
+
+    if not summary_only:
+        _print_detail_table(results)
+
+    _print_summary(results)
+
+    # Migration signals summary
+    from autosys.analysis.complexity import JobAssessment
+    summary = compute_summary([
+        JobAssessment(
+            job_name=a.job_name, job_type=a.job_type, box_name=a.box_name,
+            size=a.size, effort_h=a.effort_h, drivers=a.drivers,
+            risk=a.risk, risk_drivers=a.risk_drivers,
+            blast_radius=a.blast_radius, gap_tags=a.gap_tags,
+            machine_concentration=a.machine_concentration,
+            command_dialect=a.command_dialect,
+            box_nesting_depth=a.box_nesting_depth,
+            has_cross_box_dep=a.has_cross_box_dep,
+            schedule_burst_count=a.schedule_burst_count,
+            has_notifications=a.has_notifications,
+            has_hardcoded_logs=a.has_hardcoded_logs,
+            timezone=a.timezone,
+        )
+        for a in assessments
+    ])
+
+    _console.print()
+    _console.print("[bold]Migration Signals (JIL structural analysis)[/bold]")
+    _console.print(f"  Cross-box dependencies: {summary.cross_box_dep_count}")
+    _console.print(f"  Max box nesting depth:  {summary.max_box_nesting}")
+    _console.print(f"  Max schedule burst:     {summary.max_schedule_burst} jobs at one time")
+    _console.print(f"  Jobs with notifications: {summary.notification_job_count}")
+    _console.print(f"  Jobs with hardcoded log paths: {summary.hardcoded_log_job_count}")
+    _console.print(f"  Jobs with timezone:    {summary.timezone_count}")
+    if summary.dialect_counts:
+        _console.print(f"  Script dialects:        {dict(summary.dialect_counts)}")
+    _console.print()
+
+    if csv_path:
+        from autosys.analysis.complexity import export_csv as _export_csv_new
+        with open(csv_path, "w", newline="") as f:
+            f.write(_export_csv_new(assessments))
+        _console.print(f"  [green]CSV exported to {csv_path}[/green]")
+
+    # Per-box effort breakdown
+    from autosys.analysis.complexity import box_effort_breakdown, astronomer_mapping, risk_mitigation
+    _console.print()
+    _console.print("[bold]Per-Box Effort Breakdown[/bold]")
+    box_table = Table(box=rich_box.SIMPLE, show_header=True, header_style="bold")
+    box_table.add_column("Box", style="cyan")
+    box_table.add_column("Jobs", justify="right")
+    box_table.add_column("Effort", justify="right")
+    box_table.add_column("Sizes", style="dim")
+    box_table.add_column("HIGH Risk", style="red")
+    for b in box_effort_breakdown(assessments):
+        box_table.add_row(
+            b["box_name"],
+            str(b["job_count"]),
+            f"{b['total_effort_h']}h",
+            ", ".join(f"{k}={v}" for k, v in b["sizes"].items() if v),
+            ", ".join(b["high_risk_jobs"]) or "-",
+        )
+    _console.print(box_table)
+
+    # Top 5 Astronomer mapping recommendations
+    _console.print()
+    _console.print("[bold]Astronomer Mapping Recommendations (top 5 XL/L jobs)[/bold]")
+    for a in sorted(assessments, key=lambda x: x.effort_h, reverse=True)[:5]:
+        _console.print(f"  [bold]{a.job_name}[/bold] [{a.size}]")
+        _console.print(f"    -> {astronomer_mapping(a)}")
+        _console.print(f"    !  {risk_mitigation(a)}")
+    _console.print()

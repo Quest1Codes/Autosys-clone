@@ -38,6 +38,7 @@ from autosys.db.repository        import (
 )
 from autosys.models.event         import Event
 from autosys.models.job           import BoxJob, CmdJob
+from autosys.models.enums         import JobStatus
 from autosys.models.machine       import MachineDef
 from autosys.parser.jil_parser    import JILParser, JILParseError, parse_jil
 from autosys.parser.jil_writer    import machine_to_jil
@@ -93,6 +94,9 @@ def _get_status(name) -> str:
 
 
 def _set_status(name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, name)
         if row:
@@ -608,9 +612,9 @@ class TestEventProcessorBoxIntegration:
         with sync_session() as session:
             proc_no_ac.process_one_tick(session)   # reset_children → fc1 INACTIVE → box ACTIVATED/RUNNING + fc1 STARTING
         # Child was reset and re-activated (STARTING), box is no longer SUCCESS
-        assert _get_status("fbox") in ("ACTIVATED", "RUNNING")
+        assert _get_status("fbox") in (JobStatus.ACTIVATED.value, JobStatus.RUNNING.value)
         # fc1 was reset then re-activated; stub dispatcher leaves it RUNNING
-        assert _get_status("fc1")  in ("INACTIVE", "STARTING", "RUNNING")
+        assert _get_status("fc1")  in (JobStatus.INACTIVE.value, JobStatus.STARTING.value, JobStatus.RUNNING.value)
 
     def test_box_not_completed_with_running_children(self):
         _seed_box("wait_box")
@@ -622,7 +626,7 @@ class TestEventProcessorBoxIntegration:
             proc.process_one_tick(session)   # box → RUNNING, child → STARTING
         with sync_session() as session:
             proc.process_one_tick(session)   # child still STARTING → box stays RUNNING
-        assert _get_status("wait_box") in ("RUNNING",)
+        assert _get_status("wait_box") in (JobStatus.RUNNING.value,)
 
     def test_empty_box_completes_on_first_tick(self):
         _seed_box("empty_box")

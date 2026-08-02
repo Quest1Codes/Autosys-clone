@@ -159,9 +159,10 @@ def scheduler_run_once(auto_complete: bool, quiet: bool) -> None:
         after = {r.job_name: r.status for r in job_repo.list_all(session)}
 
     if not quiet:
+        from autosys.scheduler.state_machine import _norm_status
         # Show jobs whose status changed
         changed = [
-            (name, before.get(name, "N/A"), after.get(name, "N/A"))
+            (name, _norm_status(before.get(name)), _norm_status(after.get(name)))
             for name in sorted(set(before) | set(after))
             if before.get(name) != after.get(name)
         ]
@@ -204,9 +205,10 @@ def scheduler_status() -> None:
         pending = len(event_repo.dequeue_pending(session))
         rows = job_repo.list_all(session)
 
+    from autosys.scheduler.state_machine import _norm_status
     status_counts: dict[str, int] = {}
     for row in rows:
-        s = row.status or "INACTIVE"
+        s = _norm_status(row.status)
         status_counts[s] = status_counts.get(s, 0) + 1
 
     _console.print()
@@ -261,7 +263,12 @@ def scheduler_status() -> None:
                   "instantly without executing any scripts or contacting remote agents. "
                   "Ideal for local development and migration complexity analysis."
               ))
-def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool) -> None:
+@click.option("--ha", is_flag=True, default=False,
+              help="Enable HA mode with distributed lock for tie-breaker scheduling.")
+@click.option("--tie-breaker", is_flag=True, default=False,
+              help="Run as standby tie-breaker scheduler. Only active if primary fails.")
+def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool,
+                    ha: bool, tie_breaker: bool) -> None:
     """
     Run the Event Processor and REST API server together.
 
@@ -285,16 +292,23 @@ def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool) -
     from autosys.app_server.main import create_app
 
     dry_label = "  [bold yellow][DRY-RUN — stub dispatcher][/bold yellow]" if dry_run else ""
+    ha_label = "  [bold cyan][HA MODE — tie-breaker][/bold cyan]" if ha and tie_breaker else ("  [bold green][HA MODE — primary][/bold green]" if ha else "")
     _console.print(
         f"\n[bold green]AutoSys App Server[/bold green] starting on "
-        f"[cyan]http://{host}:{port}[/cyan]{dry_label}\n"
+        f"[cyan]http://{host}:{port}[/cyan]{dry_label}{ha_label}\n"
         f"  API docs:  [bold]http://localhost:{port}/docs[/bold]\n"
         f"  Live feed: [bold]ws://localhost:{port}/api/v1/ws/events[/bold]\n"
         f"  EPS poll:  {poll_interval:.1f}s\n"
         f"[dim]Ctrl+C to stop[/dim]\n"
     )
 
-    app = create_app(start_eps=True, eps_poll_interval=poll_interval, dry_run=dry_run)
+    app = create_app(
+        start_eps=True,
+        eps_poll_interval=poll_interval,
+        dry_run=dry_run,
+        ha=ha,
+        tie_breaker=tie_breaker,
+    )
 
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning")

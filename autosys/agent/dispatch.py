@@ -52,6 +52,7 @@ from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo, runs as run_repo, output as output_repo
 from autosys.db.schema import JobRow
 from autosys.agent.runner import LocalJobRunner
+from autosys.agent.runners import create_runner
 from autosys.models.enums import JobStatus
 from autosys.parser.variable_sub import substitute, UndefinedVariableError
 from autosys.models.event import Event
@@ -173,10 +174,10 @@ class AgentDispatch:
         row.status     = JobStatus.RUNNING.value
         row.last_start = now
 
-        runner = LocalJobRunner(
-            command         = command,
-            job_name        = row.job_name,
+        runner = create_runner(
+            row             = row,
             run_id          = run_id,
+            command         = command,
             max_run_secs    = (row.max_run_alarm * 60) if row.max_run_alarm else None,
             output_callback = self._on_output_line,
         )
@@ -317,13 +318,24 @@ class AgentDispatch:
                 # Re-create a fresh runner for the next attempt
                 import uuid
                 run_id = str(uuid.uuid4())
-                runner = LocalJobRunner(
-                    command         = runner.command,
-                    job_name        = job_name,
-                    run_id          = run_id,
-                    max_run_secs    = runner.max_run_secs,
-                    output_callback = self._on_output_line,
-                )
+                with sync_session() as session:
+                    job_row = job_repo.get_row(session, job_name)
+                    if job_row:
+                        runner = create_runner(
+                            row             = job_row,
+                            run_id          = run_id,
+                            command         = runner.command,
+                            max_run_secs    = runner.max_run_secs,
+                            output_callback = self._on_output_line,
+                        )
+                    else:
+                        runner = LocalJobRunner(
+                            command         = runner.command,
+                            job_name        = job_name,
+                            run_id          = run_id,
+                            max_run_secs    = runner.max_run_secs,
+                            output_callback = self._on_output_line,
+                        )
                 with self._lock:
                     self._active[job_name] = (runner, run_id)
 

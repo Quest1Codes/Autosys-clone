@@ -82,6 +82,9 @@ def _get_status(job_name) -> str:
 
 
 def _set_status(job_name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, job_name)
         if row:
@@ -89,6 +92,9 @@ def _set_status(job_name, status):
 
 
 def _wait_for_status(job_name, expected, timeout=15) -> bool:
+    if isinstance(expected, str):
+        from autosys.models.enums import JobStatus
+        expected = JobStatus[expected].value
     deadline = time.time() + timeout
     while time.time() < deadline:
         if _get_status(job_name) == expected:

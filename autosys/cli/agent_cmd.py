@@ -380,19 +380,21 @@ def jobs_history(job_name: str, limit: int) -> None:
         "STARTING":   "yellow",
     }
 
+    from autosys.scheduler.state_machine import _norm_status
     for r in run_rows:
         dur = "—"
         if r.start_time and r.end_time:
             secs = (r.end_time - r.start_time).total_seconds()
             dur = f"{secs:.1f}s"
 
-        col = status_colour.get(r.status, "white")
+        sname = _norm_status(r.status)
+        col = status_colour.get(sname, "white")
         table.add_row(
             r.run_id[:8] + "…",
             r.start_time.strftime("%Y-%m-%d %H:%M:%S") if r.start_time else "—",
             r.end_time.strftime("%Y-%m-%d %H:%M:%S")   if r.end_time   else "—",
             dur,
-            f"[{col}]{r.status}[/{col}]",
+            f"[{col}]{sname}[/{col}]",
             str(r.exit_code) if r.exit_code is not None else "—",
         )
 

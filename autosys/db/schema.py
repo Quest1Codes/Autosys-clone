@@ -16,6 +16,13 @@ Table inventory
 7.  AlarmRow         — raised/cleared alarms
 8.  VirtualResourceRow — virtual resources (max_load / job_load)
 9.  MachineRow       — System Agent registry (machine name → host:port)
+10. JobOutputRow     — captured stdout/stderr per run
+11. JobTypeRow       — user-defined job types (command templates)
+12. MonitorRow       — monbro definitions (file/cpu/disk monitors)
+13. BlobRow          — binary large objects tied to jobs
+14. GlobRow          — global named blobs (not tied to a job)
+15. ExternalInstanceRow — cross-instance definitions
+16. ConnectionProfileRow — connection profiles (Hadoop, AWS, etc.)
 
 Relationship diagram (conceptual)
 ----------------------------------
@@ -134,6 +141,18 @@ class JobRow(Base):
     max_load             = Column(Integer)
     resources            = Column(Text)
     auto_hold            = Column(Boolean, default=False, nullable=False)
+
+    # --- Extended attributes (Phase 4) ---
+    auto_delete          = Column(Boolean, default=False, nullable=False)
+    application          = Column(String(255))
+    sub_application      = Column(String(255))
+    command_timeout      = Column(Integer)
+    continuous           = Column(Boolean, default=False, nullable=False)
+    cpu_usage            = Column(Integer)
+    disk_space           = Column(Integer)
+    auth_string          = Column(Text)
+    connection_retry     = Column(Integer)
+    connection_timeout   = Column(Integer)
 
     # --- Notifications ---
     notification_msg          = Column(Text)
@@ -516,3 +535,153 @@ class JobOutputRow(Base):
             f"<JobOutputRow run={self.run_id[:8]}… "
             f"line={self.line_no} [{self.stream}] {self.content[:40]!r}>"
         )
+
+
+# ---------------------------------------------------------------------------
+# 11. Job Types table  (user-defined job types)
+# ---------------------------------------------------------------------------
+
+class JobTypeRow(Base):
+    """User-defined job types with custom command templates."""
+    __tablename__ = "ujo_job_type"
+
+    type_name        = Column(String(128), primary_key=True)
+    command_template = Column(Text)
+    description      = Column(Text)
+    created_at       = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<JobTypeRow {self.type_name}>"
+
+
+# ---------------------------------------------------------------------------
+# 12. Monitor / Report table  (monbro definitions)
+# ---------------------------------------------------------------------------
+
+class MonitorRow(Base):
+    """Monitor and report definitions (file watchers, CPU monitors, etc.)."""
+    __tablename__ = "ujo_monbro"
+
+    monbro_name      = Column(String(128), primary_key=True)
+    monbro_type      = Column(String(32), nullable=False)
+    job_name         = Column(String(255), ForeignKey("ujo_job.job_name"), nullable=True)
+    attributes_json  = Column(Text)
+    created_at       = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<MonitorRow {self.monbro_name} type={self.monbro_type}>"
+
+
+# ---------------------------------------------------------------------------
+# 13. Blob table  (binary large objects tied to jobs)
+# ---------------------------------------------------------------------------
+
+class BlobRow(Base):
+    """Binary large objects associated with jobs (scripts, config files)."""
+    __tablename__ = "ujo_blob"
+
+    blob_id     = Column(Integer, primary_key=True, autoincrement=True)
+    blob_name   = Column(String(255), nullable=False, index=True)
+    job_name    = Column(String(255), ForeignKey("ujo_job.job_name"), nullable=True)
+    content     = Column(Text, nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<BlobRow {self.blob_name} job={self.job_name}>"
+
+
+# ---------------------------------------------------------------------------
+# 14. Glob table  (global named blobs)
+# ---------------------------------------------------------------------------
+
+class GlobRow(Base):
+    """Global named blobs not tied to a specific job."""
+    __tablename__ = "ujo_glob"
+
+    glob_name   = Column(String(255), primary_key=True)
+    content     = Column(Text, nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<GlobRow {self.glob_name}>"
+
+
+# ---------------------------------------------------------------------------
+# 15. External Instance table  (cross-instance dependencies)
+# ---------------------------------------------------------------------------
+
+class ExternalInstanceRow(Base):
+    """External AutoSys instance definitions for cross-instance job dependencies."""
+    __tablename__ = "ujo_xinst"
+
+    xinst_name      = Column(String(128), primary_key=True)
+    instance_name   = Column(String(255), nullable=False)
+    host            = Column(String(255), nullable=False)
+    port            = Column(Integer, default=9000, nullable=False)
+    description     = Column(Text)
+    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<ExternalInstanceRow {self.xinst_name} → {self.host}:{self.port}>"
+
+
+# ---------------------------------------------------------------------------
+# 16. Connection Profile table  (Hadoop, AWS, Hive, etc.)
+# ---------------------------------------------------------------------------
+
+class ConnectionProfileRow(Base):
+    """Connection profiles for cloud and enterprise integrations."""
+    __tablename__ = "ujo_connection_profile"
+
+    profile_name    = Column(String(128), primary_key=True)
+    profile_type    = Column(String(64), nullable=False)
+    attributes_json = Column(Text)
+    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<ConnectionProfileRow {self.profile_name} type={self.profile_type}>"
+
+
+# ---------------------------------------------------------------------------
+# 17. Scheduler Lock table  (HA distributed lock for tie-breaker)
+# ---------------------------------------------------------------------------
+
+class SchedulerLockRow(Base):
+    """
+    Distributed lock for HA tie-breaker scheduler.
+
+    Only one EventProcessor can hold the lock at a time.  The lock holder
+    updates ``last_heartbeat`` every tick.  If the heartbeat is stale
+    (older than ``heartbeat_timeout`` seconds), a standby EPS can steal it.
+    """
+    __tablename__ = "ujo_scheduler_lock"
+
+    lock_id          = Column(String(64), primary_key=True)
+    instance_id      = Column(String(128), nullable=False)
+    role             = Column(String(32), nullable=False, default="primary")
+    is_active        = Column(Boolean, default=True, nullable=False)
+    last_heartbeat   = Column(DateTime, default=datetime.utcnow, nullable=False)
+    acquired_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+    heartbeat_timeout = Column(Integer, default=5, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<SchedulerLockRow {self.lock_id} active={self.is_active} by={self.instance_id}>"
+
+
+# ---------------------------------------------------------------------------
+# 18. Report Row table  (generated reports)
+# ---------------------------------------------------------------------------
+
+class ReportRow(Base):
+    """Generated report metadata and content."""
+    __tablename__ = "ujo_report"
+
+    report_id     = Column(String(64), primary_key=True)
+    report_type   = Column(String(32), nullable=False)
+    date_from     = Column(DateTime, nullable=False)
+    date_to       = Column(DateTime, nullable=False)
+    content_json  = Column(Text)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<ReportRow {self.report_id} type={self.report_type}>"

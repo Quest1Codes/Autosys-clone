@@ -34,7 +34,7 @@ def _row_to_response(row) -> JobResponse:
     return JobResponse(
         job_name      = row.job_name,
         job_type      = row.job_type or "CMD",
-        status        = _status_name(row.status),
+        status        = row.status if row.status is not None else JobStatus.INACTIVE.value,
         machine       = row.machine,
         box_name      = row.box_name,
         condition     = row.condition,
@@ -60,7 +60,7 @@ def _row_to_detail(row) -> JobDetailResponse:
     return JobDetailResponse(
         job_name           = row.job_name,
         job_type           = row.job_type or "CMD",
-        status             = _status_name(row.status),
+        status             = row.status if row.status is not None else JobStatus.INACTIVE.value,
         machine            = row.machine,
         box_name           = row.box_name,
         condition          = row.condition,
@@ -102,7 +102,11 @@ def list_jobs(
         rows = job_repo.list_all(session)
 
     if status:
-        rows = [r for r in rows if (r.status or "INACTIVE") == status.upper()]
+        try:
+            status_int = JobStatus[status.upper()].value
+        except KeyError:
+            status_int = int(status)
+        rows = [r for r in rows if (r.status or JobStatus.INACTIVE.value) == status_int]
 
     return [_row_to_response(r) for r in rows]
 

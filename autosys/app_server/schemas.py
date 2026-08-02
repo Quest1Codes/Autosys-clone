@@ -18,7 +18,7 @@ class JobResponse(BaseModel):
     """Summary view of a job — used in list responses."""
     job_name:     str
     job_type:     str
-    status:       str
+    status:       int
     machine:      Optional[str] = None
     box_name:     Optional[str] = None
     condition:    Optional[str] = None
@@ -39,13 +39,25 @@ class JobDetailResponse(JobResponse):
     run_calendar:      Optional[str]   = None
     exclude_calendar:  Optional[str]   = None
     n_retrys:          int             = 0
-    max_run_alarm:     int             = 0
-    min_run_alarm:     int             = 0
-    term_run_time:     int             = 0
+    max_run_alarm:     Optional[int]   = None
+    min_run_alarm:     Optional[int]   = None
+    term_run_time:     Optional[int]   = None
     alarm_if_terminated: bool          = False
     description:       Optional[str]   = None
     std_out_file:      Optional[str]   = None
     std_err_file:      Optional[str]   = None
+    priority:          Optional[int]   = None
+    timezone:          Optional[str]   = None
+    auto_delete:       bool            = False
+    application:       Optional[str]   = None
+    sub_application:   Optional[str]   = None
+    command_timeout:   Optional[int]   = None
+    continuous:        bool            = False
+    cpu_usage:         Optional[int]   = None
+    disk_space:        Optional[int]   = None
+    auth_string:       Optional[str]   = None
+    connection_retry:  Optional[int]   = None
+    connection_timeout: Optional[int]  = None
 
     model_config = {"from_attributes": True}
 
@@ -87,7 +99,7 @@ class EventResponse(BaseModel):
 class RunResponse(BaseModel):
     run_id:           str
     job_name:         str
-    status:           str
+    status:           int
     exit_code:        Optional[int]   = None
     machine:          Optional[str]   = None
     run_date:         Optional[str]   = None
@@ -275,8 +287,8 @@ class BoxTraceRequest(BaseModel):
 class BoxTraceTransitionEntry(BaseModel):
     tick:     int
     job_name: str
-    old:      str
-    new:      str
+    old:      int | str
+    new:      int | str
     ts:       str
 
 

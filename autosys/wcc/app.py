@@ -20,11 +20,13 @@ import asyncio
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, AsyncGenerator
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from autosys.db.connection import sync_session
@@ -60,10 +62,12 @@ def _fmt_dt(dt: datetime | None) -> str:
 
 
 def _job_dict(row: JobRow) -> dict:
+    sname = _status_name(row.status)
     return {
         "job_name":   row.job_name,
         "job_type":   row.job_type,
-        "status":     _status_name(row.status),
+        "status":     sname,
+        "status_cls": f"status-{sname.lower()}",
         "machine":    row.machine or "—",
         "box_name":   row.box_name,
         "owner":      row.owner or "—",
@@ -103,6 +107,42 @@ def create_wcc_app() -> FastAPI:
         if status:
             jobs = [j for j in jobs if j["status"] == status.upper()]
         return {"jobs": jobs, "total": len(jobs)}
+
+    @app.get("/api/wcc/jobs/{name}")
+    def api_job_detail(name: str):
+        with sync_session() as session:
+            row = session.get(JobRow, name)
+            if row is None:
+                return JSONResponse(status_code=404, content={"error": f"Job '{name}' not found"})
+            runs = session.execute(
+                select(JobRunRow)
+                .where(JobRunRow.job_name == name)
+                .order_by(JobRunRow.start_time.desc())
+                .limit(20)
+            ).scalars().all()
+            children = []
+            if row.job_type == "BOX":
+                children = session.execute(
+                    select(JobRow).where(JobRow.box_name == name)
+                ).scalars().all()
+
+        job = _job_dict(row)
+        job["runs"] = [
+            {
+                "run_id":     r.run_id,
+                "status":     r.status or "RUNNING",
+                "exit_code":  r.exit_code,
+                "machine":    r.machine,
+                "start_time": _fmt_dt(r.start_time),
+                "end_time":   _fmt_dt(r.end_time),
+            }
+            for r in runs
+        ]
+        job["children"] = [
+            {"job_name": c.job_name, "job_type": c.job_type, "status": _status_name(c.status)}
+            for c in children
+        ]
+        return job
 
     @app.get("/api/wcc/boxes/{name}")
     def api_box(name: str):
@@ -211,6 +251,22 @@ def create_wcc_app() -> FastAPI:
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
+
+    # ── Serve React frontend (if built) ──────────────────────────────────────
+
+    _frontend_dist = Path(__file__).parents[2] / "wcc-frontend" / "dist"
+    if _frontend_dist.exists():
+        app.mount("/assets", StaticFiles(directory=_frontend_dist / "assets"), name="assets")
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        def spa_fallback(full_path: str):
+            """Serve the React SPA for any non-API route."""
+            if full_path.startswith("api/"):
+                return JSONResponse(status_code=404, content={"error": "Not found"})
+            index = _frontend_dist / "index.html"
+            if index.exists():
+                return FileResponse(str(index))
+            return HTMLResponse(status_code=404, content="<h1>Frontend not built. Run: cd wcc-frontend && npm run build</h1>")
 
     return app
 

@@ -171,7 +171,7 @@ class BoxManager:
                 "BOX %r has no children — auto-completing as SUCCESS",
                 box.job_name,
             )
-            box.status  = "SUCCESS"
+            box.status  = JobStatus.SUCCESS.value
             box.last_end = now
             return 1
 
@@ -185,7 +185,7 @@ class BoxManager:
                         "BOX %r: activating child %r → STARTING",
                         box.job_name, child.job_name,
                     )
-                    child.status = "STARTING"
+                    child.status = JobStatus.STARTING.value
                     # Update snapshot so later siblings see this child's new status
                     snapshot[child.job_name] = "STARTING"
 
@@ -204,13 +204,13 @@ class BoxManager:
 
         # Step 2: check box_failure and box_success conditions first
         if box.box_failure and self._conditions_met(box, snapshot, box.box_failure):
-            box.status = "FAILURE"
+            box.status = JobStatus.FAILURE.value
             box.last_end = now
             logger.info("BOX %r completed → FAILURE (box_failure condition met)", box.job_name)
             return changes + 1
 
         if box.box_success and self._conditions_met(box, snapshot, box.box_success):
-            box.status = "SUCCESS"
+            box.status = JobStatus.SUCCESS.value
             box.last_end = now
             logger.info("BOX %r completed → SUCCESS (box_success condition met)", box.job_name)
             return changes + 1
@@ -277,9 +277,9 @@ class BoxManager:
 
         children = job_repo.get_children(session, box_name)
         for child in children:
-            if child.status in _TERMINAL:
+            if _norm_status(child.status) in _TERMINAL:
                 continue
-            if child.status in _ACTIVE and self._kill_fn is not None:
+            if _norm_status(child.status) in _ACTIVE and self._kill_fn is not None:
                 try:
                     self._kill_fn(session, child)
                 except Exception as exc:
@@ -287,7 +287,7 @@ class BoxManager:
                         "BOX kill: kill_fn raised for child %r: %s",
                         child.job_name, exc,
                     )
-            child.status  = "TERMINATED"
+            child.status  = JobStatus.TERMINATED.value
             child.last_end = now
             logger.info(
                 "BOX %r: child %r killed → TERMINATED",
@@ -313,7 +313,7 @@ class BoxManager:
         children = job_repo.get_children(session, box_name)
         now      = datetime.now()
         for child in children:
-            if child.status in _ACTIVE and self._kill_fn is not None:
+            if _norm_status(child.status) in _ACTIVE and self._kill_fn is not None:
                 try:
                     self._kill_fn(session, child)
                 except Exception as exc:
@@ -321,7 +321,7 @@ class BoxManager:
                         "BOX reset: kill_fn raised for %r: %s",
                         child.job_name, exc,
                     )
-            child.status  = "INACTIVE"
+            child.status  = JobStatus.INACTIVE.value
             child.last_end = None
             logger.debug("BOX %r: reset child %r → INACTIVE", box_name, child.job_name)
 

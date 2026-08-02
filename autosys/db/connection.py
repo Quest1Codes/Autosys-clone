@@ -49,6 +49,41 @@ from autosys.db.schema import Base
 
 
 # ---------------------------------------------------------------------------
+# Dialect helpers
+# ---------------------------------------------------------------------------
+
+def _current_db_url() -> str:
+    """Return the current sync DB URL (without async driver prefix)."""
+    return _get_db_url(async_=False)
+
+def is_sqlite() -> bool:
+    """Return True if the configured database is SQLite."""
+    return "sqlite" in _current_db_url()
+
+def is_postgresql() -> bool:
+    """Return True if the configured database is PostgreSQL."""
+    url = _current_db_url()
+    return "postgresql" in url or "postgres" in url
+
+def _pool_kwargs() -> dict:
+    """
+    Return connection pool kwargs for PostgreSQL engines.
+
+    Reads ``AUTOSYS_DB_POOL_SIZE`` (default 5) and
+    ``AUTOSYS_DB_MAX_OVERFLOW`` (default 10) from the environment.
+    Returns an empty dict for SQLite (which uses StaticPool/NullPool).
+    """
+    if is_sqlite():
+        return {}
+    return {
+        "pool_size": int(os.environ.get("AUTOSYS_DB_POOL_SIZE", "5")),
+        "max_overflow": int(os.environ.get("AUTOSYS_DB_MAX_OVERFLOW", "10")),
+        "pool_pre_ping": True,
+        "pool_recycle": int(os.environ.get("AUTOSYS_DB_POOL_RECYCLE", "1800")),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Resolve DB URL
 # ---------------------------------------------------------------------------
 
@@ -126,6 +161,7 @@ def get_sync_engine():
             url,
             echo=os.environ.get("AUTOSYS_SQL_ECHO", "false").lower() == "true",
             connect_args={"check_same_thread": False} if "sqlite" in url else {},
+            **_pool_kwargs(),
         )
         if "sqlite" in url:
             @event.listens_for(engine, "connect")
@@ -181,6 +217,7 @@ def get_async_engine():
             url,
             echo=os.environ.get("AUTOSYS_SQL_ECHO", "false").lower() == "true",
             connect_args={"check_same_thread": False} if "sqlite" in url else {},
+            **_pool_kwargs(),
         )
         _async_engines[url] = engine
         _async_session_factories[url] = async_sessionmaker(

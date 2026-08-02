@@ -83,6 +83,9 @@ def _seed_box(name="my_box", condition=None):
 
 
 def _set_status(job_name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, job_name)
         row.status = status

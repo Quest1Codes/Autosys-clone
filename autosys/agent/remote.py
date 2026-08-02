@@ -47,6 +47,7 @@ from autosys.agent.protocol import (
 )
 from autosys.db.repository import runs as run_repo
 from autosys.db.schema import JobRow, MachineRow
+from autosys.models.enums import JobStatus
 from autosys.parser.variable_sub import substitute, UndefinedVariableError
 
 
@@ -136,8 +137,8 @@ class RemoteDispatch:
                 row.job_name, resp,
             )
             # Roll back the optimistic RUNNING status
-            row.status = "FAILURE"
-            run_repo.finish(session, run_id, "FAILURE", -1)
+            row.status = JobStatus.FAILURE.value
+            run_repo.finish(session, run_id, JobStatus.FAILURE.value, -1)
             return False
 
     # ------------------------------------------------------------------

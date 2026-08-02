@@ -153,7 +153,7 @@ def run_box_trace(
             new      = payload["new"],
             ts       = payload["ts"],
         ))
-        if payload["new"] in ("STARTING", "ACTIVATED") and job_name not in activated_tick:
+        if _norm_status(payload["new"]) in ("STARTING", "ACTIVATED") and job_name not in activated_tick:
             activated_tick[job_name] = tick
 
     processor = EventProcessor(

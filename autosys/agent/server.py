@@ -53,12 +53,14 @@ from autosys.agent.protocol import (
     KillResponse,
 )
 from autosys.agent.runner import LocalJobRunner
+from autosys.agent.runners import create_runner
 from autosys.db.connection import sync_session
 from autosys.db.repository import (
     jobs as job_repo,
     runs as run_repo,
     output as output_repo,
 )
+from autosys.models.enums import JobStatus
 
 
 def _now() -> datetime:
@@ -276,14 +278,25 @@ class AgentServer:
                 run_date = _now().strftime("%Y-%m-%d"),
             )
 
-        # Build runner
-        runner = LocalJobRunner(
-            command         = command,
-            job_name        = job_name,
-            run_id          = run_id,
-            max_run_secs    = max_run_secs,
-            output_callback = self._on_output,
-        )
+        # Build runner — look up JobRow for job_type-aware dispatch
+        with sync_session() as sess:
+            job_row = job_repo.get_row(sess, job_name)
+        if job_row is not None:
+            runner = create_runner(
+                row             = job_row,
+                run_id          = run_id,
+                command         = command,
+                max_run_secs    = max_run_secs,
+                output_callback = self._on_output,
+            )
+        else:
+            runner = LocalJobRunner(
+                command         = command,
+                job_name        = job_name,
+                run_id          = run_id,
+                max_run_secs    = max_run_secs,
+                output_callback = self._on_output,
+            )
 
         with self._active_lock:
             self._active[job_name] = runner
@@ -379,17 +392,17 @@ class AgentServer:
                 self._active.pop(job_name, None)
 
         threshold = max_exit_success if max_exit_success is not None else 0
-        status = 4 if exit_code <= threshold else "FAILURE"
+        status = JobStatus.SUCCESS.value if exit_code <= threshold else JobStatus.FAILURE.value
         now    = _now()
 
         with sync_session() as session:
             job_row = job_repo.get_row(session, job_name)
             if job_row:
-                if job_row.status != "TERMINATED":
+                if job_row.status != JobStatus.TERMINATED.value:
                     job_row.status   = status
                     job_row.last_end = now
                 else:
-                    status = "TERMINATED"
+                    status = JobStatus.TERMINATED.value
 
             run_repo.finish(
                 session,

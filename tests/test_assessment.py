@@ -614,7 +614,7 @@ class TestAssessmentReportAPI:
         for field in ("risk", "risk_drivers", "blast_radius", "gap_tags"):
             assert field in job_a
 
-        assert data["summary"]["risk_counts"]["HIGH"] == 1
+        assert data["summary"]["risk_counts"]["HIGH"] == 2  # job "a" + seq_box (inherited)
         assert "gap_severity_counts" in data["summary"]
 
 
@@ -647,6 +647,7 @@ class TestBoxTraceAPI:
 
     def test_trace_is_idempotent_and_non_mutating(self, ssa_client, isolated_db):
         from autosys.db.connection import sync_session
+        from autosys.models.enums import JobStatus
         with sync_session() as session:
             _seed_sequential_box(session)
             session.commit()
@@ -657,4 +658,4 @@ class TestBoxTraceAPI:
         assert r1.json()["wave_count"] == r2.json()["wave_count"] == 3
 
         job = ssa_client.get("/api/v1/jobs/seq_box").json()
-        assert job["status"] == "INACTIVE"
+        assert job["status"] == JobStatus.INACTIVE.value

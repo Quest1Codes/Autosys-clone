@@ -86,6 +86,7 @@ from autosys.scheduler.state_machine import (
     InvalidTransitionError,
 )
 from autosys.scheduler.time_trigger import get_triggered_jobs
+from autosys.scheduler.failure_injector import FailureInjector
 import json
 
 
@@ -171,6 +172,7 @@ class EventProcessor:
         on_status_change: Optional[callable]         = None,
         alarm_manager:    Optional[object]           = None,
         dispatcher:       Optional[object]           = None,
+        failure_injector: Optional[FailureInjector]  = None,
     ) -> None:
         from autosys.scheduler.box_manager import BoxManager
         self._dispatch_fn      = dispatch_fn or _stub_dispatch
@@ -178,6 +180,7 @@ class EventProcessor:
         self.poll_interval     = poll_interval
         self.auto_complete     = auto_complete
         self._running          = False
+        self._failure_injector = failure_injector
         # Optional callback invoked on every job status change.
         # Signature: on_status_change({"type": "STATUS_CHANGE", "job_name": ...,
         #            "old": ..., "new": ..., "ts": ...})
@@ -195,21 +198,27 @@ class EventProcessor:
     # WebSocket broadcast helper
     # ------------------------------------------------------------------
 
-    def _emit_status_change(self, job_name: str, old: str, new: str) -> None:
+    def _emit_status_change(self, job_name: str, old, new) -> None:
         """
         Fire the on_status_change callback if one was provided.
 
         Called whenever a job transitions to a new status.  The payload
         matches the WsStatusChange schema consumed by the WCC dashboard.
+        Status values are normalised to integer JobStatus enum values.
         """
         if self._on_status_change is None or old == new:
             return
+        # Normalise string status names to integer values
+        from autosys.scheduler.state_machine import _norm_status
+        _name_to_val = {v.name: v.value for v in JobStatus}
+        old_val = old if isinstance(old, int) else _name_to_val.get(old, old)
+        new_val = new if isinstance(new, int) else _name_to_val.get(new, new)
         try:
             self._on_status_change({
                 "type":     "STATUS_CHANGE",
                 "job_name": job_name,
-                "old":      old,
-                "new":      new,
+                "old":      old_val,
+                "new":      new_val,
                 "ts":       datetime.now().isoformat(),
             })
         except Exception as exc:
@@ -291,9 +300,17 @@ class EventProcessor:
                 except Exception as exc:
                     logger.warning("re-dispatch error for %r: %s", row.job_name, exc)
                 if self.auto_complete and _ns(row.status) == "RUNNING":
-                    row.status   = JobStatus.SUCCESS.value
-                    row.last_end = now
-                    self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
+                    if self._failure_injector and self._failure_injector.should_fail(row):
+                        row.status   = JobStatus.FAILURE.value
+                        row.last_end = now
+                        self._emit_status_change(row.job_name, "RUNNING", "FAILURE")
+                        self._record_run(session, row, now, failed=True)
+                    else:
+                        row.status   = JobStatus.SUCCESS.value
+                        row.last_end = now
+                        self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
+                        if self._failure_injector:
+                            self._record_run(session, row, now, failed=False)
         snapshot = build_status_snapshot(session)
 
         # 3. Check time triggers (enqueue STARTJOB events for next tick)
@@ -378,7 +395,7 @@ class EventProcessor:
     # Agent Heartbeat
     # ------------------------------------------------------------------
 
-    async def run_forever(self) -> None:
+    async def run_forever(self, shutdown_timeout: float = 30.0) -> None:
         """
         Run the event processor as an async daemon.
 
@@ -389,20 +406,39 @@ class EventProcessor:
           4. Sleeps for ``poll_interval`` seconds.
 
         The loop runs until ``stop()`` is called (or the process is killed).
+        Signal handlers for SIGTERM and SIGINT are saved and restored on exit.
         """
+        import signal
+
         self._running = True
         logger.info(
             "Event Processor started (poll interval: %.1fs)", self.poll_interval
         )
-        while self._running:
-            try:
-                with sync_session() as session:
-                    n = self.process_one_tick(session)
-                    if n:
-                        logger.debug("Tick processed %d event(s)", n)
-            except Exception as exc:
-                logger.error("Tick error: %s", exc)
-            await asyncio.sleep(self.poll_interval)
+
+        # Save and override signal handlers
+        _orig_sigterm = signal.getsignal(signal.SIGTERM)
+        _orig_sigint = signal.getsignal(signal.SIGINT)
+
+        def _signal_stop(signum, frame):
+            self.stop()
+
+        signal.signal(signal.SIGTERM, _signal_stop)
+        signal.signal(signal.SIGINT, _signal_stop)
+
+        try:
+            while self._running:
+                try:
+                    with sync_session() as session:
+                        n = self.process_one_tick(session)
+                        if n:
+                            logger.debug("Tick processed %d event(s)", n)
+                except Exception as exc:
+                    logger.error("Tick error: %s", exc)
+                await asyncio.sleep(self.poll_interval)
+        finally:
+            # Restore original signal handlers
+            signal.signal(signal.SIGTERM, _orig_sigterm)
+            signal.signal(signal.SIGINT, _orig_sigint)
 
     def stop(self) -> None:
         """Signal the daemon loop to exit after the current tick."""
@@ -854,10 +890,60 @@ class EventProcessor:
         self._dispatch_fn(session, row)
 
         if self.auto_complete and row.status == JobStatus.RUNNING.value:
-            self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
-            row.status = JobStatus.SUCCESS.value
-            row.last_end = now
-            logger.info("STARTJOB: %r → SUCCESS (auto-complete stub)", row.job_name)
+            if self._failure_injector and self._failure_injector.should_fail(row):
+                self._emit_status_change(row.job_name, "RUNNING", "FAILURE")
+                row.status = JobStatus.FAILURE.value
+                row.last_end = now
+                logger.info("STARTJOB: %r → FAILURE (injected)", row.job_name)
+                self._record_run(session, row, now, failed=True)
+            else:
+                self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
+                row.status = JobStatus.SUCCESS.value
+                row.last_end = now
+                logger.info("STARTJOB: %r → SUCCESS (auto-complete stub)", row.job_name)
+                if self._failure_injector:
+                    self._record_run(session, row, now, failed=False)
+
+    def _record_run(
+        self,
+        session: Session,
+        row: JobRow,
+        now: datetime,
+        *,
+        failed: bool = False,
+    ) -> None:
+        """Create a JobRunRow record for a completed job (S1+S4)."""
+        import uuid
+        from autosys.db.repository import runs as run_repo
+        run_id = str(uuid.uuid4())
+        run_secs = (
+            self._failure_injector.estimated_run_secs(row)
+            if self._failure_injector else 60.0
+        )
+        from datetime import timedelta
+        start = now - timedelta(seconds=run_secs)
+        run_repo.start(
+            session,
+            run_id=run_id,
+            job_name=row.job_name,
+            command=row.command or "",
+            machine=row.machine or "localhost",
+            run_date=now.strftime("%Y-%m-%d"),
+        )
+        session.flush()
+        from autosys.db.schema import JobRunRow as _JR
+        jr = session.get(_JR, run_id)
+        if jr is not None:
+            jr.start_time = start
+            # Simulate retry count: if job failed and has n_retrys, count retries
+            if failed and row.n_retrys and row.n_retrys > 0:
+                jr.retry_count = min(row.n_retrys, 3)
+        run_repo.finish(
+            session,
+            run_id=run_id,
+            status=JobStatus.FAILURE.value if failed else JobStatus.SUCCESS.value,
+            exit_code=1 if failed else 0,
+        )
 
     def _activate_box(
         self,
