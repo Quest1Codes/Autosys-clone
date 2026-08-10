@@ -50,6 +50,7 @@ from loguru import logger
 from autosys.parser.condition_parser import (
     parse_condition,
     evaluate,
+    list_job_dependencies,
     ConditionSyntaxError as ConditionParseError,
 )
 from autosys.scheduler.state_machine import _norm_status
@@ -131,6 +132,24 @@ def is_satisfied(
             condition_str, exc,
         )
         return False
+
+
+def referenced_job_names(condition_str: Optional[str]) -> set[str]:
+    """
+    Return the set of job names referenced by *condition_str*.
+
+    Used by BoxManager to decide whether an INACTIVE child can still
+    possibly activate: if every job its condition references is already
+    terminal (or doesn't exist at all) and the condition is still False,
+    nothing left in the system can ever make it True — e.g. an alert job
+    with ``condition: failure(x)`` once ``x`` has already reached SUCCESS.
+    """
+    if not condition_str:
+        return set()
+    try:
+        return set(list_job_dependencies(parse_condition(condition_str)))
+    except ConditionParseError:
+        return set()
 
 
 def _ran_today(job_name: str, status: str, today_str: str) -> bool:

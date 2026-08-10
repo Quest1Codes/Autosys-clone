@@ -433,7 +433,7 @@ class EventProcessor:
                         if n:
                             logger.debug("Tick processed %d event(s)", n)
                 except Exception as exc:
-                    logger.error("Tick error: %s", exc)
+                    logger.exception("Tick error: {}", exc)
                 await asyncio.sleep(self.poll_interval)
         finally:
             # Restore original signal handlers

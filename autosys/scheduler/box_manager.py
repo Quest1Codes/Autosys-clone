@@ -63,7 +63,7 @@ from sqlalchemy.orm import Session
 
 from autosys.db.schema import JobRow
 from autosys.models.enums import JobStatus
-from autosys.scheduler.condition_evaluator import is_satisfied
+from autosys.scheduler.condition_evaluator import is_satisfied, referenced_job_names
 from autosys.scheduler.state_machine import _norm_status
 
 # Reuse the same type aliases as event_processor.py
@@ -228,13 +228,24 @@ class BoxManager:
                 )
                 return changes + 1
 
-        # All-terminal check
-        non_terminal = [c for c in children if _norm_status(c.status) not in _TERMINAL]
+        # All-terminal check.  A child that's still INACTIVE but whose
+        # condition can never be satisfied anymore — e.g. an alert job with
+        # `condition: failure(x)` once `x` has already reached SUCCESS —
+        # would otherwise block the box forever.  Exclude those: nothing
+        # left in the system can change their outcome, so they're
+        # effectively done (still INACTIVE, correctly, just not "pending").
+        non_terminal = [
+            c for c in children
+            if _norm_status(c.status) not in _TERMINAL
+            and not self._is_unreachable(c, snapshot)
+        ]
         if non_terminal:
             return changes   # box is still in progress
 
-        # All children are terminal — determine box outcome
-        terminal_statuses = {_norm_status(c.status) for c in children}
+        # All children are terminal (or permanently unreachable) — determine
+        # box outcome from whichever children actually ran.
+        ran_children = [c for c in children if _norm_status(c.status) in _TERMINAL]
+        terminal_statuses = {_norm_status(c.status) for c in ran_children}
 
         if "TERMINATED" in terminal_statuses:
             box.status = JobStatus.TERMINATED.value
@@ -348,3 +359,29 @@ class BoxManager:
                 child.job_name, condition, exc,
             )
             return False
+
+    def _is_unreachable(self, child: JobRow, snapshot: dict[str, str]) -> bool:
+        """
+        Return True if *child* is INACTIVE and its condition can never be
+        satisfied anymore given the current snapshot.
+
+        Every job it references is either terminal (won't change again) or
+        doesn't exist in the system (never will), and its condition still
+        evaluates to False — e.g. `condition: failure(x)` once `x` has
+        already reached SUCCESS.  Real AutoSys doesn't wait forever for a
+        child that's structurally incapable of triggering.
+        """
+        if _norm_status(child.status) != "INACTIVE" or not child.condition:
+            return False
+
+        refs = referenced_job_names(child.condition)
+        if not refs:
+            return False
+
+        if any(
+            name in snapshot and _norm_status(snapshot[name]) not in _TERMINAL
+            for name in refs
+        ):
+            return False  # a referenced job can still change state
+
+        return not self._conditions_met(child, snapshot)
