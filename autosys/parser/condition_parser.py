@@ -80,6 +80,21 @@ class JobCondNode(ConditionNode):
     """
     func: str       # "success" | "failure" | "done" | "notrunning" | "terminated" | "activated"
     job_name: str   # the job whose status is tested
+    instance: Optional[str] = None
+    look_back: Optional[int] = None
+
+
+@dataclass
+class ExitCodeCondNode(ConditionNode):
+    """
+    Compares a job's last exit code to an integer.
+
+    Real AutoSys example:
+        condition: exitcode(extract_sales) = 0
+    """
+    job_name: str
+    op: str            # "=" or "!="
+    expected: int
 
 
 @dataclass
@@ -119,20 +134,22 @@ class NotNode(ConditionNode):
 # Status-check functions (used by evaluate())
 # ---------------------------------------------------------------------------
 
+from autosys.models.enums import JobStatus
+
 _FUNC_CHECKS: dict[str, callable] = {
     # Full names
-    "success":    lambda s: s == "SUCCESS",
-    "failure":    lambda s: s == "FAILURE",
-    "done":       lambda s: s in ("SUCCESS", "FAILURE"),
-    "notrunning": lambda s: s not in ("STARTING", "RUNNING", "RESTART"),
-    "terminated": lambda s: s == "TERMINATED",
-    "activated":  lambda s: s == "ACTIVATED",
+    "success":    lambda s: s == JobStatus.SUCCESS,
+    "failure":    lambda s: s == JobStatus.FAILURE,
+    "done":       lambda s: s in (JobStatus.SUCCESS, JobStatus.FAILURE, JobStatus.TERMINATED),
+    "notrunning": lambda s: s not in (JobStatus.STARTING, JobStatus.RUNNING, JobStatus.RESTART),
+    "terminated": lambda s: s == JobStatus.TERMINATED,
+    "activated":  lambda s: s == JobStatus.ACTIVATED,
     # Real AutoSys single-letter shorthands (used in JIL condition: attributes)
-    "s":  lambda s: s == "SUCCESS",          # s() = success()
-    "f":  lambda s: s == "FAILURE",          # f() = failure()
-    "d":  lambda s: s in ("SUCCESS", "FAILURE"),  # d() = done()
-    "n":  lambda s: s not in ("STARTING", "RUNNING", "RESTART"),  # n() = notrunning()
-    "t":  lambda s: s == "TERMINATED",       # t() = terminated()
+    "s":  lambda s: s == JobStatus.SUCCESS,
+    "f":  lambda s: s == JobStatus.FAILURE,
+    "d":  lambda s: s in (JobStatus.SUCCESS, JobStatus.FAILURE, JobStatus.TERMINATED),
+    "n":  lambda s: s not in (JobStatus.STARTING, JobStatus.RUNNING, JobStatus.RESTART),
+    "t":  lambda s: s == JobStatus.TERMINATED,
 }
 
 _VALID_FUNCS = frozenset(_FUNC_CHECKS)
@@ -145,6 +162,7 @@ _VALID_FUNCS = frozenset(_FUNC_CHECKS)
 class _CondTokenKind:
     FUNC    = "FUNC"      # success, failure, done, …
     VALUE   = "VALUE"     # the keyword "value"
+    EXITCODE = "EXITCODE" # the keyword "exitcode"
     LPAREN  = "LPAREN"    # (
     RPAREN  = "RPAREN"    # )
     AND     = "AND"       # &
@@ -153,7 +171,9 @@ class _CondTokenKind:
     EQ      = "EQ"        # =
     NEQ     = "NEQ"       # !=
     QSTRING = "QSTRING"   # "literal" (quotes stripped in .value)
+    NUMBER  = "NUMBER"    # integer literal
     IDENT   = "IDENT"     # job_name or global_name
+    COMMA   = "COMMA"     # ,
     EOF     = "EOF"
 
 
@@ -175,7 +195,9 @@ _COND_RE = re.compile(
     r'|(?P<RPAREN>\))'
     r'|(?P<NOT>!)'
     r'|(?P<QSTRING>"(?:[^"\\]|\\.)*")'
-    r'|(?P<IDENT>[A-Za-z][A-Za-z0-9_.:%-]*)'
+    r'|(?P<NUMBER>-?\d+)'
+    r'|(?P<COMMA>,)'
+    r'|(?P<IDENT>[A-Za-z0-9_][A-Za-z0-9_.:%^-]*)'
 )
 
 
@@ -208,6 +230,8 @@ def _tokenize_condition(expr: str) -> list[_CondToken]:
                 kind = _CondTokenKind.FUNC
             elif val == "value":
                 kind = _CondTokenKind.VALUE
+            elif val == "exitcode":
+                kind = _CondTokenKind.EXITCODE
         elif kind == "QSTRING":
             raw = raw[1:-1]   # strip surrounding double-quotes from the token value
         
@@ -313,6 +337,9 @@ class _CondParser:
         if tok.kind == _CondTokenKind.VALUE:
             return self._parse_value_cond()
 
+        if tok.kind == _CondTokenKind.EXITCODE:
+            return self._parse_exitcode_cond()
+
         if tok.kind == _CondTokenKind.NOT:
             return self._parse_not()
 
@@ -331,15 +358,28 @@ class _CondParser:
 
     def _parse_job_func(self) -> JobCondNode:
         """
-        job_func := func_name '(' job_ref ')'
+        job_func := func_name '(' job_ref [',' NUMBER] ')'
         e.g.  success(extract_sales)
-              activated(demo_etl_box)
+              success(job1^PRD, 12)
         """
         func_tok = self._consume(_CondTokenKind.FUNC)
         self._consume(_CondTokenKind.LPAREN)
         name_tok = self._consume(_CondTokenKind.IDENT)
+        
+        # parse instance if present in IDENT
+        job_name = name_tok.value
+        instance = None
+        if "^" in job_name:
+            job_name, instance = job_name.split("^", 1)
+
+        look_back = None
+        if self._peek().kind == _CondTokenKind.COMMA:
+            self._consume(_CondTokenKind.COMMA)
+            num_tok = self._consume(_CondTokenKind.NUMBER)
+            look_back = int(num_tok.value)
+
         self._consume(_CondTokenKind.RPAREN)
-        return JobCondNode(func=func_tok.value, job_name=name_tok.value)
+        return JobCondNode(func=func_tok.value, job_name=job_name, instance=instance, look_back=look_back)
 
     def _parse_value_cond(self) -> ValueCondNode:
         """
@@ -370,6 +410,37 @@ class _CondParser:
             global_name=name_tok.value.upper(),
             op=op,
             expected=val_tok.value,  # already unquoted by tokenizer
+        )
+
+    def _parse_exitcode_cond(self) -> ExitCodeCondNode:
+        """
+        exitcode_comparison := 'exitcode' '(' job_name ')' ('=' | '!=') NUMBER
+        e.g.  exitcode(extract_sales) = 0
+              exitcode(job_a) != 1
+        """
+        self._consume(_CondTokenKind.EXITCODE)
+        self._consume(_CondTokenKind.LPAREN)
+        name_tok = self._consume(_CondTokenKind.IDENT)
+        self._consume(_CondTokenKind.RPAREN)
+
+        op_tok = self._peek()
+        if op_tok.kind == _CondTokenKind.EQ:
+            self._consume(_CondTokenKind.EQ)
+            op = "="
+        elif op_tok.kind == _CondTokenKind.NEQ:
+            self._consume(_CondTokenKind.NEQ)
+            op = "!="
+        else:
+            raise ConditionSyntaxError(
+                f"Expected '=' or '!=' after exitcode(...), got {op_tok.value!r}",
+                self._expr, op_tok.pos,
+            )
+
+        val_tok = self._consume(_CondTokenKind.NUMBER)
+        return ExitCodeCondNode(
+            job_name=name_tok.value,
+            op=op,
+            expected=int(val_tok.value),
         )
 
     def _parse_not(self) -> NotNode:
@@ -414,6 +485,7 @@ def evaluate(
     node: ConditionNode,
     job_statuses: dict[str, str],
     global_vars: Optional[dict[str, str]] = None,
+    job_exitcodes: Optional[dict[str, int]] = None,
 ) -> bool:
     """
     Walk the condition AST and return True if all conditions are satisfied.
@@ -431,6 +503,9 @@ def evaluate(
     global_vars:
         Mapping of global variable name → current value.
         Names are normalised to UPPERCASE before lookup.
+    job_exitcodes:
+        Mapping of job_name → current exit code.
+        If an exitcode condition references a job with no exitcode, it will fail to match.
 
     Examples
     --------
@@ -452,7 +527,19 @@ def evaluate(
 
     def _eval(n: ConditionNode) -> bool:
         if isinstance(n, JobCondNode):
-            status = job_statuses.get(n.job_name, "INACTIVE")
+            raw = job_statuses.get(n.job_name, "INACTIVE")
+            # Normalise to a JobStatus enum so _FUNC_CHECKS lambdas work
+            # regardless of whether the snapshot contains ints or strings.
+            if isinstance(raw, int):
+                try:
+                    status: JobStatus = JobStatus(raw)
+                except ValueError:
+                    status = JobStatus.INACTIVE
+            else:
+                try:
+                    status = JobStatus[str(raw).upper()]
+                except KeyError:
+                    status = JobStatus.INACTIVE
             checker = _FUNC_CHECKS.get(n.func)
             if checker is None:
                 raise ValueError(f"Unknown condition function: {n.func!r}")
@@ -461,6 +548,12 @@ def evaluate(
         if isinstance(n, ValueCondNode):
             actual = _global_vars.get(n.global_name, "")
             return (actual == n.expected) if n.op == "=" else (actual != n.expected)
+
+        if isinstance(n, ExitCodeCondNode):
+            actual_code = (job_exitcodes or {}).get(n.job_name)
+            if actual_code is None:
+                return False
+            return (actual_code == n.expected) if n.op == "=" else (actual_code != n.expected)
 
         if isinstance(n, AndNode):
             # Short-circuit: if left is False, don't evaluate right
@@ -495,6 +588,9 @@ def condition_to_str(node: ConditionNode) -> str:
 
     if isinstance(node, ValueCondNode):
         return f'value({node.global_name}) {node.op} "{node.expected}"'
+
+    if isinstance(node, ExitCodeCondNode):
+        return f'exitcode({node.job_name}) {node.op} {node.expected}'
 
     if isinstance(node, AndNode):
         left  = condition_to_str(node.left)
@@ -540,6 +636,8 @@ def list_job_dependencies(node: ConditionNode) -> list[str]:
             _collect(n.right)
         elif isinstance(n, NotNode):
             _collect(n.operand)
+        elif isinstance(n, ExitCodeCondNode):
+            seen[n.job_name] = None
         # ValueCondNode references globals, not jobs — skip
 
     _collect(node)

@@ -292,7 +292,21 @@ class Event(BaseModel):
     )
 
     # ------------------------------------------------------------------
-    # Processing state
+    # Optional metadata (COMMENT, ALARM, RELEASE_RESOURCE)
+    # ------------------------------------------------------------------
+
+    comment: Optional[str] = Field(
+        None,
+        description="Audit comment for the event history."
+    )
+    
+    resource_name: Optional[str] = Field(
+        None,
+        description="Name of the virtual resource to release."
+    )
+
+    # ------------------------------------------------------------------
+    # Tracking and lineage
     # ------------------------------------------------------------------
 
     processed: bool = Field(
@@ -409,6 +423,12 @@ class Event(BaseModel):
                     "Example: job_name='ETL_LOAD_SALES'"
                 )
 
+        elif self.event_type == EventType.COMMENT:
+            if not self.comment and not self.job_name:
+                raise ValueError("COMMENT requires job_name and comment")
+        elif self.event_type == EventType.RELEASE_RESOURCE:
+            if not self.resource_name:
+                raise ValueError("RELEASE_RESOURCE requires resource_name")
         return self
 
 

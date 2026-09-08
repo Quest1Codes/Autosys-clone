@@ -1,0 +1,90 @@
+/* ============================================================
+   FILE: 43_custody_reporting.jil
+   DOMAIN: Custody Reporting
+   STATUS: SUCCESS
+   UPSTREAM: 05_position_management (position_mgmt_box)
+   DOWNSTREAM: 30_client_reporting
+   ============================================================ */
+
+insert_job: custody_reporting_box   job_type: BOX
+owner: svc_custody
+condition: success(position_mgmt_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Produce custody statements, safe-keeping reports and asset segregation confirmations"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,02:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: custody-ops@bank.com
+
+insert_job: generate_custody_statements   job_type: CMD
+box_name: custody_reporting_box
+owner: svc_custody
+command: /scripts/custody/gen_statements.py --date %%DATE%% --custodian STATE_STREET,BNY_MELLON
+machine: custody-app-01
+profile: /etc/autosys/profiles/svc_custody.sh
+std_out_file: /logs/custody/%%YEAR%%/%%MM%%/statements_%%DATE%%.out
+std_err_file: /logs/custody/%%YEAR%%/%%MM%%/statements_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: verify_asset_segregation   job_type: CMD
+box_name: custody_reporting_box
+owner: svc_custody
+command: /scripts/custody/verify_segregation.py --date %%DATE%% --rules MiFID_SAFEKEEPING,UCITS_DEPOSIT
+machine: custody-app-01
+profile: /etc/autosys/profiles/svc_custody.sh
+condition: success(generate_custody_statements)
+std_out_file: /logs/custody/%%YEAR%%/%%MM%%/segregation_%%DATE%%.out
+std_err_file: /logs/custody/%%YEAR%%/%%MM%%/segregation_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: generate_asset_in_transit_report   job_type: CMD
+box_name: custody_reporting_box
+owner: svc_custody
+command: /scripts/custody/in_transit_report.py --date %%DATE%%
+machine: custody-app-01
+profile: /etc/autosys/profiles/svc_custody.sh
+condition: success(verify_asset_segregation)
+std_out_file: /logs/custody/%%YEAR%%/%%MM%%/in_transit_%%DATE%%.out
+std_err_file: /logs/custody/%%YEAR%%/%%MM%%/in_transit_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+insert_job: distribute_custody_reports   job_type: CMD
+box_name: custody_reporting_box
+owner: svc_custody
+command: /scripts/custody/distribute.sh --date %%DATE%% --recipients institutional-clients@bank.com
+machine: custody-app-01
+profile: /etc/autosys/profiles/svc_custody.sh
+condition: success(generate_asset_in_transit_report)
+std_out_file: /logs/custody/%%YEAR%%/%%MM%%/distribute_%%DATE%%.out
+std_err_file: /logs/custody/%%YEAR%%/%%MM%%/distribute_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

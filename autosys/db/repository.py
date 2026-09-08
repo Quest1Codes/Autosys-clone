@@ -30,13 +30,15 @@ _row_to_job(row: JobRow) -> Job
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.orm import Session
 
+from autosys.models.enums import JobStatus
 from autosys.db.schema import (
     EventHistoryRow,
     EventQueueRow,
@@ -45,6 +47,14 @@ from autosys.db.schema import (
     JobRow,
     JobRunRow,
     MachineRow,
+    CalendarRow,
+    VirtualResourceRow,
+    JobTypeRow,
+    MonitorRow,
+    BlobRow,
+    GlobRow,
+    ExternalInstanceRow,
+    ConnectionProfileRow,
 )
 from autosys.models.job import Job, parse_job
 from autosys.models.event import Event
@@ -173,6 +183,105 @@ class JobRepository:
         session.delete(row)
         return True
 
+    def rename(self, session: Session, old_name: str, new_name: str) -> bool:
+        """
+        Rename a job and update all dependency references.
+
+        Returns True if the job existed, False otherwise.
+        """
+        row: Optional[JobRow] = session.get(JobRow, old_name)
+        if row is None:
+            return False
+
+        session.flush()
+        session.expire(row)
+
+        # Disable FK checking during PK rename
+        from autosys.db.connection import is_sqlite
+        _is_sqlite = is_sqlite()
+        if _is_sqlite:
+            session.execute(text("PRAGMA foreign_keys=OFF"))
+        else:
+            session.execute(text("SET session_replication_role = 'replica'"))
+
+        # Rename the job PK
+        session.execute(
+            JobRow.__table__.update()
+            .where(JobRow.job_name == old_name)
+            .values(job_name=new_name)
+        )
+
+        # Update FK references in job_runs
+        session.execute(
+            JobRunRow.__table__.update()
+            .where(JobRunRow.job_name == old_name)
+            .values(job_name=new_name)
+        )
+
+        # Update event_queue references
+        session.execute(
+            EventQueueRow.__table__.update()
+            .where(EventQueueRow.job_name == old_name)
+            .values(job_name=new_name)
+        )
+
+        # Update event_history references
+        session.execute(
+            EventHistoryRow.__table__.update()
+            .where(EventHistoryRow.job_name == old_name)
+            .values(job_name=new_name)
+        )
+
+        # Update job_output references
+        session.execute(
+            JobOutputRow.__table__.update()
+            .where(JobOutputRow.job_name == old_name)
+            .values(job_name=new_name)
+        )
+
+        # Update all jobs that reference old_name in box_name
+        session.execute(
+            JobRow.__table__.update()
+            .where(JobRow.box_name == old_name)
+            .values(box_name=new_name)
+        )
+
+        # Re-enable FK
+        if _is_sqlite:
+            session.execute(text("PRAGMA foreign_keys=ON"))
+        else:
+            session.execute(text("SET session_replication_role = 'origin'"))
+
+        # Update condition strings (safe, no FK involved)
+        all_jobs = session.scalars(
+            select(JobRow).where(JobRow.condition.isnot(None))
+        ).all()
+        for j in all_jobs:
+            if j.condition and old_name in j.condition:
+                j.condition = j.condition.replace(old_name, new_name)
+
+        return True
+
+    def delete_box(self, session: Session, box_name: str) -> int:
+        """
+        Delete a BOX job and all its children.
+
+        Returns the number of jobs deleted (box + children).
+        """
+        row: Optional[JobRow] = session.get(JobRow, box_name)
+        if row is None:
+            return 0
+
+        children = session.scalars(
+            select(JobRow).where(JobRow.box_name == box_name)
+        ).all()
+        count = 1 + len(children)  # box + children
+
+        for child in children:
+            session.delete(child)
+        session.delete(row)
+        return count
+
     # ------------------------------------------------------------------
     # Read operations
     # ------------------------------------------------------------------
@@ -245,15 +354,19 @@ class JobRepository:
 
     def get_running_boxes(self, session: Session) -> list[JobRow]:
         """
-        Return all BOX jobs currently in RUNNING state.
+        Return all BOX jobs currently in RUNNING or ACTIVATED state.
 
-        Called each tick by BoxManager to find boxes that need child evaluation
-        and completion checking.
+        ACTIVATED = BOX has been started, children not yet running.
+        RUNNING   = at least one child is running.
+        Both states need BoxManager to evaluate/cascade children.
         """
         return list(session.scalars(
             select(JobRow)
             .where(JobRow.job_type == "BOX")
-            .where(JobRow.status   == "RUNNING")
+            .where(JobRow.status.in_([
+                JobStatus.RUNNING.value,
+                JobStatus.ACTIVATED.value,
+            ]))
             .order_by(JobRow.job_name)
         ))
 
@@ -308,7 +421,7 @@ class EventRepository:
             job_name   = event.job_name,
             global_name  = event.global_name,
             global_value = event.global_value,
-            new_status   = str(event.new_status) if event.new_status else None,
+            new_status   = event.new_status.value if hasattr(event.new_status, 'value') else event.new_status,
             source     = str(event.source),
             processed  = False,
         )
@@ -321,7 +434,7 @@ class EventRepository:
             job_name     = event.job_name,
             global_name  = event.global_name,
             global_value = event.global_value,
-            new_status   = str(event.new_status) if event.new_status else None,
+            status       = event.new_status.value if hasattr(event.new_status, 'value') else event.new_status,
             source       = str(event.source),
             created_at   = event.created_at,
         )
@@ -387,7 +500,7 @@ class GlobalVarRepository:
         row: Optional[GlobalVariableRow] = session.get(GlobalVariableRow, name)
         if row is None:
             session.add(GlobalVariableRow(
-                name=name, value=value,
+                global_name=name, value=value,
             ))
         else:
             row.value      = value
@@ -403,7 +516,7 @@ class GlobalVarRepository:
     def list_all(self, session: Session) -> list[GlobalVariableRow]:
         """Return all global variables ordered by name."""
         return list(session.scalars(
-            select(GlobalVariableRow).order_by(GlobalVariableRow.name)
+            select(GlobalVariableRow).order_by(GlobalVariableRow.global_name)
         ))
 
     def as_dict(self, session: Session) -> dict[str, str]:
@@ -413,7 +526,7 @@ class GlobalVarRepository:
         Convenience for passing to ``substitute()`` in the variable
         substitution engine.
         """
-        return {row.name: row.value for row in self.list_all(session)}
+        return {row.global_name: row.value for row in self.list_all(session)}
 
 
 # ===========================================================================
@@ -450,8 +563,8 @@ class RunRepository:
         row = JobRunRow(
             run_id     = run_id,
             job_name   = job_name,
-            status     = "RUNNING",
-            start_time = _dt.now(),
+            status     = JobStatus.RUNNING.value,
+            start_time = datetime.now(),
             machine    = machine,
             run_date   = run_date,
         )
@@ -462,7 +575,7 @@ class RunRepository:
         self,
         session: Session,
         run_id: str,
-        status: str,
+        status: int,
         exit_code: Optional[int],
         pid: Optional[int] = None,
     ) -> None:
@@ -473,6 +586,11 @@ class RunRepository:
         in its own session (separate from the dispatch session).
         """
         from datetime import datetime as _dt
+        if isinstance(status, str):
+            try:
+                status = JobStatus[status.upper()].value
+            except KeyError:
+                pass
         row: Optional[JobRunRow] = session.get(JobRunRow, run_id)
         if row is None:
             return
@@ -710,11 +828,348 @@ class MachineRepository:
         if row:
             row.status = status
 
+    def delete(self, session: Session, machine_name: str) -> bool:
+        """Delete a machine registration. Returns True if it existed."""
+        row = session.get(MachineRow, machine_name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Calendar Repository (Phase 11)
+# ---------------------------------------------------------------------------
+
+class CalendarRepository:
+    def get(self, session: Session, name: str) -> Optional[CalendarRow]:
+        return session.get(CalendarRow, name)
+
+    def list_all(self, session: Session) -> list[CalendarRow]:
+        return list(session.scalars(select(CalendarRow)).all())
+
+    def upsert(self, session: Session, calendar: CalendarRow) -> None:
+        session.merge(calendar)
+        session.flush()
+        
+    def delete(self, session: Session, name: str) -> bool:
+        row = session.get(CalendarRow, name)
+        if row:
+            session.delete(row)
+            session.flush()
+            return True
+        return False
+
+    def add_date(self, session: Session, name: str, date_str: str) -> bool:
+        """Append a single date to a calendar's date list (deduplicated, sorted)."""
+        row = session.get(CalendarRow, name)
+        if row is None:
+            return False
+        dates = json.loads(row.dates_json) if row.dates_json else []
+        if date_str not in dates:
+            dates.append(date_str)
+            dates.sort()
+            row.dates_json = json.dumps(dates)
+        return True
+
+    def add_dates(self, session: Session, name: str, date_list: list[str]) -> int:
+        """Append multiple dates to a calendar. Returns number of dates added."""
+        row = session.get(CalendarRow, name)
+        if row is None:
+            return 0
+        dates = json.loads(row.dates_json) if row.dates_json else []
+        added = 0
+        for d in date_list:
+            if d not in dates:
+                dates.append(d)
+                added += 1
+        dates.sort()
+        row.dates_json = json.dumps(dates)
+        return added
+
+    def remove_date(self, session: Session, name: str, date_str: str) -> bool:
+        """Remove a single date from a calendar's date list."""
+        row = session.get(CalendarRow, name)
+        if row is None:
+            return False
+        dates = json.loads(row.dates_json) if row.dates_json else []
+        if date_str in dates:
+            dates.remove(date_str)
+            row.dates_json = json.dumps(dates)
+            return True
+        return False
+
+
+# ===========================================================================
+# Resource Repository
+# ===========================================================================
+
+class ResourceRepository:
+    """CRUD for virtual resources (ujo_resource table)."""
+
+    def upsert(self, session: Session, name: str, max_load: int = 1,
+               description: Optional[str] = None) -> str:
+        row: Optional[VirtualResourceRow] = session.get(VirtualResourceRow, name)
+        if row is None:
+            session.add(VirtualResourceRow(
+                resource_name=name, max_load=max_load,
+                description=description,
+            ))
+            return "inserted"
+        row.max_load = max_load
+        if description is not None:
+            row.description = description
+        return "updated"
+
+    def delete(self, session: Session, name: str) -> bool:
+        row = session.get(VirtualResourceRow, name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+    def get(self, session: Session, name: str) -> Optional[VirtualResourceRow]:
+        return session.get(VirtualResourceRow, name)
+
+    def list_all(self, session: Session) -> list[VirtualResourceRow]:
+        return list(session.scalars(
+            select(VirtualResourceRow).order_by(VirtualResourceRow.resource_name)
+        ))
+
+
+# ===========================================================================
+# Job Type Repository
+# ===========================================================================
+
+class JobTypeRepository:
+    """CRUD for user-defined job types (ujo_job_type table)."""
+
+    def upsert(self, session: Session, type_name: str,
+               command_template: Optional[str] = None,
+               description: Optional[str] = None) -> str:
+        row: Optional[JobTypeRow] = session.get(JobTypeRow, type_name)
+        if row is None:
+            session.add(JobTypeRow(
+                type_name=type_name,
+                command_template=command_template,
+                description=description,
+            ))
+            return "inserted"
+        if command_template is not None:
+            row.command_template = command_template
+        if description is not None:
+            row.description = description
+        return "updated"
+
+    def delete(self, session: Session, type_name: str) -> bool:
+        row = session.get(JobTypeRow, type_name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+    def get(self, session: Session, type_name: str) -> Optional[JobTypeRow]:
+        return session.get(JobTypeRow, type_name)
+
+    def list_all(self, session: Session) -> list[JobTypeRow]:
+        return list(session.scalars(
+            select(JobTypeRow).order_by(JobTypeRow.type_name)
+        ))
+
+
+# ===========================================================================
+# Monitor Repository
+# ===========================================================================
+
+class MonitorRepository:
+    """CRUD for monbro definitions (ujo_monbro table)."""
+
+    def upsert(self, session: Session, name: str, monbro_type: str,
+               job_name: Optional[str] = None,
+               attributes_json: Optional[str] = None) -> str:
+        row: Optional[MonitorRow] = session.get(MonitorRow, name)
+        if row is None:
+            session.add(MonitorRow(
+                monbro_name=name, monbro_type=monbro_type,
+                job_name=job_name, attributes_json=attributes_json,
+            ))
+            return "inserted"
+        row.monbro_type = monbro_type
+        if job_name is not None:
+            row.job_name = job_name
+        if attributes_json is not None:
+            row.attributes_json = attributes_json
+        return "updated"
+
+    def delete(self, session: Session, name: str) -> bool:
+        row = session.get(MonitorRow, name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+    def get(self, session: Session, name: str) -> Optional[MonitorRow]:
+        return session.get(MonitorRow, name)
+
+    def list_all(self, session: Session) -> list[MonitorRow]:
+        return list(session.scalars(
+            select(MonitorRow).order_by(MonitorRow.monbro_name)
+        ))
+
+
+# ===========================================================================
+# Blob Repository
+# ===========================================================================
+
+class BlobRepository:
+    """CRUD for binary large objects (ujo_blob table)."""
+
+    def insert(self, session: Session, blob_name: str, content: str,
+               job_name: Optional[str] = None) -> int:
+        row = BlobRow(blob_name=blob_name, content=content, job_name=job_name)
+        session.add(row)
+        session.flush()
+        return row.blob_id
+
+    def delete(self, session: Session, blob_name: str) -> int:
+        rows = session.scalars(
+            select(BlobRow).where(BlobRow.blob_name == blob_name)
+        ).all()
+        for r in rows:
+            session.delete(r)
+        return len(rows)
+
+    def get(self, session: Session, blob_name: str) -> list[BlobRow]:
+        return list(session.scalars(
+            select(BlobRow).where(BlobRow.blob_name == blob_name)
+        ))
+
+    def list_all(self, session: Session) -> list[BlobRow]:
+        return list(session.scalars(
+            select(BlobRow).order_by(BlobRow.blob_name)
+        ))
+
+
+# ===========================================================================
+# Glob Repository
+# ===========================================================================
+
+class GlobRepository:
+    """CRUD for global named blobs (ujo_glob table)."""
+
+    def upsert(self, session: Session, glob_name: str, content: str) -> str:
+        row: Optional[GlobRow] = session.get(GlobRow, glob_name)
+        if row is None:
+            session.add(GlobRow(glob_name=glob_name, content=content))
+            return "inserted"
+        row.content = content
+        return "updated"
+
+    def delete(self, session: Session, glob_name: str) -> bool:
+        row = session.get(GlobRow, glob_name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+    def get(self, session: Session, glob_name: str) -> Optional[GlobRow]:
+        return session.get(GlobRow, glob_name)
+
+    def list_all(self, session: Session) -> list[GlobRow]:
+        return list(session.scalars(
+            select(GlobRow).order_by(GlobRow.glob_name)
+        ))
+
+
+# ===========================================================================
+# External Instance Repository
+# ===========================================================================
+
+class ExternalInstanceRepository:
+    """CRUD for cross-instance definitions (ujo_xinst table)."""
+
+    def upsert(self, session: Session, xinst_name: str,
+               instance_name: str, host: str, port: int = 9000,
+               description: Optional[str] = None) -> str:
+        row: Optional[ExternalInstanceRow] = session.get(ExternalInstanceRow, xinst_name)
+        if row is None:
+            session.add(ExternalInstanceRow(
+                xinst_name=xinst_name, instance_name=instance_name,
+                host=host, port=port, description=description,
+            ))
+            return "inserted"
+        row.instance_name = instance_name
+        row.host = host
+        row.port = port
+        if description is not None:
+            row.description = description
+        return "updated"
+
+    def delete(self, session: Session, xinst_name: str) -> bool:
+        row = session.get(ExternalInstanceRow, xinst_name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+    def get(self, session: Session, xinst_name: str) -> Optional[ExternalInstanceRow]:
+        return session.get(ExternalInstanceRow, xinst_name)
+
+    def list_all(self, session: Session) -> list[ExternalInstanceRow]:
+        return list(session.scalars(
+            select(ExternalInstanceRow).order_by(ExternalInstanceRow.xinst_name)
+        ))
+
+
+# ===========================================================================
+# Connection Profile Repository
+# ===========================================================================
+
+class ConnectionProfileRepository:
+    """CRUD for connection profiles (ujo_connection_profile table)."""
+
+    def upsert(self, session: Session, profile_name: str, profile_type: str,
+               attributes_json: Optional[str] = None) -> str:
+        row: Optional[ConnectionProfileRow] = session.get(ConnectionProfileRow, profile_name)
+        if row is None:
+            session.add(ConnectionProfileRow(
+                profile_name=profile_name, profile_type=profile_type,
+                attributes_json=attributes_json,
+            ))
+            return "inserted"
+        row.profile_type = profile_type
+        if attributes_json is not None:
+            row.attributes_json = attributes_json
+        return "updated"
+
+    def delete(self, session: Session, profile_name: str) -> bool:
+        row = session.get(ConnectionProfileRow, profile_name)
+        if row is None:
+            return False
+        session.delete(row)
+        return True
+
+    def get(self, session: Session, profile_name: str) -> Optional[ConnectionProfileRow]:
+        return session.get(ConnectionProfileRow, profile_name)
+
+    def list_all(self, session: Session) -> list[ConnectionProfileRow]:
+        return list(session.scalars(
+            select(ConnectionProfileRow).order_by(ConnectionProfileRow.profile_name)
+        ))
+
 
 #: Default singleton — import and use directly in commands.
-jobs     = JobRepository()
-events   = EventRepository()
-globs    = GlobalVarRepository()
-runs     = RunRepository()
-output   = OutputRepository()
-machines = MachineRepository()
+jobs      = JobRepository()
+events    = EventRepository()
+globs     = GlobalVarRepository()
+runs      = RunRepository()
+output    = OutputRepository()
+machines  = MachineRepository()
+calendars = CalendarRepository()
+resources = ResourceRepository()
+job_types = JobTypeRepository()
+monitors  = MonitorRepository()
+blobs     = BlobRepository()
+globs2    = GlobRepository()
+xinsts    = ExternalInstanceRepository()
+profiles  = ConnectionProfileRepository()

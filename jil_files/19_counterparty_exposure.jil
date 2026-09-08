@@ -1,0 +1,91 @@
+/* ============================================================
+   FILE: 19_counterparty_exposure.jil
+   DOMAIN: Counterparty Exposure Monitoring
+   STATUS: RUNNING
+   UPSTREAM: 06_risk_engine (risk_engine_box)
+             17_credit_risk (credit_risk_box)
+   DOWNSTREAM: 12_regulatory_reporting
+   ============================================================ */
+
+insert_job: counterparty_exposure_box   job_type: BOX
+owner: svc_risk
+condition: success(risk_engine_box) & success(credit_risk_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Compute gross and net counterparty exposure across all products"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: credit-risk@bank.com
+
+/* Step 1: Aggregate gross exposure by counterparty and product type */
+insert_job: aggregate_gross_exposure   job_type: CMD
+box_name: counterparty_exposure_box
+owner: svc_risk
+command: /scripts/cpty/aggregate_gross.py --date %%DATE%% --dimensions CPTY,PRODUCT,CURRENCY
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+std_out_file: /logs/cpty/%%YEAR%%/%%MM%%/gross_%%DATE%%.out
+std_err_file: /logs/cpty/%%YEAR%%/%%MM%%/gross_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 2: Apply netting agreements (ISDA MAs) and collateral offsets */
+insert_job: apply_netting_and_collateral   job_type: CMD
+box_name: counterparty_exposure_box
+owner: svc_risk
+command: /scripts/cpty/apply_netting.py --date %%DATE%% --netting_type ISDA_BILATERAL
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(aggregate_gross_exposure)
+std_out_file: /logs/cpty/%%YEAR%%/%%MM%%/net_exposure_%%DATE%%.out
+std_err_file: /logs/cpty/%%YEAR%%/%%MM%%/net_exposure_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3: Compute large exposure concentration (>10% of capital base) */
+insert_job: check_large_exposure_limits   job_type: CMD
+box_name: counterparty_exposure_box
+owner: svc_risk
+command: /scripts/cpty/large_exposure.py --date %%DATE%% --limit_pct 0.10 --capital_base /data/risk/capital_base.json
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(apply_netting_and_collateral)
+std_out_file: /logs/cpty/%%YEAR%%/%%MM%%/large_exposure_%%DATE%%.out
+std_err_file: /logs/cpty/%%YEAR%%/%%MM%%/large_exposure_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* FAILURE HANDLER: Alert on large exposure breach */
+insert_job: large_exposure_breach_alert   job_type: CMD
+box_name: counterparty_exposure_box
+owner: svc_risk
+command: /scripts/alerts/large_exposure.sh "LARGE EXPOSURE BREACH %%DATE%%" --notify cro@bank.com
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: failure(check_large_exposure_limits)
+std_out_file: /logs/cpty/%%YEAR%%/%%MM%%/breach_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

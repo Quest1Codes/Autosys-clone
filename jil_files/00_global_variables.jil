@@ -1,0 +1,81 @@
+/* ============================================================
+   FILE: 00_global_variables.jil
+   PURPOSE: Global variable definitions (%%VARIABLE%% substitution).
+   IMPORT ORDER: Must be imported SECOND, after 00_machines.jil.
+   These values are updated daily by the batch ops team or via
+   SET_GLOBAL events at runtime.
+   ============================================================ */
+
+/* ── Temporal variables ───────────────────────────────────── */
+
+/* Current fiscal quarter (Q1/Q2/Q3/Q4) — updated manually at quarter-end */
+insert_glob: QUARTER
+global_value: Q3
+
+/* Prior business day — updated nightly by ops team */
+insert_glob: YESTERDAY
+global_value: 20260705
+
+/* Prior business day (alias) */
+insert_glob: PRIOR_BUSINESS_DAY
+global_value: 20260705
+
+/* Current year-month for report grouping */
+insert_glob: YEAR_MONTH
+global_value: 2026-07
+
+/* Current fiscal year */
+insert_glob: FISCAL_YEAR
+global_value: 2026
+
+/* ── Environment control ──────────────────────────────────── */
+
+/* Execution environment: PROD / UAT / DEV */
+insert_glob: PROCESSING_ENV
+global_value: PROD
+
+/* Service account used for batch ownership */
+insert_glob: BATCH_OWNER
+global_value: autosys_batch
+
+/* ── Path roots (override per environment) ───────────────── */
+
+insert_glob: DATA_ROOT
+global_value: /data
+
+insert_glob: SCRIPTS_ROOT
+global_value: /scripts
+
+insert_glob: LOGS_ROOT
+global_value: /logs
+
+insert_glob: INBOUND_ROOT
+global_value: /data/inbound
+
+insert_glob: ARCHIVE_ROOT
+global_value: /data/archive
+
+/* ── Notification targets ────────────────────────────────── */
+
+insert_glob: ALERT_EMAIL
+global_value: ops-alerts@bank.com
+
+insert_glob: RISK_OPS_EMAIL
+global_value: risk-ops@bank.com
+
+insert_glob: COMPLIANCE_EMAIL
+global_value: regulatory-ops@bank.com
+
+/* ── Processing flags ────────────────────────────────────── */
+
+/* Set to 1 to enable dry-run mode across all ETL jobs */
+insert_glob: DRY_RUN
+global_value: 0
+
+/* Current market session (NY / LN / TK) — set by intraday scheduler */
+insert_glob: MARKET_SESSION
+global_value: NY
+
+/* Holiday override: set to 1 to force-run on a market holiday */
+insert_glob: HOLIDAY_OVERRIDE
+global_value: 0

@@ -1,0 +1,94 @@
+/* ============================================================
+   FILE: 23_dividend_processing.jil
+   DOMAIN: Dividend & Coupon Processing
+   STATUS: RUNNING
+   UPSTREAM: 22_corporate_actions (corporate_actions_box)
+             13_portfolio_nav (portfolio_nav_box)
+   DOWNSTREAM: 11_gl_posting (cash entries), 09_payments_treasury, 42_tax_reporting, 44_fund_accounting
+   ============================================================ */
+
+insert_job: dividend_processing_box   job_type: BOX
+owner: svc_operations
+condition: success(corporate_actions_box) & success(portfolio_nav_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Process equity dividends, bond coupons, and withholding tax calculations"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "09:00,14:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: ops@bank.com
+
+/* Step 1: Identify positions eligible for dividend and coupon payments */
+insert_job: identify_eligible_positions   job_type: CMD
+box_name: dividend_processing_box
+owner: svc_operations
+command: /scripts/dividend/identify_eligible.py --date %%DATE%% --event_types DIVIDEND,COUPON,INTEREST
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+std_out_file: /logs/dividend/%%YEAR%%/%%MM%%/eligible_%%DATE%%.out
+std_err_file: /logs/dividend/%%YEAR%%/%%MM%%/eligible_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Compute gross dividend/coupon amounts */
+insert_job: compute_dividend_amounts   job_type: CMD
+box_name: dividend_processing_box
+owner: svc_operations
+command: /scripts/dividend/compute_amounts.py --date %%DATE%%
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(identify_eligible_positions)
+std_out_file: /logs/dividend/%%YEAR%%/%%MM%%/amounts_%%DATE%%.out
+std_err_file: /logs/dividend/%%YEAR%%/%%MM%%/amounts_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Apply withholding tax (WHT) per country and treaty rates */
+insert_job: apply_withholding_tax   job_type: CMD
+box_name: dividend_processing_box
+owner: svc_operations
+command: /scripts/dividend/apply_wht.py --date %%DATE%% --treaty_db /data/tax/treaties.json
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(compute_dividend_amounts)
+std_out_file: /logs/dividend/%%YEAR%%/%%MM%%/wht_%%DATE%%.out
+std_err_file: /logs/dividend/%%YEAR%%/%%MM%%/wht_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 4: Post dividend/coupon receipts to client accounts */
+insert_job: post_dividend_receipts   job_type: CMD
+box_name: dividend_processing_box
+owner: svc_operations
+command: /scripts/dividend/post_receipts.sh --date %%DATE%% --gl_system SAP_FICO
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(apply_withholding_tax)
+std_out_file: /logs/dividend/%%YEAR%%/%%MM%%/receipts_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 10

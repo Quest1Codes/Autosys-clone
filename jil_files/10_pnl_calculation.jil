@@ -1,0 +1,127 @@
+/* ============================================================
+   FILE: 10_pnl_calculation.jil
+   DOMAIN: P&L — Profit and Loss
+   STATUS: RUNNING
+   UPSTREAM: 05_position_management (position_mgmt_box)
+             01_market_data_ingest (mkt_data_ingest_box)
+   DOWNSTREAM: 11_gl_posting, 18_liquidity_reporting, 30_client_reporting
+   ============================================================ */
+
+insert_job: pnl_box   job_type: BOX
+owner: svc_pnl
+condition: success(position_mgmt_box) & success(mkt_data_ingest_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Compute realized and unrealized P&L by desk, fund and asset class"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,02:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: pnl-ops@bank.com
+
+/* Step 1: Compute realized P&L from closed positions and settled trades */
+insert_job: compute_realized_pnl   job_type: CMD
+box_name: pnl_box
+owner: svc_pnl
+command: /scripts/pnl/realized_pnl.py --date %%DATE%% --method FIFO
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_pnl.sh
+std_out_file: /logs/pnl/%%YEAR%%/%%MM%%/realized_%%DATE%%.out
+std_err_file: /logs/pnl/%%YEAR%%/%%MM%%/realized_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 2A: Compute unrealized P&L for equity positions */
+insert_job: compute_unrealized_pnl_equity   job_type: CMD
+box_name: pnl_box
+owner: svc_pnl
+command: /scripts/pnl/unrealized_pnl.py --date %%DATE%% --asset_class EQUITY
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_pnl.sh
+std_out_file: /logs/pnl/%%YEAR%%/%%MM%%/unrealized_equity_%%DATE%%.out
+std_err_file: /logs/pnl/%%YEAR%%/%%MM%%/unrealized_equity_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 25
+min_run_alarm: 3
+term_run_time: 30
+job_load: 20
+
+/* Step 2B: Compute unrealized P&L for fixed income (include accrued interest) */
+insert_job: compute_unrealized_pnl_fi   job_type: CMD
+box_name: pnl_box
+owner: svc_pnl
+command: /scripts/pnl/unrealized_pnl.py --date %%DATE%% --asset_class FIXED_INCOME --include_accruals
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_pnl.sh
+std_out_file: /logs/pnl/%%YEAR%%/%%MM%%/unrealized_fi_%%DATE%%.out
+std_err_file: /logs/pnl/%%YEAR%%/%%MM%%/unrealized_fi_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 25
+min_run_alarm: 3
+term_run_time: 30
+job_load: 20
+
+/* Step 2C: Compute FX translation P&L */
+insert_job: compute_fx_translation_pnl   job_type: CMD
+box_name: pnl_box
+owner: svc_pnl
+command: /scripts/pnl/fx_translation_pnl.py --date %%DATE%% --base_currency USD
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_pnl.sh
+std_out_file: /logs/pnl/%%YEAR%%/%%MM%%/fx_pnl_%%DATE%%.out
+std_err_file: /logs/pnl/%%YEAR%%/%%MM%%/fx_pnl_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3: Aggregate total P&L by desk, book and asset class */
+insert_job: aggregate_desk_pnl   job_type: CMD
+box_name: pnl_box
+owner: svc_pnl
+command: /scripts/pnl/aggregate_pnl.py --date %%DATE%% --dimensions DESK,BOOK,ASSET_CLASS
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_pnl.sh
+condition: success(compute_realized_pnl) & success(compute_unrealized_pnl_equity) & success(compute_unrealized_pnl_fi) & success(compute_fx_translation_pnl)
+std_out_file: /logs/pnl/%%YEAR%%/%%MM%%/aggregate_%%DATE%%.out
+std_err_file: /logs/pnl/%%YEAR%%/%%MM%%/aggregate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Publish P&L flash to senior management dashboard */
+insert_job: publish_pnl_flash   job_type: CMD
+box_name: pnl_box
+owner: svc_pnl
+command: /scripts/pnl/publish_flash.py --date %%DATE%% --recipients cfo@bank.com,cro@bank.com
+machine: pnl-app-01
+profile: /etc/autosys/profiles/svc_pnl.sh
+condition: success(aggregate_desk_pnl)
+std_out_file: /logs/pnl/%%YEAR%%/%%MM%%/flash_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

@@ -122,3 +122,25 @@ yarn-error.log*
 .npm
 .yarn-integrity
 dist/
+
+# ---------------------------------------------------------------------------
+# Scratch / temp files
+# ---------------------------------------------------------------------------
+test.txt
+tst_fix.txt
+fix_*.py
+run_agent_test.py
+e2e_check.py
+notes.txt
+commands.md
+plan.md
+IMPROVEMENTS.md
+
+# ---------------------------------------------------------------------------
+# Binary assets (kept locally, not in git)
+# ---------------------------------------------------------------------------
+*.pdf
+*.zip
+*.webp
+*.svg
+data/

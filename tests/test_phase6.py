@@ -82,6 +82,9 @@ def _get_status(job_name) -> str:
 
 
 def _set_status(job_name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, job_name)
         if row:
@@ -89,6 +92,9 @@ def _set_status(job_name, status):
 
 
 def _wait_for_status(job_name, expected, timeout=15) -> bool:
+    if isinstance(expected, str):
+        from autosys.models.enums import JobStatus
+        expected = JobStatus[expected].value
     deadline = time.time() + timeout
     while time.time() < deadline:
         if _get_status(job_name) == expected:
@@ -297,16 +303,29 @@ class TestAgentServer:
 
     def test_server_registers_machine_in_db(self, agent_server):
         """AgentServer.serve_forever() should register itself in the machines table."""
-        with sync_session() as session:
-            row = machine_repo.get(session, "test-agent")
+        row = None
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            with sync_session() as session:
+                row = machine_repo.get(session, "test-agent")
+            if row is not None:
+                break
+            time.sleep(0.05)
         assert row is not None
         assert row.status == "UP"
         assert row.port   == agent_server.port
 
     def test_heartbeat_updates_last_heartbeat(self, agent_server):
         send_message(*agent_server.addr, HeartbeatRequest())
-        with sync_session() as session:
-            row = machine_repo.get(session, "test-agent")
+        row = None
+        deadline = time.time() + 3
+        while time.time() < deadline:
+            with sync_session() as session:
+                row = machine_repo.get(session, "test-agent")
+            if row is not None and row.last_heartbeat is not None:
+                break
+            time.sleep(0.05)
+        assert row is not None
         assert row.last_heartbeat is not None
 
     def test_unknown_message_type_returns_error(self, agent_server):

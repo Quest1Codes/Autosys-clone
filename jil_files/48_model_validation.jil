@@ -1,0 +1,77 @@
+/* ============================================================
+   FILE: 48_model_validation.jil
+   DOMAIN: Quantitative Model Validation
+   SCHEDULE: Quarterly — ON HOLD (Model Risk team backlog)
+   STATUS: ON HOLD (entire box suspended)
+   UPSTREAM: 06_risk_engine (risk_engine_box), 47_volatility_surface (vol_surface_box)
+   DOWNSTREAM: None (internal model governance sign-off)
+   ============================================================ */
+
+insert_job: model_validation_box   job_type: BOX
+owner: svc_quant
+condition: success(risk_engine_box) & success(vol_surface_box)
+days_of_week: su
+alarm_if_fail: 1
+max_run_alarm: 480
+description: "Quarterly independent model validation: VaR back-testing, SIMM validation, vol model benchmarking"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "00:00,23:59"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: model-risk@bank.com
+job_on_hold: 1
+
+insert_job: run_var_backtesting   job_type: CMD
+box_name: model_validation_box
+owner: svc_quant
+command: /scripts/modelval/var_backtest.py --lookback_days 250 --confidence 0.99 --expected_breaches 2.5
+machine: quant-compute-01
+profile: /etc/autosys/profiles/svc_quant.sh
+std_out_file: /logs/modelval/%%YEAR%%/%%MM%%/var_backtest_%%DATE%%.out
+std_err_file: /logs/modelval/%%YEAR%%/%%MM%%/var_backtest_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 0
+max_run_alarm: 120
+min_run_alarm: 10
+term_run_time: 125
+job_load: 40
+job_on_hold: 1
+
+insert_job: validate_pricing_models   job_type: CMD
+box_name: model_validation_box
+owner: svc_quant
+command: /scripts/modelval/pricing_model_validation.py --models BLACK_SCHOLES,SABR,HULL_WHITE
+machine: quant-compute-01
+profile: /etc/autosys/profiles/svc_quant.sh
+condition: success(run_var_backtesting)
+std_out_file: /logs/modelval/%%YEAR%%/%%MM%%/pricing_%%DATE%%.out
+std_err_file: /logs/modelval/%%YEAR%%/%%MM%%/pricing_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 0
+max_run_alarm: 180
+min_run_alarm: 15
+term_run_time: 185
+job_load: 40
+job_on_hold: 1
+
+insert_job: generate_model_validation_report   job_type: CMD
+box_name: model_validation_box
+owner: svc_quant
+command: /scripts/modelval/gen_report.py --date %%DATE%% --notify model-risk@bank.com,cro@bank.com
+machine: quant-compute-01
+profile: /etc/autosys/profiles/svc_quant.sh
+condition: success(validate_pricing_models)
+std_out_file: /logs/modelval/%%YEAR%%/%%MM%%/report_%%DATE%%.out
+std_err_file: /logs/modelval/%%YEAR%%/%%MM%%/report_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 5
+job_on_hold: 1

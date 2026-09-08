@@ -62,7 +62,9 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import JobRow
-from autosys.scheduler.condition_evaluator import is_satisfied
+from autosys.models.enums import JobStatus
+from autosys.scheduler.condition_evaluator import is_satisfied, referenced_job_names
+from autosys.scheduler.state_machine import _norm_status
 
 # Reuse the same type aliases as event_processor.py
 DispatchFn = Callable[[Session, JobRow], None]
@@ -77,7 +79,7 @@ _ACTIVE = frozenset({"STARTING", "RUNNING"})
 
 def _stub_dispatch(session: Session, row: JobRow) -> None:
     """Stub dispatcher — immediately marks CMD children SUCCESS (no subprocess)."""
-    row.status     = "SUCCESS"
+    row.status     = JobStatus.SUCCESS.value
     row.last_start = datetime.now()
     row.last_end   = datetime.now()
 
@@ -169,7 +171,7 @@ class BoxManager:
                 "BOX %r has no children — auto-completing as SUCCESS",
                 box.job_name,
             )
-            box.status  = "SUCCESS"
+            box.status  = JobStatus.SUCCESS.value
             box.last_end = now
             return 1
 
@@ -177,18 +179,18 @@ class BoxManager:
 
         # Step 1: activate INACTIVE children whose conditions are met
         for child in children:
-            if child.status == "INACTIVE":
+            if _norm_status(child.status) == "INACTIVE":
                 if self._conditions_met(child, snapshot):
                     logger.info(
                         "BOX %r: activating child %r → STARTING",
                         box.job_name, child.job_name,
                     )
-                    child.status = "STARTING"
+                    child.status = JobStatus.STARTING.value
                     # Update snapshot so later siblings see this child's new status
                     snapshot[child.job_name] = "STARTING"
 
                     if self._auto_complete:
-                        child.status     = "SUCCESS"
+                        child.status     = JobStatus.SUCCESS.value
                         child.last_start = now
                         child.last_end   = now
                     else:
@@ -200,20 +202,57 @@ class BoxManager:
                     # multiple ticks (one per wave of the dependency chain).
                     changes += 1
 
-        # Step 2: check if all children are terminal → complete the box
-        non_terminal = [c for c in children if c.status not in _TERMINAL]
+        # Step 2: check box_failure and box_success conditions first
+        if box.box_failure and self._conditions_met(box, snapshot, box.box_failure):
+            box.status = JobStatus.FAILURE.value
+            box.last_end = now
+            logger.info("BOX %r completed → FAILURE (box_failure condition met)", box.job_name)
+            return changes + 1
+
+        if box.box_success and self._conditions_met(box, snapshot, box.box_success):
+            box.status = JobStatus.SUCCESS.value
+            box.last_end = now
+            logger.info("BOX %r completed → SUCCESS (box_success condition met)", box.job_name)
+            return changes + 1
+
+        # Step 3: default fail-fast — if any child FAILED and there is no custom
+        # box_failure condition, immediately fail the box.  This mirrors real
+        # AutoSys default behaviour: a single child failure aborts the box.
+        if not box.box_failure:
+            if any(_norm_status(c.status) == "FAILURE" for c in children):
+                box.status   = JobStatus.FAILURE.value
+                box.last_end = now
+                logger.info(
+                    "BOX %r → FAILURE (child failed, default fail-fast)",
+                    box.job_name,
+                )
+                return changes + 1
+
+        # All-terminal check.  A child that's still INACTIVE but whose
+        # condition can never be satisfied anymore — e.g. an alert job with
+        # `condition: failure(x)` once `x` has already reached SUCCESS —
+        # would otherwise block the box forever.  Exclude those: nothing
+        # left in the system can change their outcome, so they're
+        # effectively done (still INACTIVE, correctly, just not "pending").
+        non_terminal = [
+            c for c in children
+            if _norm_status(c.status) not in _TERMINAL
+            and not self._is_unreachable(c, snapshot)
+        ]
         if non_terminal:
             return changes   # box is still in progress
 
-        # All children are terminal — determine box outcome
-        terminal_statuses = {c.status for c in children}
+        # All children are terminal (or permanently unreachable) — determine
+        # box outcome from whichever children actually ran.
+        ran_children = [c for c in children if _norm_status(c.status) in _TERMINAL]
+        terminal_statuses = {_norm_status(c.status) for c in ran_children}
 
         if "TERMINATED" in terminal_statuses:
-            box.status = "TERMINATED"
+            box.status = JobStatus.TERMINATED.value
         elif "FAILURE" in terminal_statuses:
-            box.status = "FAILURE"
+            box.status = JobStatus.FAILURE.value
         else:
-            box.status = "SUCCESS"
+            box.status = JobStatus.SUCCESS.value
 
         box.last_end = now
         logger.info(
@@ -249,9 +288,9 @@ class BoxManager:
 
         children = job_repo.get_children(session, box_name)
         for child in children:
-            if child.status in _TERMINAL:
+            if _norm_status(child.status) in _TERMINAL:
                 continue
-            if child.status in _ACTIVE and self._kill_fn is not None:
+            if _norm_status(child.status) in _ACTIVE and self._kill_fn is not None:
                 try:
                     self._kill_fn(session, child)
                 except Exception as exc:
@@ -259,7 +298,7 @@ class BoxManager:
                         "BOX kill: kill_fn raised for child %r: %s",
                         child.job_name, exc,
                     )
-            child.status  = "TERMINATED"
+            child.status  = JobStatus.TERMINATED.value
             child.last_end = now
             logger.info(
                 "BOX %r: child %r killed → TERMINATED",
@@ -285,12 +324,15 @@ class BoxManager:
         children = job_repo.get_children(session, box_name)
         now      = datetime.now()
         for child in children:
-            if child.status in _ACTIVE and self._kill_fn is not None:
+            if _norm_status(child.status) in _ACTIVE and self._kill_fn is not None:
                 try:
                     self._kill_fn(session, child)
                 except Exception as exc:
-                    logger.warning(f"BOX reset: kill_fn raised for {child.job_name!r}: {exc}")
-            child.status  = "INACTIVE"
+                    logger.warning(
+                        "BOX reset: kill_fn raised for %r: %s",
+                        child.job_name, exc,
+                    )
+            child.status  = JobStatus.INACTIVE.value
             child.last_end = None
             logger.debug(f"BOX {box_name!r}: reset child {child.job_name!r} → INACTIVE")
 
@@ -298,14 +340,14 @@ class BoxManager:
     # Condition evaluation helper
     # ------------------------------------------------------------------
 
-    def _conditions_met(self, child: JobRow, snapshot: dict[str, str]) -> bool:
+    def _conditions_met(self, child: JobRow, snapshot: dict[str, str], condition_override: Optional[str] = None) -> bool:
         """
-        Return True if the child's start conditions are satisfied.
+        Return True if the child's start conditions (or overridden condition) are satisfied.
 
         Uses the module-level ``is_satisfied`` function from condition_evaluator.
         Jobs with no condition are always eligible.
         """
-        condition = child.condition
+        condition = condition_override if condition_override is not None else child.condition
         if not condition or condition.strip() == "":
             return True
 
@@ -317,3 +359,29 @@ class BoxManager:
                 child.job_name, condition, exc,
             )
             return False
+
+    def _is_unreachable(self, child: JobRow, snapshot: dict[str, str]) -> bool:
+        """
+        Return True if *child* is INACTIVE and its condition can never be
+        satisfied anymore given the current snapshot.
+
+        Every job it references is either terminal (won't change again) or
+        doesn't exist in the system (never will), and its condition still
+        evaluates to False — e.g. `condition: failure(x)` once `x` has
+        already reached SUCCESS.  Real AutoSys doesn't wait forever for a
+        child that's structurally incapable of triggering.
+        """
+        if _norm_status(child.status) != "INACTIVE" or not child.condition:
+            return False
+
+        refs = referenced_job_names(child.condition)
+        if not refs:
+            return False
+
+        if any(
+            name in snapshot and _norm_status(snapshot[name]) not in _TERMINAL
+            for name in refs
+        ):
+            return False  # a referenced job can still change state
+
+        return not self._conditions_met(child, snapshot)

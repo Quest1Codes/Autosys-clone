@@ -15,15 +15,26 @@ from autosys.app_server.schemas import (
 )
 from autosys.db.repository import jobs as job_repo, events as event_repo
 from autosys.models.event  import Event
+from autosys.models.job    import JobStatus
 
 router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
+
+
+def _status_name(val) -> str:
+    """Convert an integer or string status to its canonical string name."""
+    if isinstance(val, int):
+        try:
+            return JobStatus(val).name
+        except ValueError:
+            return "INACTIVE"
+    return str(val) if val else "INACTIVE"
 
 
 def _row_to_response(row) -> JobResponse:
     return JobResponse(
         job_name      = row.job_name,
         job_type      = row.job_type or "CMD",
-        status        = row.status   or "INACTIVE",
+        status        = row.status if row.status is not None else JobStatus.INACTIVE.value,
         machine       = row.machine,
         box_name      = row.box_name,
         condition     = row.condition,
@@ -49,7 +60,7 @@ def _row_to_detail(row) -> JobDetailResponse:
     return JobDetailResponse(
         job_name           = row.job_name,
         job_type           = row.job_type or "CMD",
-        status             = row.status   or "INACTIVE",
+        status             = row.status if row.status is not None else JobStatus.INACTIVE.value,
         machine            = row.machine,
         box_name           = row.box_name,
         condition          = row.condition,
@@ -91,7 +102,11 @@ def list_jobs(
         rows = job_repo.list_all(session)
 
     if status:
-        rows = [r for r in rows if (r.status or "INACTIVE") == status.upper()]
+        try:
+            status_int = JobStatus[status.upper()].value
+        except KeyError:
+            status_int = int(status)
+        rows = [r for r in rows if (r.status or JobStatus.INACTIVE.value) == status_int]
 
     return [_row_to_response(r) for r in rows]
 

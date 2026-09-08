@@ -75,12 +75,24 @@ def _fmt_ts(dt) -> str:
         return _BLANK
 
 
-def _abbrev(status: str) -> str:
-    return _STATUS_ABBREV.get(status.upper(), status[:2].upper())
+from autosys.models.enums import JobStatus
+
+def _get_status_name(status_int: int | str) -> str:
+    if isinstance(status_int, str):
+        return status_int.upper()
+    try:
+        return JobStatus(status_int).name
+    except ValueError:
+        return str(status_int)
+
+def _abbrev(status: int | str) -> str:
+    name = _get_status_name(status)
+    return _STATUS_ABBREV.get(name, name[:2].upper())
 
 
-def _status_colour(status: str) -> str:
+def _status_colour(status: int | str) -> str:
     """Return a rich colour tag for the status abbreviation."""
+    name = _get_status_name(status)
     return {
         "INACTIVE":   "dim",
         "ACTIVATED":  "cyan",
@@ -93,7 +105,7 @@ def _status_colour(status: str) -> str:
         "QUE_WAIT":   "yellow",
         "ON_HOLD":    "magenta",
         "ON_ICE":     "magenta",
-    }.get(status.upper(), "white")
+    }.get(name, "white")
 
 
 # ---------------------------------------------------------------------------
@@ -169,9 +181,11 @@ def _print_table(rows: list[JobRow], *, no_children: bool) -> None:
     table.add_column("Last End",   style="dim",     min_width=19, no_wrap=True)
     table.add_column("ST",         style="",        min_width=2,  no_wrap=True)
     table.add_column("Run",        style="",        min_width=3,  no_wrap=True, justify="right")
+    table.add_column("Type",       style="dim",     min_width=6,  no_wrap=True)
+    table.add_column("Application", style="dim",    min_width=12, no_wrap=True)
 
     def _add_row(r: JobRow, indent: int = 0) -> None:
-        status = r.status or "INACTIVE"
+        status = r.status if r.status is not None else JobStatus.INACTIVE.value
         abbrev = _abbrev(status)
         colour = _status_colour(status)
         prefix = "  " * indent
@@ -181,6 +195,8 @@ def _print_table(rows: list[JobRow], *, no_children: bool) -> None:
             _fmt_ts(r.last_end),
             f"[{colour}]{abbrev}[/{colour}]",
             str(_run_count(r)),
+            str(r.job_type or ""),
+            str(r.application or ""),
         )
 
     if no_children:
@@ -213,13 +229,15 @@ def _print_table(rows: list[JobRow], *, no_children: bool) -> None:
 def _print_tsv(rows: list[JobRow]) -> None:
     """Print tab-separated values for scripting (no rich markup)."""
     for r in rows:
-        status = r.status or "INACTIVE"
+        status = r.status if r.status is not None else JobStatus.INACTIVE.value
         print(
             r.job_name,
             _fmt_ts(r.last_start),
             _fmt_ts(r.last_end),
             _abbrev(status),
             str(_run_count(r)),
+            str(r.job_type or ""),
+            str(r.application or ""),
             sep="\t",
         )
 

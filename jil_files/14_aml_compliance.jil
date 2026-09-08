@@ -1,0 +1,109 @@
+/* ============================================================
+   FILE: 14_aml_compliance.jil
+   DOMAIN: Anti-Money Laundering (AML) & Compliance
+   STATUS: ON ICE — entire box suspended pending FINCEN approval for new AML engine
+   UPSTREAM: 03_trade_capture (trade_capture_box)
+             33_sanctions_screening (sanctions_screening_box)
+   DOWNSTREAM: 32_compliance_monitoring
+   ============================================================ */
+
+insert_job: aml_compliance_box   job_type: BOX
+owner: svc_compliance
+condition: success(trade_capture_box) & success(sanctions_screening_box)
+days_of_week: mo,tu,we,th,fr
+alarm_if_fail: 1
+max_run_alarm: 120
+description: "AML transaction screening — ON ICE pending FinCEN new-system approval"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: aml-ops@bank.com
+job_on_ice: 1
+
+/* Step 1: Extract transactions above reporting threshold for AML screening */
+insert_job: extract_transactions_for_aml   job_type: CMD
+box_name: aml_compliance_box
+owner: svc_compliance
+command: /scripts/aml/extract_transactions.py --date %%DATE%% --threshold 10000 --currency USD
+machine: aml-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/aml/%%YEAR%%/%%MM%%/extract_%%DATE%%.out
+std_err_file: /logs/aml/%%YEAR%%/%%MM%%/extract_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 2: Run AML rules engine (velocity, structuring, layering checks) */
+insert_job: run_aml_rules_engine   job_type: CMD
+box_name: aml_compliance_box
+owner: svc_compliance
+command: /scripts/aml/run_rules.py --date %%DATE%% --engine ACTIMIZE --ruleset FULL
+machine: aml-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(extract_transactions_for_aml)
+std_out_file: /logs/aml/%%YEAR%%/%%MM%%/rules_%%DATE%%.out
+std_err_file: /logs/aml/%%YEAR%%/%%MM%%/rules_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 30
+
+/* Step 3: Check OFAC, EU, UN consolidated sanctions lists */
+insert_job: check_sanctions_lists   job_type: CMD
+box_name: aml_compliance_box
+owner: svc_compliance
+command: /scripts/aml/sanctions_check.py --date %%DATE%% --lists OFAC,EU_CONSOL,UN_CONSOL,UK_HMT
+machine: aml-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(extract_transactions_for_aml)
+std_out_file: /logs/aml/%%YEAR%%/%%MM%%/sanctions_%%DATE%%.out
+std_err_file: /logs/aml/%%YEAR%%/%%MM%%/sanctions_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 4: Generate SAR (Suspicious Activity Report) candidates for BSA officer review */
+insert_job: generate_sar_candidates   job_type: CMD
+box_name: aml_compliance_box
+owner: svc_compliance
+command: /scripts/aml/gen_sar_candidates.py --date %%DATE%% --threshold_score 75
+machine: aml-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(run_aml_rules_engine) & success(check_sanctions_lists)
+std_out_file: /logs/aml/%%YEAR%%/%%MM%%/sar_%%DATE%%.out
+std_err_file: /logs/aml/%%YEAR%%/%%MM%%/sar_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 5: Alert BSA officer if any hard-block sanctions hits found */
+insert_job: sanctions_hard_block_alert   job_type: CMD
+box_name: aml_compliance_box
+owner: svc_compliance
+command: /scripts/alerts/sanctions_block.sh --date %%DATE%% --notify bsa-officer@bank.com --page
+machine: aml-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: failure(check_sanctions_lists)
+std_out_file: /logs/aml/%%YEAR%%/%%MM%%/block_alert_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

@@ -76,19 +76,18 @@ class TestEnums:
         assert set(JobType) == {
             JobType.BOX, JobType.CMD, JobType.FTP,
             JobType.FILEWATCH, JobType.CONNECT,
+            JobType.SAP, JobType.PEOPLESOFT, JobType.INFORMATICA,
+            JobType.MICROFOCUS, JobType.WEBSERVICE, JobType.REMOTECMD,
+            JobType.WOL, JobType.USERDEFINED,
         }
 
-    def test_job_status_has_12_states(self):
-        # Real AutoSys has 13 states including ACTIVATED (BOX-only)
-        expected = {
-            "INACTIVE", "WAIT_REPLY", "ON_HOLD", "ON_ICE", "STARTING",
-            "RUNNING", "SUCCESS", "FAILURE", "TERMINATED", "RESTART",
-            "REFRESH_DEPENDENCIES", "ACTIVATED", "QUE_WAIT",
-        }
+    def test_job_status_has_17_states(self):
+        # Real AutoSys uses integer status codes for DB compatibility
+        expected = {1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 99}
         assert {s.value for s in JobStatus} == expected
 
-    def test_event_type_has_11_members(self):
-        assert len(EventType) == 11
+    def test_event_type_has_15_members(self):
+        assert len(EventType) == 15
 
     def test_alarm_type_members(self):
         assert AlarmType.MAX_RUN_ALARM.value == "MAX_RUN_ALARM"
@@ -100,8 +99,8 @@ class TestEnums:
         assert DayOfWeek.ALL.value == "all"
 
     def test_all_enums_are_strings(self):
-        """All enums inherit from str so they serialise to plain strings in JSON."""
-        for enum_cls in (JobType, JobStatus, EventType, AlarmType, DayOfWeek):
+        """All enums (except JobStatus which uses IntEnum) inherit from str so they serialise to plain strings in JSON."""
+        for enum_cls in (JobType, EventType, AlarmType, DayOfWeek):
             for member in enum_cls:
                 assert isinstance(member.value, str), f"{enum_cls.__name__}.{member.name}"
 
@@ -126,7 +125,7 @@ class TestJobModels:
             max_run_alarm=60,
         )
         assert j.job_name == "extract_sales"
-        assert j.status == "INACTIVE"          # use_enum_values=True → plain string
+        assert j.status == 8          # use_enum_values=True → plain string
         assert j.n_retrys == 2
         assert j.alarm_if_fail is True
 
@@ -231,7 +230,7 @@ class TestJobModels:
 
     def test_default_status_is_inactive(self):
         j = parse_job({"job_name": "x", "job_type": "BOX"})
-        assert j.status == "INACTIVE"
+        assert j.status == 8
 
 
 # ===========================================================================
@@ -247,23 +246,23 @@ class TestJobRunModel:
     def test_duration_seconds_computed(self):
         t0 = datetime(2025, 1, 1, 6, 0, 0)
         t1 = datetime(2025, 1, 1, 6, 5, 30)
-        r = JobRun(job_name="my_job", start_time=t0, end_time=t1, status="SUCCESS")
+        r = JobRun(job_name="my_job", start_time=t0, end_time=t1, status=4)
         assert r.duration_seconds == pytest.approx(330.0)
 
     def test_is_terminal_for_success(self):
-        r = JobRun(job_name="j", status="SUCCESS")
+        r = JobRun(job_name="j", status=4)
         assert r.is_terminal is True
 
     def test_is_terminal_for_failure(self):
-        r = JobRun(job_name="j", status="FAILURE")
+        r = JobRun(job_name="j", status=5)
         assert r.is_terminal is True
 
     def test_is_terminal_for_terminated(self):
-        r = JobRun(job_name="j", status="TERMINATED")
+        r = JobRun(job_name="j", status=6)
         assert r.is_terminal is True
 
     def test_not_terminal_while_running(self):
-        r = JobRun(job_name="j", status="RUNNING")
+        r = JobRun(job_name="j", status=1)
         assert r.is_terminal is False
 
     def test_run_id_is_uuid(self):
@@ -313,9 +312,9 @@ class TestEventModel:
         e = Event(
             event_type="CHANGE_STATUS",
             job_name="my_job",
-            new_status="ON_HOLD",
+            new_status=11,
         )
-        assert e.new_status == "ON_HOLD"
+        assert e.new_status == 11
 
     def test_force_startjob_requires_job_name(self):
         with pytest.raises(Exception, match="job_name"):
@@ -477,9 +476,9 @@ class TestGlobalVariableModel:
 class TestDBSchema:
 
     EXPECTED_TABLES = {
-        "jobs", "job_runs", "event_queue", "event_history",
-        "global_variables", "calendars", "alarms",
-        "virtual_resources", "machines",
+        "ujo_job", "ujo_job_runs", "ujo_event", "ujo_proc_event",
+        "ujo_glob_var", "ujo_calendar", "alarms",
+        "ujo_resource", "ujo_machine",
     }
 
     def test_all_9_tables_created(self):
@@ -554,7 +553,7 @@ class TestRoundTrip:
         assert fetched.command    == "/scripts/extract.sh --date %%DATE%%"
         assert fetched.n_retrys   == 2
         assert fetched.alarm_if_fail is True
-        assert fetched.status     == "INACTIVE"
+        assert fetched.status     == 8
         assert "06:00" in fetched.start_times
         assert fetched.condition  == "success(check_source_ready)"
 
@@ -581,9 +580,9 @@ class TestRoundTrip:
     def test_global_variable_write_and_read(self):
         with sync_session() as session:
             session.add(GlobalVariableRow(
-                name       = "RUN_DATE",
-                value      = "20250625",
-                updated_by = "test",
+                global_name = "RUN_DATE",
+                value       = "20250625",
+                updated_by  = "test",
             ))
 
         with sync_session() as session:

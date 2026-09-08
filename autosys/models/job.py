@@ -23,7 +23,7 @@ Scheduling      : start_times, start_mins, days_of_week,
                   run_calendar, exclude_calendar,
                   date_conditions, term_run_time
 Dependencies    : condition
-Reliability     : n_retrys, max_run_alarm, min_run_alarm,
+Reliability     : n_retrys, max_exit_success, max_run_alarm, min_run_alarm,
                   alarm_if_fail, alarm_if_terminated
 Resources       : job_load, max_load
 Notifications   : notification_msg, notification_emailaddress,
@@ -87,6 +87,7 @@ class Job(BaseModel):
         None,
         description="OS user to run the job as (may differ from owner).",
     )
+    group: Optional[str] = Field(None, description="Job group name.")
 
     # ------------------------------------------------------------------
     # Execution  (CMD jobs)
@@ -116,6 +117,9 @@ class Job(BaseModel):
     std_out_file: Optional[str] = Field(None, description="Path to capture stdout.")
     std_err_file: Optional[str] = Field(None, description="Path to capture stderr.")
     std_in_file: Optional[str] = Field(None, description="Path to redirect as stdin.")
+    envvars: Optional[str] = Field(None, description="Environment variables.")
+    chk_files: Optional[str] = Field(None, description="Check files.")
+    ulimit: Optional[str] = Field(None, description="ulimit settings.")
 
     # ------------------------------------------------------------------
     # BOX container  (BOX jobs and their children)
@@ -130,13 +134,13 @@ class Job(BaseModel):
     box_success: Optional[str] = Field(
         None,
         description=(
-            "Job name whose SUCCESS triggers the BOX to be marked SUCCESS. "
+            "Dependency condition expression whose evaluation to True triggers the BOX to be marked SUCCESS. "
             "Defaults to: all child jobs reached SUCCESS."
         ),
     )
     box_failure: Optional[str] = Field(
         None,
-        description="Job name whose FAILURE triggers the BOX to be marked FAILURE.",
+        description="Dependency condition expression whose evaluation to True triggers the BOX to be marked FAILURE.",
     )
     box_terminator: bool = Field(
         False,
@@ -194,6 +198,11 @@ class Job(BaseModel):
             "this many minutes the Scheduler sends KILLJOB automatically."
         ),
     )
+    avg_runtime: Optional[int] = Field(None, description="Average runtime in minutes.")
+    must_complete_times: Optional[str] = Field(None, description="Must complete times.")
+    must_start_times: Optional[str] = Field(None, description="Must start times.")
+    priority: Optional[int] = Field(None, description="Job priority.")
+    timezone: Optional[str] = Field(None, description="Timezone for the job.")
 
     # ------------------------------------------------------------------
     # Dependencies
@@ -222,6 +231,16 @@ class Job(BaseModel):
             "through RESTART → STARTING → RUNNING."
         ),
     )
+    max_exit_success: Optional[int] = Field(
+        None,
+        ge=0,
+        description=(
+            "Maximum exit code that is still considered SUCCESS. "
+            "If the process exits with a code <= max_exit_success the job "
+            "is marked SUCCESS; any higher code is FAILURE. "
+            "Defaults to None (only exit code 0 = SUCCESS)."
+        ),
+    )
     max_run_alarm: Optional[int] = Field(
         None,
         ge=1,
@@ -247,6 +266,7 @@ class Job(BaseModel):
         False,
         description="Raise an ALARM_IF_TERMINATED alarm when the job is killed.",
     )
+    fail_codes: Optional[str] = Field(None, description="Specific exit codes that mean FAILURE.")
 
     # ------------------------------------------------------------------
     # Virtual resources  (concurrency control)
@@ -266,6 +286,57 @@ class Job(BaseModel):
             "Maximum total job_load that may run simultaneously on this machine. "
             "Jobs that would exceed this wait in QUE_WAIT state."
         ),
+    )
+    resources: Optional[str] = Field(None, description="Virtual resources required.")
+    auto_hold: bool = Field(False, description="Automatically place job ON_HOLD when created.")
+
+    # ------------------------------------------------------------------
+    # Extended attributes (Phase 4)
+    # ------------------------------------------------------------------
+    auto_delete: bool = Field(
+        False,
+        description="If True, auto-delete the job definition after it reaches a terminal state.",
+    )
+    application: Optional[str] = Field(
+        None,
+        description="Associate this job with an application name for grouping and filtering.",
+    )
+    sub_application: Optional[str] = Field(
+        None,
+        description="Sub-grouping within the application.",
+    )
+    command_timeout: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Kill the command after this many seconds (distinct from max_run_alarm which only raises an alarm).",
+    )
+    continuous: bool = Field(
+        False,
+        description="If True, the job monitors continuously (e.g. FILEWATCH loops instead of one-shot).",
+    )
+    cpu_usage: Optional[int] = Field(
+        None,
+        ge=0,
+        description="CPU usage threshold for monitoring (percentage).",
+    )
+    disk_space: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Minimum disk space in MB required before running.",
+    )
+    auth_string: Optional[str] = Field(
+        None,
+        description="Authorization string passed to the agent for execution.",
+    )
+    connection_retry: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Number of times to retry connection for CONNECT/WEBSERVICE jobs.",
+    )
+    connection_timeout: Optional[int] = Field(
+        None,
+        ge=1,
+        description="Connection timeout in seconds for CONNECT/WEBSERVICE jobs.",
     )
 
     # ------------------------------------------------------------------
@@ -461,6 +532,30 @@ class ConnectJob(Job):
             raise ValueError("CONNECT job requires 'machine'")
         return self
 
+class SapJob(Job):
+    job_type: JobType = JobType.SAP
+
+class PeoplesoftJob(Job):
+    job_type: JobType = JobType.PEOPLESOFT
+
+class InformaticaJob(Job):
+    job_type: JobType = JobType.INFORMATICA
+
+class MicrofocusJob(Job):
+    job_type: JobType = JobType.MICROFOCUS
+
+class WebserviceJob(Job):
+    job_type: JobType = JobType.WEBSERVICE
+
+class RemotecmdJob(Job):
+    job_type: JobType = JobType.REMOTECMD
+
+class WolJob(Job):
+    job_type: JobType = JobType.WOL
+
+class UserdefinedJob(Job):
+    job_type: JobType = JobType.USERDEFINED
+
 
 # ---------------------------------------------------------------------------
 # Factory function — build the right subclass from a raw JIL dict
@@ -472,6 +567,14 @@ _JOB_TYPE_MAP: dict[str, type[Job]] = {
     JobType.FILEWATCH: FilewatchJob,
     JobType.FTP:       FtpJob,
     JobType.CONNECT:   ConnectJob,
+    JobType.SAP:       SapJob,
+    JobType.PEOPLESOFT: PeoplesoftJob,
+    JobType.INFORMATICA: InformaticaJob,
+    JobType.MICROFOCUS: MicrofocusJob,
+    JobType.WEBSERVICE: WebserviceJob,
+    JobType.REMOTECMD: RemotecmdJob,
+    JobType.WOL:       WolJob,
+    JobType.USERDEFINED: UserdefinedJob,
 }
 
 

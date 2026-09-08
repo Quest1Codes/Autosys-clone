@@ -83,6 +83,9 @@ def _seed_box(name="my_box", condition=None):
 
 
 def _set_status(job_name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, job_name)
         row.status = status
@@ -206,43 +209,43 @@ class TestConditionEvaluator:
         assert is_satisfied("", {}) is True
 
     def test_success_condition_met(self):
-        assert is_satisfied("success(a)", {"a": "SUCCESS"}) is True
+        assert is_satisfied("success(a)", {"a": 4}) is True
 
     def test_success_condition_not_met(self):
-        assert is_satisfied("success(a)", {"a": "FAILURE"}) is False
+        assert is_satisfied("success(a)", {"a": 5}) is False
 
     def test_failure_condition_met(self):
-        assert is_satisfied("failure(a)", {"a": "FAILURE"}) is True
+        assert is_satisfied("failure(a)", {"a": 5}) is True
 
     def test_done_condition_success(self):
-        assert is_satisfied("done(a)", {"a": "SUCCESS"}) is True
+        assert is_satisfied("done(a)", {"a": 4}) is True
 
     def test_done_condition_failure(self):
-        assert is_satisfied("done(a)", {"a": "FAILURE"}) is True
+        assert is_satisfied("done(a)", {"a": 5}) is True
 
     def test_done_condition_running(self):
-        assert is_satisfied("done(a)", {"a": "RUNNING"}) is False
+        assert is_satisfied("done(a)", {"a": 1}) is False
 
     def test_and_both_met(self):
-        statuses = {"a": "SUCCESS", "b": "SUCCESS"}
+        statuses = {"a": 4, "b": 4}
         assert is_satisfied("success(a) & success(b)", statuses) is True
 
     def test_and_one_not_met(self):
-        statuses = {"a": "SUCCESS", "b": "FAILURE"}
+        statuses = {"a": 4, "b": 5}
         assert is_satisfied("success(a) & success(b)", statuses) is False
 
     def test_or_one_met(self):
-        statuses = {"a": "FAILURE", "b": "SUCCESS"}
+        statuses = {"a": 5, "b": 4}
         assert is_satisfied("success(a) | success(b)", statuses) is True
 
     def test_or_neither_met(self):
-        statuses = {"a": "FAILURE", "b": "FAILURE"}
+        statuses = {"a": 5, "b": 5}
         assert is_satisfied("success(a) | success(b)", statuses) is False
 
     def test_and_binds_tighter_than_or(self):
         # success(a) | success(b) & success(c)
         # should parse as: success(a) | (success(b) & success(c))
-        statuses = {"a": "FAILURE", "b": "SUCCESS", "c": "SUCCESS"}
+        statuses = {"a": 5, "b": 4, "c": 4}
         assert is_satisfied("success(a) | success(b) & success(c)", statuses) is True
 
     def test_unknown_job_is_unsatisfied(self):
@@ -264,7 +267,7 @@ class TestTimeTrigger:
         job_name="sched_job",
         start_times="06:00",
         days_of_week="mo,tu,we,th,fr",
-        status="INACTIVE",
+        status=8,
         last_run_date=None,
     ):
         """Create a minimal in-memory stub that quacks like a JobRow."""
@@ -336,14 +339,14 @@ class TestTimeTrigger:
         assert is_triggered(row, now) is False
 
     def test_running_job_does_not_retrigger(self):
-        row = self._make_row(start_times="06:00", days_of_week=None, status="RUNNING")
+        row = self._make_row(start_times="06:00", days_of_week=None, status=1)
         now = datetime(2026, 6, 24, 6, 0)
         assert is_triggered(row, now) is False
 
     def test_success_job_retriggers_next_day(self):
         row = self._make_row(
             start_times="06:00", days_of_week=None,
-            status="SUCCESS", last_run_date="2026-06-23",
+            status=4, last_run_date="2026-06-23",
         )
         now = datetime(2026, 6, 24, 6, 0)
         assert is_triggered(row, now) is True
@@ -372,7 +375,7 @@ class TestEventProcessor:
         _seed_cmd("job_a")
         _enqueue("STARTJOB", "job_a")
         _tick()
-        assert _get_status("job_a") == "SUCCESS"
+        assert _get_status("job_a") == 4
 
     def test_startjob_no_condition_transitions_to_starting_without_autocomplete(self):
         _seed_cmd("job_a")
@@ -380,7 +383,7 @@ class TestEventProcessor:
         proc = EventProcessor(auto_complete=False)
         _tick(proc)
         # With auto_complete=False, stops at RUNNING (stub sets RUNNING not SUCCESS)
-        assert _get_status("job_a") == "RUNNING"
+        assert _get_status("job_a") == 1
 
     def test_startjob_condition_satisfied(self):
         _seed_cmd("dep_job")
@@ -388,7 +391,7 @@ class TestEventProcessor:
         _set_status("dep_job", "SUCCESS")
         _enqueue("STARTJOB", "main_job")
         _tick()
-        assert _get_status("main_job") == "SUCCESS"
+        assert _get_status("main_job") == 4
 
     def test_startjob_condition_not_satisfied(self):
         _seed_cmd("dep_job")
@@ -396,7 +399,7 @@ class TestEventProcessor:
         # dep_job is INACTIVE — condition not met
         _enqueue("STARTJOB", "main_job")
         _tick()
-        assert _get_status("main_job") == "INACTIVE"
+        assert _get_status("main_job") == 8
 
     def test_startjob_unknown_job_is_noop(self):
         _enqueue("STARTJOB", "no_such_job")
@@ -408,7 +411,7 @@ class TestEventProcessor:
         _set_status("job_a", "RUNNING")
         _enqueue("STARTJOB", "job_a")
         _tick()
-        assert _get_status("job_a") == "RUNNING"   # unchanged
+        assert _get_status("job_a") == 1   # unchanged
 
     def test_startjob_marks_last_run_date(self):
         _seed_cmd("job_a")
@@ -427,7 +430,7 @@ class TestEventProcessor:
         _enqueue("FORCE_STARTJOB", "main_job")
         _tick()
         # Should succeed despite unsatisfied condition
-        assert _get_status("main_job") == "SUCCESS"
+        assert _get_status("main_job") == 4
 
     # -- KILLJOB -----------------------------------------------------------
 
@@ -436,13 +439,13 @@ class TestEventProcessor:
         _set_status("job_a", "RUNNING")
         _enqueue("KILLJOB", "job_a")
         _tick()
-        assert _get_status("job_a") == "TERMINATED"
+        assert _get_status("job_a") == 6
 
     def test_killjob_inactive_job_is_noop(self):
         _seed_cmd("job_a")
         _enqueue("KILLJOB", "job_a")
         _tick()
-        assert _get_status("job_a") == "INACTIVE"   # unchanged
+        assert _get_status("job_a") == 8   # unchanged
 
     # -- HOLD_JOB / JOB_OFF_HOLD ------------------------------------------
 
@@ -450,14 +453,14 @@ class TestEventProcessor:
         _seed_cmd("job_a")
         _enqueue("HOLD_JOB", "job_a")
         _tick()
-        assert _get_status("job_a") == "ON_HOLD"
+        assert _get_status("job_a") == 11
 
     def test_off_hold_returns_to_inactive(self):
         _seed_cmd("job_a")
         _set_status("job_a", "ON_HOLD")
         _enqueue("JOB_OFF_HOLD", "job_a")
         _tick()
-        assert _get_status("job_a") == "INACTIVE"
+        assert _get_status("job_a") == 8
 
     def test_hold_then_off_hold_returns_startable(self):
         _seed_cmd("job_a")
@@ -473,29 +476,29 @@ class TestEventProcessor:
         _seed_cmd("job_a")
         _enqueue("JOB_ON_ICE", "job_a")
         _tick()
-        assert _get_status("job_a") == "ON_ICE"
+        assert _get_status("job_a") == 7
 
     def test_off_ice_returns_to_inactive(self):
         _seed_cmd("job_a")
         _set_status("job_a", "ON_ICE")
         _enqueue("JOB_OFF_ICE", "job_a")
         _tick()
-        assert _get_status("job_a") == "INACTIVE"
+        assert _get_status("job_a") == 8
 
     # -- CHANGE_STATUS -----------------------------------------------------
 
     def test_change_status_overrides_any_status(self):
         _seed_cmd("job_a")
         _set_status("job_a", "RUNNING")
-        _enqueue("CHANGE_STATUS", "job_a", new_status="INACTIVE")
+        _enqueue("CHANGE_STATUS", "job_a", new_status=8)
         _tick()
-        assert _get_status("job_a") == "INACTIVE"
+        assert _get_status("job_a") == 8
 
     def test_change_status_to_failure(self):
         _seed_cmd("job_a")
-        _enqueue("CHANGE_STATUS", "job_a", new_status="FAILURE")
+        _enqueue("CHANGE_STATUS", "job_a", new_status=5)
         _tick()
-        assert _get_status("job_a") == "FAILURE"
+        assert _get_status("job_a") == 5
 
     # -- SET_GLOBAL --------------------------------------------------------
 
@@ -515,8 +518,8 @@ class TestEventProcessor:
         _enqueue("STARTJOB", "job_b")
         n = _tick()
         assert n == 2
-        assert _get_status("job_a") == "SUCCESS"
-        assert _get_status("job_b") == "SUCCESS"
+        assert _get_status("job_a") == 4
+        assert _get_status("job_b") == 4
 
     def test_processed_events_not_replayed(self):
         _seed_cmd("job_a")
@@ -587,8 +590,8 @@ class TestEventProcessor:
         _tick()
 
         # With auto_complete, both box and child should be SUCCESS
-        assert _get_status("my_cmd") == "SUCCESS"
-        assert _get_status("my_box") == "SUCCESS"
+        assert _get_status("my_cmd") == 4
+        assert _get_status("my_box") == 4
 
     def test_box_failure_when_child_fails(self):
         """A BOX should FAIL if a child FAILs."""
@@ -608,7 +611,7 @@ class TestEventProcessor:
 
         # Use a dispatcher stub that makes the child FAIL instead of succeed
         def _fail_dispatch(session, row):
-            row.status = "RUNNING"
+            row.status=1
 
         proc = EventProcessor(dispatch_fn=_fail_dispatch, auto_complete=False)
         _enqueue("STARTJOB", "fail_box")
@@ -620,7 +623,7 @@ class TestEventProcessor:
         _set_status("fail_child", "FAILURE")
 
         # Verify the child is indeed FAILURE
-        assert _get_status("fail_child") == "FAILURE"
+        assert _get_status("fail_child") == 5
 
 
 # ===========================================================================

@@ -42,7 +42,7 @@ from __future__ import annotations
 import socket
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from loguru import logger
@@ -52,7 +52,26 @@ from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo, runs as run_repo, output as output_repo
 from autosys.db.schema import JobRow
 from autosys.agent.runner import LocalJobRunner
+from autosys.agent.runners import create_runner
+from autosys.models.enums import JobStatus
 from autosys.parser.variable_sub import substitute, UndefinedVariableError
+from autosys.models.event import Event
+
+
+def _now() -> datetime:
+    """Return current time in UTC (matches schema column defaults)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _exit_code_to_status(exit_code: int, max_exit_success: Optional[int]) -> str:
+    """
+    Map a subprocess exit code to 'SUCCESS' or 'FAILURE'.
+
+    If max_exit_success is set, any exit code <= max_exit_success is SUCCESS.
+    Otherwise only exit code 0 is SUCCESS (AutoSys default).
+    """
+    threshold = max_exit_success if max_exit_success is not None else 0
+    return "SUCCESS" if exit_code <= threshold else "FAILURE"
 
 
 # ---------------------------------------------------------------------------
@@ -109,16 +128,31 @@ class AgentDispatch:
           - ``row.status``     ← "RUNNING"  (on successful dispatch)
           - ``row.last_start`` ← now
         """
-        now     = datetime.now()
+        now     = _now()
         machine = row.machine or "localhost"
 
         if _is_local_machine(machine):
             self._dispatch_local(session, row, now)
         elif not self.local_only:
-            self._dispatch_remote(session, row, machine)
+            # If the registered machine's host resolves to localhost, run locally.
+            from autosys.db.repository import machines as machine_repo
+            machine_row = machine_repo.get(session, machine)
+            if machine_row and _is_local_machine(machine_row.host):
+                logger.info(
+                    "[agent] %r → %r registered as localhost-equivalent, dispatching locally",
+                    row.job_name, machine,
+                )
+                self._dispatch_local(session, row, now)
+            else:
+                self._dispatch_remote(session, row, machine)
         else:
-            logger.warning(f"[agent] {row.job_name!r} targets {machine!r} (not local) — use AgentDispatch(local_only=False) for remote dispatch.")
-            # Leave in STARTING; operator can CHANGE_STATUS manually
+            logger.warning(
+                "[agent] %r targets %r (not local) — "
+                "use AgentDispatch(local_only=False) for remote dispatch.",
+                row.job_name, machine,
+            )
+            row.status   = JobStatus.FAILURE.value
+            row.last_end = now
 
     def _dispatch_local(self, session: Session, row: JobRow, now: datetime) -> None:
         """Fork the job locally (same machine as the scheduler)."""
@@ -137,22 +171,26 @@ class AgentDispatch:
             run_date = now.strftime("%Y-%m-%d"),
         )
 
-        row.status     = "RUNNING"
+        row.status     = JobStatus.RUNNING.value
         row.last_start = now
 
-        runner = LocalJobRunner(
-            command         = command,
-            job_name        = row.job_name,
+        runner = create_runner(
+            row             = row,
             run_id          = run_id,
+            command         = command,
             max_run_secs    = (row.max_run_alarm * 60) if row.max_run_alarm else None,
             output_callback = self._on_output_line,
         )
         with self._lock:
             self._active[row.job_name] = (runner, run_id)
 
+        # Capture retry config before session closes
+        n_retrys        = row.n_retrys or 0
+        max_exit_success = row.max_exit_success
+
         t = threading.Thread(
             target = self._run_job,
-            args   = (row.job_name, run_id, runner),
+            args   = (row.job_name, run_id, runner, n_retrys, max_exit_success),
             daemon = True,
             name   = f"agent-{row.job_name}",
         )
@@ -166,7 +204,13 @@ class AgentDispatch:
 
         machine_row = machine_repo.get(session, machine)
         if machine_row is None:
-            logger.warning(f"[agent] remote dispatch: machine {machine!r} not registered — run 'autosys machine register {machine} --host <host>' first.")
+            logger.warning(
+                "[agent] remote dispatch: machine %r not registered — "
+                "job %r → FAILURE. Run 'autosys machine register %s' first.",
+                machine, row.job_name, machine,
+            )
+            row.status   = JobStatus.FAILURE.value
+            row.last_end = _now()
             return
 
         rd = RemoteDispatch()
@@ -211,53 +255,126 @@ class AgentDispatch:
 
     def _run_job(
         self,
-        job_name: str,
-        run_id:   str,
-        runner:   LocalJobRunner,
+        job_name:         str,
+        run_id:           str,
+        runner:           LocalJobRunner,
+        n_retrys:         int = 0,
+        max_exit_success: Optional[int] = None,
     ) -> None:
         """
         Execute the job and update the DB when it finishes.
+
+        Implements the n_retrys retry loop: if a job fails and retries remain,
+        it transitions FAILURE → RESTART → re-runs the command.
 
         Runs entirely in a background thread so the EPS tick is not blocked.
         Opens its own DB session (separate from the dispatch session which has
         already been committed).
         """
-        was_killed = False
+        was_killed  = False
+        retry_count = 0
 
-        try:
-            exit_code = runner.run()
-        except Exception as exc:
-            logger.error(f"[agent] unhandled error in {job_name!r}: {exc}")
-            exit_code  = -1
-        finally:
+        while True:
+            try:
+                exit_code = runner.run()
+            except Exception as exc:
+                logger.error("[agent] unhandled error in %r: %s", job_name, exc)
+                exit_code = -1
+
             with self._lock:
                 self._active.pop(job_name, None)
 
-        # Determine terminal status
-        now    = datetime.now()
-        status = "SUCCESS" if exit_code == 0 else "FAILURE"
+            now    = _now()
+            status = _exit_code_to_status(exit_code, max_exit_success)
 
-        with sync_session() as session:
-            # Check if the EPS already set TERMINATED (via KILLJOB event)
-            job_row = job_repo.get_row(session, job_name)
-            if job_row:
-                if job_row.status == "TERMINATED":
-                    # Respect the KILLJOB transition — just update history
-                    status    = "TERMINATED"
+            # Check for KILLJOB (EPS may have set TERMINATED while we ran)
+            with sync_session() as session:
+                job_row = job_repo.get_row(session, job_name)
+                if job_row and job_row.status == JobStatus.TERMINATED.value:
+                    status     = "TERMINATED"
                     was_killed = True
-                else:
-                    job_row.status   = status
-                    job_row.last_end = now
 
-            run_repo.finish(
-                session,
-                run_id    = run_id,
-                status    = status,
-                exit_code = exit_code,
-                pid       = runner.pid,
-            )
+            if status == "FAILURE" and not was_killed and retry_count < n_retrys:
+                retry_count += 1
+                logger.info(
+                    "[agent] %r FAILURE — retry %d/%d",
+                    job_name, retry_count, n_retrys,
+                )
+                with sync_session() as session:
+                    job_row = job_repo.get_row(session, job_name)
+                    if job_row:
+                        job_row.status = JobStatus.RESTART.value
+                    run_repo.finish(
+                        session,
+                        run_id    = run_id,
+                        status    = "FAILURE",
+                        exit_code = exit_code,
+                        pid       = runner.pid,
+                    )
 
-        logger.info(f"[agent] {job_name!r} completed  status={status}  exit_code={exit_code}{'  (killed)' if was_killed else ''}")
+                # Re-create a fresh runner for the next attempt
+                import uuid
+                run_id = str(uuid.uuid4())
+                with sync_session() as session:
+                    job_row = job_repo.get_row(session, job_name)
+                    if job_row:
+                        runner = create_runner(
+                            row             = job_row,
+                            run_id          = run_id,
+                            command         = runner.command,
+                            max_run_secs    = runner.max_run_secs,
+                            output_callback = self._on_output_line,
+                        )
+                    else:
+                        runner = LocalJobRunner(
+                            command         = runner.command,
+                            job_name        = job_name,
+                            run_id          = run_id,
+                            max_run_secs    = runner.max_run_secs,
+                            output_callback = self._on_output_line,
+                        )
+                with self._lock:
+                    self._active[job_name] = (runner, run_id)
+
+                with sync_session() as session:
+                    job_row = job_repo.get_row(session, job_name)
+                    if job_row:
+                        job_row.status     = JobStatus.RUNNING.value
+                        job_row.last_start = _now()
+                    run_repo.start(
+                        session,
+                        run_id   = run_id,
+                        job_name = job_name,
+                        command  = runner.command,
+                        machine  = "localhost",
+                        run_date = now.strftime("%Y-%m-%d"),
+                    )
+                continue  # back to top of while loop
+
+            # Terminal: no more retries (or SUCCESS/TERMINATED)
+            with sync_session() as session:
+                job_row = job_repo.get_row(session, job_name)
+                if job_row:
+                    if job_row.status != JobStatus.TERMINATED.value:
+                        job_row.status   = JobStatus[status].value
+                        job_row.last_end = now
+                    else:
+                        status = "TERMINATED"
+
+                run_repo.finish(
+                    session,
+                    run_id    = run_id,
+                    status    = status,
+                    exit_code = exit_code,
+                    pid       = runner.pid,
+                )
+            break
+
+        logger.info(
+            "[agent] %r completed  status=%s  exit_code=%d  retries=%d%s",
+            job_name, status, exit_code, retry_count,
+            "  (killed)" if was_killed else "",
+        )
 
     # ------------------------------------------------------------------
     # Output callback — called per stdout line from reader thread

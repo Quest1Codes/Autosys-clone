@@ -58,33 +58,53 @@ def scheduler_group() -> None:
 @scheduler_group.command("start")
 @click.option("--poll-interval", "-p", default=1.0, show_default=True,
               help="Seconds between event queue polls.")
-@click.option("--auto-complete/--no-auto-complete", default=True,
-              help="Phase 4 stub: auto-complete jobs immediately after RUNNING.")
-def scheduler_start(poll_interval: float, auto_complete: bool) -> None:
+@click.option("--dry-run", is_flag=True, default=False,
+              help=(
+                  "Use the stub dispatcher: jobs transition STARTING → RUNNING → SUCCESS "
+                  "instantly without executing any scripts or contacting remote agents. "
+                  "Ideal for local development and migration complexity analysis."
+              ))
+@click.option("--auto-complete/--no-auto-complete", default=False,
+              help="(Non-dry-run) Auto-complete jobs immediately after RUNNING.")
+def scheduler_start(poll_interval: float, dry_run: bool, auto_complete: bool) -> None:
     """
     Run the Event Processor in the foreground.
 
     Polls the event queue every POLL_INTERVAL seconds and drives the job
     state machine.  Press Ctrl+C to stop.
 
-    In Phase 4 the dispatcher is a stub that transitions RUNNING → SUCCESS
-    immediately (no real subprocess is launched).  Phase 5 adds real System
-    Agent dispatch.
+    Use --dry-run to exercise the full state machine (BOX cascading,
+    condition evaluation, alarms) without needing any System Agents running.
+    This is the recommended mode for migration analysis.
 
     Example
     -------
     \\b
-        $ autosys scheduler start
-        Event Processor started (poll interval: 1.0s)
+        $ autosys scheduler start --dry-run
+        Event Processor starting [DRY-RUN] (poll interval: 1.0s)
         ^C  Stopped.
     """
-    processor = EventProcessor(
-        poll_interval = poll_interval,
-        auto_complete = auto_complete,
-    )
+    from autosys.scheduler.event_processor import _stub_dispatch
+    if dry_run:
+        processor = EventProcessor(
+            poll_interval = poll_interval,
+            dispatch_fn   = _stub_dispatch,
+            auto_complete = True,
+        )
+        mode_label = "[bold yellow][DRY-RUN][/bold yellow] "
+    else:
+        from autosys.agent.dispatch import AgentDispatch
+        agent = AgentDispatch(local_only=False)
+        processor = EventProcessor(
+            poll_interval = poll_interval,
+            auto_complete = auto_complete,
+            dispatch_fn   = agent.dispatch,
+            kill_fn       = agent.kill,
+        )
+        mode_label = ""
 
     _console.print(
-        f"\n[bold green]Event Processor starting[/bold green] "
+        f"\n[bold green]Event Processor starting[/bold green] {mode_label}"
         f"(poll interval: {poll_interval:.1f}s)  "
         f"[dim]Ctrl+C to stop[/dim]\n"
     )
@@ -139,9 +159,10 @@ def scheduler_run_once(auto_complete: bool, quiet: bool) -> None:
         after = {r.job_name: r.status for r in job_repo.list_all(session)}
 
     if not quiet:
+        from autosys.scheduler.state_machine import _norm_status
         # Show jobs whose status changed
         changed = [
-            (name, before.get(name, "N/A"), after.get(name, "N/A"))
+            (name, _norm_status(before.get(name)), _norm_status(after.get(name)))
             for name in sorted(set(before) | set(after))
             if before.get(name) != after.get(name)
         ]
@@ -184,9 +205,10 @@ def scheduler_status() -> None:
         pending = len(event_repo.dequeue_pending(session))
         rows = job_repo.list_all(session)
 
+    from autosys.scheduler.state_machine import _norm_status
     status_counts: dict[str, int] = {}
     for row in rows:
-        s = row.status or "INACTIVE"
+        s = _norm_status(row.status)
         status_counts[s] = status_counts.get(s, 0) + 1
 
     _console.print()
@@ -235,7 +257,18 @@ def scheduler_status() -> None:
               help="Host to bind the REST API server to.")
 @click.option("--poll-interval", default=1.0, show_default=True,
               help="EPS tick interval in seconds.")
-def scheduler_serve(port: int, host: str, poll_interval: float) -> None:
+@click.option("--dry-run", is_flag=True, default=False,
+              help=(
+                  "Use the stub dispatcher: jobs transition STARTING → RUNNING → SUCCESS "
+                  "instantly without executing any scripts or contacting remote agents. "
+                  "Ideal for local development and migration complexity analysis."
+              ))
+@click.option("--ha", is_flag=True, default=False,
+              help="Enable HA mode with distributed lock for tie-breaker scheduling.")
+@click.option("--tie-breaker", is_flag=True, default=False,
+              help="Run as standby tie-breaker scheduler. Only active if primary fails.")
+def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool,
+                    ha: bool, tie_breaker: bool) -> None:
     """
     Run the Event Processor and REST API server together.
 
@@ -243,27 +276,81 @@ def scheduler_serve(port: int, host: str, poll_interval: float) -> None:
     asyncio task inside the same event loop as the API server.  All REST
     endpoints and the WebSocket live feed are available immediately.
 
+    Pass --dry-run to exercise the full state machine without needing any
+    System Agents.  Jobs complete instantly via the stub dispatcher, making
+    it easy to walk through every BOX in the WCC dashboard during migration
+    analysis.
+
     Example
     -------
     \\b
-        $ autosys scheduler serve --port 9000
-        AutoSys App Server starting on http://0.0.0.0:9000
-        Docs: http://localhost:9000/docs
+        $ autosys scheduler serve --port 9000 --dry-run
+        AutoSys App Server starting on http://0.0.0.0:9000  [DRY-RUN]
         ^C  Stopped.
     """
     import uvicorn
     from autosys.app_server.main import create_app
 
+    dry_label = "  [bold yellow][DRY-RUN — stub dispatcher][/bold yellow]" if dry_run else ""
+    ha_label = "  [bold cyan][HA MODE — tie-breaker][/bold cyan]" if ha and tie_breaker else ("  [bold green][HA MODE — primary][/bold green]" if ha else "")
     _console.print(
         f"\n[bold green]AutoSys App Server[/bold green] starting on "
-        f"[cyan]http://{host}:{port}[/cyan]\n"
+        f"[cyan]http://{host}:{port}[/cyan]{dry_label}{ha_label}\n"
         f"  API docs:  [bold]http://localhost:{port}/docs[/bold]\n"
         f"  Live feed: [bold]ws://localhost:{port}/api/v1/ws/events[/bold]\n"
         f"  EPS poll:  {poll_interval:.1f}s\n"
         f"[dim]Ctrl+C to stop[/dim]\n"
     )
 
-    app = create_app(start_eps=True, eps_poll_interval=poll_interval)
+    app = create_app(
+        start_eps=True,
+        eps_poll_interval=poll_interval,
+        dry_run=dry_run,
+        ha=ha,
+        tie_breaker=tie_breaker,
+    )
+
+    try:
+        uvicorn.run(app, host=host, port=port, log_level="warning")
+    except KeyboardInterrupt:
+        _console.print("\n[yellow]Stopped.[/yellow]\n")
+
+
+# ---------------------------------------------------------------------------
+# scheduler wcc
+# ---------------------------------------------------------------------------
+
+@scheduler_group.command("wcc")
+@click.option("--host", default="0.0.0.0", show_default=True, help="Bind host.")
+@click.option("--port", default=8080, show_default=True, help="WCC HTTP port.")
+def scheduler_wcc(host: str, port: int) -> None:
+    """
+    Start the WCC (Workload Control Centre) web dashboard on port 8080.
+
+    The WCC reads directly from the same SQLite database as the scheduler.
+    It provides a live job grid, D3 dependency graphs, alarm console, and
+    run history viewer.
+
+    Example
+    -------
+    \\b
+        $ autosys scheduler wcc --port 8080
+        AutoSys WCC Dashboard starting on http://0.0.0.0:8080
+        Open: http://localhost:8080
+        ^C  Stopped.
+    """
+    import uvicorn
+    from autosys.wcc.app import create_wcc_app
+
+    _console.print(
+        f"\n[bold cyan]AutoSys WCC Dashboard[/bold cyan] starting on "
+        f"[cyan]http://{host}:{port}[/cyan]\n"
+        f"  Job grid:   [bold]http://localhost:{port}/[/bold]\n"
+        f"  Alarms:     [bold]http://localhost:{port}/alarms[/bold]\n"
+        f"[dim]Ctrl+C to stop[/dim]\n"
+    )
+
+    app = create_wcc_app()
 
     try:
         uvicorn.run(app, host=host, port=port, log_level="warning")

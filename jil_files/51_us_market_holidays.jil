@@ -1,0 +1,35 @@
+/* ============================================================
+   FILE: 51_us_market_holidays.jil
+   PURPOSE: Calendar definitions for scheduling exclusions.
+   NOTE: AutoSys calendars are normally managed via the GUI or
+         'autocal' CLI. This file uses a simulator-specific
+         insert_calendar directive supported by this implementation.
+   ============================================================ */
+
+/* NYSE / NASDAQ market holidays 2025-2026.
+   Jobs with  exclude_calendar: us_market_holidays
+   will SKIP execution on these dates. */
+insert_calendar: us_market_holidays
+description: "NYSE / NASDAQ official market close days 2025-2026"
+dates: "2025-01-01,2025-01-20,2025-02-17,2025-04-18,2025-05-26,2025-06-19,2025-07-04,2025-09-01,2025-11-27,2025-12-25,2026-01-01,2026-01-19,2026-02-16,2026-04-03,2026-05-25,2026-06-19,2026-07-03,2026-09-07,2026-11-26,2026-12-25"
+
+/* UK bank holidays 2025-2026 (for LN-timezone jobs) */
+insert_calendar: uk_bank_holidays
+description: "Bank of England / UK bank holidays 2025-2026"
+dates: "2025-01-01,2025-04-18,2025-04-21,2025-05-05,2025-05-26,2025-08-25,2025-12-25,2025-12-26,2026-01-01,2026-04-03,2026-04-06,2026-05-04,2026-05-25,2026-08-31,2026-12-25,2026-12-28"
+
+/* EU / TARGET2 settlement holidays (ECB calendar) */
+insert_calendar: eu_target2_holidays
+description: "TARGET2 non-settlement days (ECB) 2025-2026"
+dates: "2025-01-01,2025-04-18,2025-04-21,2025-05-01,2025-12-25,2025-12-26,2026-01-01,2026-04-03,2026-04-06,2026-05-01,2026-12-25,2026-12-26"
+
+/* End-of-quarter processing dates — jobs using run_calendar: quarter_end
+   will ONLY run on these dates. */
+insert_calendar: quarter_end
+description: "Last business day of each fiscal quarter 2025-2026"
+dates: "2025-03-31,2025-06-30,2025-09-30,2025-12-31,2026-03-31,2026-06-30,2026-09-30,2026-12-31"
+
+/* Month-end processing dates */
+insert_calendar: month_end
+description: "Last business day of each month 2026"
+dates: "2026-01-30,2026-02-27,2026-03-31,2026-04-30,2026-05-29,2026-06-30,2026-07-31,2026-08-31,2026-09-30,2026-10-30,2026-11-30,2026-12-31"

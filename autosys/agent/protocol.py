@@ -120,11 +120,12 @@ class DispatchRequest(BaseModel):
         If set, the agent kills the process after this many seconds
         (from ``max_run_alarm × 60`` in the JIL definition).
     """
-    type:         str   = "dispatch"
-    run_id:       str
-    job_name:     str
-    command:      str
-    max_run_secs: Optional[float] = None
+    type:            str   = "dispatch"
+    run_id:          str
+    job_name:        str
+    command:         str
+    max_run_secs:    Optional[float] = None
+    max_exit_success: Optional[int]  = None   # None → only exit 0 = SUCCESS
 
 
 class DispatchResponse(BaseModel):

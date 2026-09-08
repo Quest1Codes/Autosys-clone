@@ -39,6 +39,10 @@ from autosys.cli.scheduler_cmd  import scheduler_group
 from autosys.cli.agent_cmd      import agent_group, jobs_group
 from autosys.cli.machine_cmd    import machine_group
 from autosys.cli.box_cmd        import box_group
+from autosys.cli.chase_cmd      import chase
+from autosys.cli.autoping_cmd   import autoping
+from autosys.cli.autocal_cmd    import autocal_group
+from autosys.cli.analyze_cmd    import analyze, migration_report
 
 _console = Console()
 _err     = Console(stderr=True)
@@ -101,3 +105,8 @@ autosys.add_command(agent_group)
 autosys.add_command(jobs_group)
 autosys.add_command(machine_group)
 autosys.add_command(box_group)
+autosys.add_command(chase)
+autosys.add_command(autoping)
+autosys.add_command(autocal_group)
+autosys.add_command(analyze)
+autosys.add_command(migration_report)

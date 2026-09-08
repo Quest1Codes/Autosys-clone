@@ -52,6 +52,7 @@ _ATTR_ORDER: list[str] = [
     "start_times", "start_mins", "days_of_week",
     "run_calendar", "exclude_calendar",
     "date_conditions", "term_run_time",
+    "priority", "timezone",
     # Dependencies
     "condition",
     # Reliability
@@ -59,6 +60,11 @@ _ATTR_ORDER: list[str] = [
     "alarm_if_fail", "alarm_if_terminated",
     # Resources
     "job_load", "max_load",
+    # Extended attributes (Phase 4)
+    "auto_delete", "application", "sub_application",
+    "command_timeout", "continuous",
+    "cpu_usage", "disk_space",
+    "auth_string", "connection_retry", "connection_timeout",
     # Notifications
     "notification_msg", "notification_emailaddress",
     "notification_type", "send_report",
@@ -79,6 +85,8 @@ _BOOL_DEFAULTS: dict[str, bool] = {
     "box_terminator":       False,
     "date_conditions":      False,
     "send_report":          False,
+    "auto_delete":          False,
+    "continuous":           False,
 }
 
 _INT_DEFAULTS: dict[str, int] = {

@@ -1,0 +1,90 @@
+/* ============================================================
+   FILE: 47_volatility_surface.jil
+   DOMAIN: Volatility Surface & Options Analytics
+   STATUS: RUNNING
+   UPSTREAM: 01_market_data_ingest (mkt_data_ingest_box)
+   DOWNSTREAM: 06_risk_engine (options VaR inputs), 48_model_validation
+   ============================================================ */
+
+insert_job: vol_surface_box   job_type: BOX
+owner: svc_quant
+condition: success(mkt_data_ingest_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Build and publish implied volatility surfaces for equity, FX and rate options"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "17:00,21:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: quant@bank.com
+
+insert_job: load_options_market_data   job_type: CMD
+box_name: vol_surface_box
+owner: svc_quant
+command: /scripts/vol/load_options_data.py --date %%DATE%% --asset_classes EQUITY,FX,RATES
+machine: quant-compute-01
+profile: /etc/autosys/profiles/svc_quant.sh
+std_out_file: /logs/vol/%%YEAR%%/%%MM%%/options_data_%%DATE%%.out
+std_err_file: /logs/vol/%%YEAR%%/%%MM%%/options_data_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 15
+
+insert_job: build_equity_vol_surface   job_type: CMD
+box_name: vol_surface_box
+owner: svc_quant
+command: /scripts/vol/build_vol_surface.py --date %%DATE%% --asset_class EQUITY --model SVI
+machine: quant-compute-01
+profile: /etc/autosys/profiles/svc_quant.sh
+condition: success(load_options_market_data)
+std_out_file: /logs/vol/%%YEAR%%/%%MM%%/equity_vol_%%DATE%%.out
+std_err_file: /logs/vol/%%YEAR%%/%%MM%%/equity_vol_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 25
+min_run_alarm: 2
+term_run_time: 30
+job_load: 30
+
+insert_job: build_fx_vol_surface   job_type: CMD
+box_name: vol_surface_box
+owner: svc_quant
+command: /scripts/vol/build_vol_surface.py --date %%DATE%% --asset_class FX --model VANNA_VOLGA
+machine: quant-compute-02
+profile: /etc/autosys/profiles/svc_quant.sh
+condition: success(load_options_market_data)
+std_out_file: /logs/vol/%%YEAR%%/%%MM%%/fx_vol_%%DATE%%.out
+std_err_file: /logs/vol/%%YEAR%%/%%MM%%/fx_vol_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 25
+
+insert_job: publish_vol_surfaces   job_type: CMD
+box_name: vol_surface_box
+owner: svc_quant
+command: /scripts/vol/publish_surfaces.sh --date %%DATE%% --consumers RISK_ENGINE,PRICING_LIB
+machine: quant-compute-01
+profile: /etc/autosys/profiles/svc_quant.sh
+condition: success(build_equity_vol_surface) & success(build_fx_vol_surface)
+std_out_file: /logs/vol/%%YEAR%%/%%MM%%/publish_%%DATE%%.out
+std_err_file: /logs/vol/%%YEAR%%/%%MM%%/publish_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

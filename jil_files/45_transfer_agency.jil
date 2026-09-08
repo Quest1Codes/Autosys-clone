@@ -1,0 +1,91 @@
+/* ============================================================
+   FILE: 45_transfer_agency.jil
+   DOMAIN: Transfer Agency — Fund Subscriptions & Redemptions
+   STATUS: RUNNING
+   UPSTREAM: 44_fund_accounting (fund_accounting_box)
+             13_portfolio_nav (portfolio_nav_box)
+             42_tax_reporting (tax_reporting_box)
+   DOWNSTREAM: 09_payments_treasury (redemption cash outflows)
+   ============================================================ */
+
+insert_job: transfer_agency_box   job_type: BOX
+owner: svc_transferagency
+condition: success(fund_accounting_box) & success(portfolio_nav_box) & success(tax_reporting_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Process investor subscriptions, redemptions, switches and unit allotments"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "13:00,20:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: ta-ops@bank.com
+
+insert_job: process_subscription_orders   job_type: CMD
+box_name: transfer_agency_box
+owner: svc_transferagency
+command: /scripts/ta/process_subscriptions.py --date %%DATE%% --cutoff 12:00
+machine: ta-app-01
+profile: /etc/autosys/profiles/svc_transferagency.sh
+std_out_file: /logs/ta/%%YEAR%%/%%MM%%/subscriptions_%%DATE%%.out
+std_err_file: /logs/ta/%%YEAR%%/%%MM%%/subscriptions_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+insert_job: process_redemption_orders   job_type: CMD
+box_name: transfer_agency_box
+owner: svc_transferagency
+command: /scripts/ta/process_redemptions.py --date %%DATE%% --cutoff 12:00
+machine: ta-app-01
+profile: /etc/autosys/profiles/svc_transferagency.sh
+std_out_file: /logs/ta/%%YEAR%%/%%MM%%/redemptions_%%DATE%%.out
+std_err_file: /logs/ta/%%YEAR%%/%%MM%%/redemptions_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+insert_job: allot_units_at_confirmed_nav   job_type: CMD
+box_name: transfer_agency_box
+owner: svc_transferagency
+command: /scripts/ta/allot_units.py --date %%DATE%% --nav_source CONFIRMED
+machine: ta-app-01
+profile: /etc/autosys/profiles/svc_transferagency.sh
+condition: success(process_subscription_orders) & success(process_redemption_orders)
+std_out_file: /logs/ta/%%YEAR%%/%%MM%%/allotment_%%DATE%%.out
+std_err_file: /logs/ta/%%YEAR%%/%%MM%%/allotment_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: send_contract_notes_to_investors   job_type: CMD
+box_name: transfer_agency_box
+owner: svc_transferagency
+command: /scripts/ta/send_contract_notes.sh --date %%DATE%% --channel SECURE_EMAIL,PORTAL
+machine: ta-app-01
+profile: /etc/autosys/profiles/svc_transferagency.sh
+condition: success(allot_units_at_confirmed_nav)
+std_out_file: /logs/ta/%%YEAR%%/%%MM%%/contract_notes_%%DATE%%.out
+std_err_file: /logs/ta/%%YEAR%%/%%MM%%/contract_notes_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5

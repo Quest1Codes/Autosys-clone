@@ -1,0 +1,96 @@
+/* ============================================================
+   FILE: 26_cash_management.jil
+   DOMAIN: Cash Management & Funding
+   STATUS: RUNNING
+   UPSTREAM: 09_payments_treasury (payments_box)
+             25_repo_processing (repo_processing_box)
+             21_margin_calls (margin_calls_box)
+   DOWNSTREAM: 27_nostro_reconciliation
+   ============================================================ */
+
+insert_job: cash_management_box   job_type: BOX
+owner: svc_treasury
+condition: success(payments_box) & success(repo_processing_box) & success(margin_calls_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "End-of-day cash sweeps, overdraft management and interbank funding"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "17:00,23:30"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: treasury-ops@bank.com
+
+/* Step 1: Compute projected end-of-day cash balances per account and currency */
+insert_job: compute_eod_cash_balances   job_type: CMD
+box_name: cash_management_box
+owner: svc_treasury
+command: /scripts/cash/eod_balances.py --date %%DATE%% --currencies USD,EUR,GBP,JPY
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+std_out_file: /logs/cash/%%YEAR%%/%%MM%%/balances_%%DATE%%.out
+std_err_file: /logs/cash/%%YEAR%%/%%MM%%/balances_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Execute zero-balance account sweeps to master concentration account */
+insert_job: execute_cash_sweeps   job_type: CMD
+box_name: cash_management_box
+owner: svc_treasury
+command: /scripts/cash/execute_sweeps.sh --date %%DATE%% --sweep_type ZBA
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(compute_eod_cash_balances)
+std_out_file: /logs/cash/%%YEAR%%/%%MM%%/sweeps_%%DATE%%.out
+std_err_file: /logs/cash/%%YEAR%%/%%MM%%/sweeps_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Place overnight excess cash in money market or Fed Funds */
+insert_job: invest_overnight_excess_cash   job_type: CMD
+box_name: cash_management_box
+owner: svc_treasury
+command: /scripts/cash/overnight_invest.py --date %%DATE%% --vehicle MMF,FED_FUNDS
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(execute_cash_sweeps)
+std_out_file: /logs/cash/%%YEAR%%/%%MM%%/overnight_%%DATE%%.out
+std_err_file: /logs/cash/%%YEAR%%/%%MM%%/overnight_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Fund any projected overdraft accounts via interbank or credit facility */
+insert_job: fund_overdraft_accounts   job_type: CMD
+box_name: cash_management_box
+owner: svc_treasury
+command: /scripts/cash/fund_overdrafts.py --date %%DATE%% --facility CREDIT_LINE --notify treasurer@bank.com
+machine: treasury-app-01
+profile: /etc/autosys/profiles/svc_treasury.sh
+condition: success(compute_eod_cash_balances)
+std_out_file: /logs/cash/%%YEAR%%/%%MM%%/overdrafts_%%DATE%%.out
+std_err_file: /logs/cash/%%YEAR%%/%%MM%%/overdrafts_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5

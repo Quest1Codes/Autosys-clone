@@ -50,13 +50,18 @@ from loguru import logger
 from autosys.parser.condition_parser import (
     parse_condition,
     evaluate,
+    list_job_dependencies,
     ConditionSyntaxError as ConditionParseError,
 )
+from autosys.scheduler.state_machine import _norm_status
 
 
 def is_satisfied(
     condition_str: Optional[str],
     job_statuses: dict[str, str],
+    globals_dict: Optional[dict[str, str]] = None,
+    date_conditions: bool = False,
+    today_str: Optional[str] = None,
 ) -> bool:
     """
     Return True if *condition_str* is satisfied given the current *job_statuses*.
@@ -70,6 +75,15 @@ def is_satisfied(
     job_statuses:
         A mapping of ``{job_name: status_string}`` for every job currently
         in the system.  The evaluator looks up job names from this dict.
+    globals_dict:
+        Optional ``{name: value}`` dict of AutoSys global variables.
+        Required for ``value(GLOBAL) = "x"`` conditions to work correctly.
+    date_conditions:
+        If True, only consider job statuses for jobs that ran *today*.
+        Any job whose last_run_date != today is treated as INACTIVE for
+        condition evaluation purposes.
+    today_str:
+        Today's date as "YYYY-MM-DD".  Used when date_conditions=True.
 
     Returns
     -------
@@ -87,10 +101,22 @@ def is_satisfied(
     if not condition_str:
         return True
 
+    # If date_conditions is active, mask out statuses for jobs that haven't
+    # run today — treat them as INACTIVE.
+    effective_statuses = job_statuses
+    if date_conditions and today_str:
+        effective_statuses = {
+            name: (status if _ran_today(name, status, today_str) else "INACTIVE")
+            for name, status in job_statuses.items()
+        }
+
     try:
         node = parse_condition(condition_str)
-        result = evaluate(node, job_statuses)
-        logger.debug(f"Condition {condition_str!r} → {result}  (given {len(job_statuses)} job statuses)")
+        result = evaluate(node, effective_statuses, global_vars=globals_dict)
+        logger.debug(
+            "Condition %r → %s  (given %d job statuses)",
+            condition_str, result, len(job_statuses),
+        )
         return result
     except ConditionParseError as exc:
         # Malformed condition → treat as unsatisfied and warn.
@@ -100,6 +126,33 @@ def is_satisfied(
     except Exception as exc:
         logger.error(f"Unexpected error evaluating condition {condition_str!r}: {exc}")
         return False
+
+
+def referenced_job_names(condition_str: Optional[str]) -> set[str]:
+    """
+    Return the set of job names referenced by *condition_str*.
+
+    Used by BoxManager to decide whether an INACTIVE child can still
+    possibly activate: if every job its condition references is already
+    terminal (or doesn't exist at all) and the condition is still False,
+    nothing left in the system can ever make it True — e.g. an alert job
+    with ``condition: failure(x)`` once ``x`` has already reached SUCCESS.
+    """
+    if not condition_str:
+        return set()
+    try:
+        return set(list_job_dependencies(parse_condition(condition_str)))
+    except ConditionParseError:
+        return set()
+
+
+def _ran_today(job_name: str, status: str, today_str: str) -> bool:
+    """
+    Placeholder: in a full implementation this would check job_runs.run_date.
+    For now we conservatively keep the current status (don't mask it).
+    Only INACTIVE jobs are definitively 'not run today'.
+    """
+    return status != "INACTIVE"
 
 
 def build_status_snapshot(session) -> dict[str, str]:
@@ -124,4 +177,4 @@ def build_status_snapshot(session) -> dict[str, str]:
     """
     from autosys.db.repository import jobs as job_repo
     rows = job_repo.list_all(session)
-    return {row.job_name: (row.status or "INACTIVE") for row in rows}
+    return {row.job_name: _norm_status(row.status) for row in rows}

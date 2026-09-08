@@ -28,7 +28,11 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
+from pathlib import Path
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -37,7 +41,7 @@ from autosys.app_server.deps        import get_session, get_current_user, Curren
 from autosys.app_server.schemas     import (
     TokenRequest, TokenResponse, HealthResponse,
 )
-from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router
+from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment, metrics as metrics_router
 from autosys.db.connection          import sync_session
 
 
@@ -60,6 +64,9 @@ def get_broadcaster() -> EventBroadcaster:
 def create_app(
     start_eps: bool = False,
     eps_poll_interval: float = 1.0,
+    dry_run: bool = False,
+    ha: bool = False,
+    tie_breaker: bool = False,
 ) -> FastAPI:
     """
     Create and return the FastAPI application.
@@ -71,6 +78,17 @@ def create_app(
         the lifespan hook.  Used by ``autosys scheduler serve``.
     eps_poll_interval:
         EPS tick interval in seconds (only relevant when start_eps=True).
+    dry_run:
+        If True, use the stub dispatcher (no real subprocess / no remote
+        agent required).  Jobs transition STARTING → RUNNING → SUCCESS
+        instantly so the full state machine can be exercised without any
+        target machines.  Intended for local dev and migration analysis.
+    ha:
+        If True, enable HA mode with distributed lock for tie-breaker
+        scheduling.  The EPS acquires a DB-row lock before processing.
+    tie_breaker:
+        If True (with ha=True), run as standby tie-breaker scheduler.
+        Only processes events when the primary's heartbeat is stale.
     """
 
     @asynccontextmanager
@@ -80,12 +98,43 @@ def create_app(
         logger.info("AutoSys App Server starting")
 
         eps_task: Optional[asyncio.Task] = None
+        ha_lock = None
         if start_eps:
-            from autosys.scheduler.event_processor import EventProcessor
-            processor = EventProcessor(
-                poll_interval = eps_poll_interval,
-                on_status_change = _broadcaster.publish_sync,
-            )
+            from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
+            if dry_run:
+                from autosys.notifications.alarm_manager import AlarmManager
+                from autosys.scheduler.failure_injector import FailureInjector
+                processor = EventProcessor(
+                    poll_interval    = eps_poll_interval,
+                    on_status_change = _broadcaster.publish_sync,
+                    dispatch_fn      = _stub_dispatch,
+                    auto_complete    = True,
+                    alarm_manager    = AlarmManager(),
+                    failure_injector = FailureInjector(seed=42),
+                )
+                logger.info("Event Processor running in DRY-RUN mode (stub dispatcher + failure injection + alarms)")
+            else:
+                from autosys.agent.dispatch import AgentDispatch
+                agent = AgentDispatch(local_only=False)
+                processor = EventProcessor(
+                    poll_interval    = eps_poll_interval,
+                    on_status_change = _broadcaster.publish_sync,
+                    dispatch_fn      = agent.dispatch,
+                    kill_fn          = agent.kill,
+                    auto_complete    = False,
+                )
+            # HA mode: wrap processor with distributed lock
+            if ha:
+                from autosys.scheduler.ha import DistributedLock
+                ha_lock = DistributedLock(
+                    heartbeat_timeout=int(eps_poll_interval * 5),
+                )
+                processor.ha_lock = ha_lock
+                if tie_breaker:
+                    processor.is_standby = True
+                    logger.info("HA: running as standby tie-breaker")
+                else:
+                    logger.info("HA: running as primary")
             eps_task = asyncio.create_task(
                 processor.run_forever(),
                 name="eps-background",
@@ -126,6 +175,10 @@ def create_app(
     app.include_router(runs.router)
     app.include_router(machines.router)
     app.include_router(globals_router.router)
+    app.include_router(jil_router.router)
+    app.include_router(alarms_router.router)
+    app.include_router(assessment.router)
+    app.include_router(metrics_router.router)
 
     # --- Auth ---
     _register_auth_routes(app)
@@ -135,6 +188,9 @@ def create_app(
 
     # --- Health ---
     _register_health_routes(app)
+
+    # --- Static UI ---
+    _mount_static(app)
 
     return app
 
@@ -207,6 +263,7 @@ def _register_ws_routes(app: FastAPI) -> None:
 def _register_health_routes(app: FastAPI) -> None:
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
+    @app.get("/health/live", response_model=HealthResponse, tags=["health"])
     def health_live():
         """Liveness probe — returns 200 if the process is running."""
         return HealthResponse(status="ok", db="unknown")
@@ -214,7 +271,7 @@ def _register_health_routes(app: FastAPI) -> None:
     @app.get("/health/ready", response_model=HealthResponse, tags=["health"])
     def health_ready():
         """
-        Readiness probe — checks that the DB is reachable.
+        Readiness probe — checks that the DB is reachable and EPS is running.
         Returns 200 if ready, 503 if the DB connection fails.
         """
         try:
@@ -227,4 +284,46 @@ def _register_health_routes(app: FastAPI) -> None:
                 status_code = status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail      = f"Database unavailable: {exc}",
             )
-        return HealthResponse(status="ok", db=db_status)
+        # Check EPS status from app state
+        eps_status = "running" if getattr(app.state, "eps_running", False) else "stopped"
+        return HealthResponse(
+            status="ok",
+            db=db_status,
+            details={"eps": eps_status},
+        )
+
+    @app.get("/api/v1/ha/status", tags=["ha"])
+    def ha_status():
+        """HA status — returns scheduler lock and secondary DB info."""
+        from autosys.scheduler.ha import DistributedLock, SecondaryDB
+
+        lock = DistributedLock()
+        sec = SecondaryDB()
+        with sync_session() as session:
+            lock_status = lock.get_status(session)
+        return {
+            "scheduler_lock": lock_status,
+            "secondary_db": sec.get_status(),
+            "instance_id": lock.instance_id,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Static UI
+# ---------------------------------------------------------------------------
+
+_STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _mount_static(app: FastAPI) -> None:
+    """Serve the single-page JIL UI at GET /ui and its static assets."""
+
+    if not _STATIC_DIR.exists():
+        logger.warning("Static directory not found: {}", _STATIC_DIR)
+        return
+
+    @app.get("/ui", tags=["ui"], include_in_schema=False)
+    def serve_ui():
+        return FileResponse(str(_STATIC_DIR / "index.html"))
+
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

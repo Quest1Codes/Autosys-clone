@@ -1,0 +1,134 @@
+/* ============================================================
+   FILE: 13_portfolio_nav.jil
+   DOMAIN: Portfolio Management — NAV Calculation
+   STATUS: SUCCESS
+   UPSTREAM: 05_position_management (position_mgmt_box)
+             01_market_data_ingest (mkt_data_ingest_box)
+             46_benchmark_pricing (benchmark_pricing_box)
+   DOWNSTREAM: 30_client_reporting, 31_performance_attribution,
+               41_esg_reporting, 44_fund_accounting, 45_transfer_agency,
+               50_end_of_month_close
+   ============================================================ */
+
+insert_job: portfolio_nav_box   job_type: BOX
+owner: svc_portfolio
+condition: success(position_mgmt_box) & success(mkt_data_ingest_box) & success(benchmark_pricing_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Calculate fund NAVs across equity, fixed income, and money market funds"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "19:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: nav-ops@bank.com
+
+/* Step 1: Load fund holdings and subscription/redemption activity */
+insert_job: load_fund_holdings   job_type: CMD
+box_name: portfolio_nav_box
+owner: svc_portfolio
+command: /scripts/nav/load_holdings.py --date %%DATE%% --funds ALL
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+std_out_file: /logs/nav/%%YEAR%%/%%MM%%/load_holdings_%%DATE%%.out
+std_err_file: /logs/nav/%%YEAR%%/%%MM%%/load_holdings_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 10
+
+/* Step 2A: Compute NAV for equity funds */
+insert_job: compute_equity_fund_nav   job_type: CMD
+box_name: portfolio_nav_box
+owner: svc_portfolio
+command: /scripts/nav/compute_nav.py --date %%DATE%% --fund_type EQUITY --pricing CLOSE
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(load_fund_holdings)
+std_out_file: /logs/nav/%%YEAR%%/%%MM%%/equity_nav_%%DATE%%.out
+std_err_file: /logs/nav/%%YEAR%%/%%MM%%/equity_nav_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 25
+min_run_alarm: 3
+term_run_time: 30
+job_load: 20
+
+/* Step 2B: Compute NAV for fixed income and bond funds */
+insert_job: compute_bond_fund_nav   job_type: CMD
+box_name: portfolio_nav_box
+owner: svc_portfolio
+command: /scripts/nav/compute_nav.py --date %%DATE%% --fund_type FIXED_INCOME --pricing EVALUATED
+machine: nav-app-02
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(load_fund_holdings)
+std_out_file: /logs/nav/%%YEAR%%/%%MM%%/bond_nav_%%DATE%%.out
+std_err_file: /logs/nav/%%YEAR%%/%%MM%%/bond_nav_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 25
+min_run_alarm: 3
+term_run_time: 30
+job_load: 20
+
+/* Step 2C: Compute NAV for money market funds (CNAV/VNAV) */
+insert_job: compute_money_market_nav   job_type: CMD
+box_name: portfolio_nav_box
+owner: svc_portfolio
+command: /scripts/nav/compute_mmf_nav.py --date %%DATE%% --method CNAV
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(load_fund_holdings)
+std_out_file: /logs/nav/%%YEAR%%/%%MM%%/mmf_nav_%%DATE%%.out
+std_err_file: /logs/nav/%%YEAR%%/%%MM%%/mmf_nav_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 3
+term_run_time: 25
+job_load: 15
+
+/* Step 3: Aggregate total AUM across all fund types */
+insert_job: aggregate_total_aum   job_type: CMD
+box_name: portfolio_nav_box
+owner: svc_portfolio
+command: /scripts/nav/aggregate_aum.py --date %%DATE%% --base_currency USD
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(compute_equity_fund_nav) & success(compute_bond_fund_nav) & success(compute_money_market_nav)
+std_out_file: /logs/nav/%%YEAR%%/%%MM%%/aum_%%DATE%%.out
+std_err_file: /logs/nav/%%YEAR%%/%%MM%%/aum_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 4: Publish NAV to Bloomberg, Reuters, and investor portal */
+insert_job: publish_nav_to_distributors   job_type: CMD
+box_name: portfolio_nav_box
+owner: svc_portfolio
+command: /scripts/nav/publish_nav.sh --date %%DATE%% --channels BLOOMBERG,REUTERS,INVESTOR_PORTAL
+machine: nav-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(aggregate_total_aum)
+std_out_file: /logs/nav/%%YEAR%%/%%MM%%/publish_%%DATE%%.out
+std_err_file: /logs/nav/%%YEAR%%/%%MM%%/publish_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5

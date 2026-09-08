@@ -146,14 +146,14 @@ class TestJobRepository:
         # In a separate session, set status to RUNNING (simulates a running job)
         with sync_session() as session:
             row = job_repo.get_row(session, "extract_sales")
-            row.status = "RUNNING"
+            row.status=1
         # Re-import the job (simulates update_job JIL stanza)
         with sync_session() as session:
             job_repo.upsert(session, self._cmd_job())
         # Status should still be RUNNING (runtime state preserved)
         with sync_session() as session:
             row = job_repo.get_row(session, "extract_sales")
-        assert row.status == "RUNNING"
+        assert row.status == 1
 
     def test_days_of_week_list_round_trips(self):
         box = BoxJob(

@@ -1,0 +1,126 @@
+/* ============================================================
+   FILE: 15_dw_etl.jil
+   DOMAIN: Data Warehouse ETL
+   SCHEDULE: Nightly after all operational workflows complete
+   STATUS: RUNNING
+   UPSTREAM: 05_position_management, 10_pnl_calculation,
+             06_risk_engine, 11_gl_posting
+   DOWNSTREAM: 36_data_quality_checks, analytics dashboards
+   ============================================================ */
+
+insert_job: dw_etl_box   job_type: BOX
+owner: svc_dataeng
+condition: success(position_mgmt_box) & success(pnl_box) & success(risk_engine_box) & success(gl_posting_box)
+start_times: "22:00"
+days_of_week: mo,tu,we,th,fr
+alarm_if_fail: 1
+max_run_alarm: 180
+description: "Nightly extract-transform-load into enterprise data warehouse (Snowflake)"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "22:00,05:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: data-eng@bank.com
+
+/* Step 1A: Extract trade and position data from OLTP systems */
+insert_job: extract_trades_for_dw   job_type: CMD
+box_name: dw_etl_box
+owner: svc_dataeng
+command: /scripts/dw/extract_trades.py --date %%DATE%% --source TRADE_DB --format PARQUET
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+std_out_file: /logs/dw/%%YEAR%%/%%MM%%/extract_trades_%%DATE%%.out
+std_err_file: /logs/dw/%%YEAR%%/%%MM%%/extract_trades_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 1B: Extract risk data */
+insert_job: extract_risk_data_for_dw   job_type: CMD
+box_name: dw_etl_box
+owner: svc_dataeng
+command: /scripts/dw/extract_risk.py --date %%DATE%% --source RISK_DB --format PARQUET
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+std_out_file: /logs/dw/%%YEAR%%/%%MM%%/extract_risk_%%DATE%%.out
+std_err_file: /logs/dw/%%YEAR%%/%%MM%%/extract_risk_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 1C: Extract GL and accounting data */
+insert_job: extract_gl_data_for_dw   job_type: CMD
+box_name: dw_etl_box
+owner: svc_dataeng
+command: /scripts/dw/extract_gl.py --date %%DATE%% --source SAP_FICO --format PARQUET
+machine: etl-server-02
+profile: /etc/autosys/profiles/svc_dataeng.sh
+std_out_file: /logs/dw/%%YEAR%%/%%MM%%/extract_gl_%%DATE%%.out
+std_err_file: /logs/dw/%%YEAR%%/%%MM%%/extract_gl_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 25
+min_run_alarm: 2
+term_run_time: 30
+job_load: 15
+
+/* Step 2: Transform and apply data quality rules, then load to Snowflake */
+insert_job: transform_and_load_snowflake   job_type: CMD
+box_name: dw_etl_box
+owner: svc_dataeng
+command: /scripts/dw/transform_load.py --date %%DATE%% --target SNOWFLAKE --schema FINANCE_DW
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(extract_trades_for_dw) & success(extract_risk_data_for_dw) & success(extract_gl_data_for_dw)
+std_out_file: /logs/dw/%%YEAR%%/%%MM%%/transform_load_%%DATE%%.out
+std_err_file: /logs/dw/%%YEAR%%/%%MM%%/transform_load_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 90
+min_run_alarm: 10
+term_run_time: 95
+job_load: 40
+
+/* Step 3: Refresh analytical materialized views and Tableau data sources */
+insert_job: refresh_analytical_views   job_type: CMD
+box_name: dw_etl_box
+owner: svc_dataeng
+command: /scripts/dw/refresh_views.sql --date %%DATE%% --schema ANALYTICS
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(transform_and_load_snowflake)
+std_out_file: /logs/dw/%%YEAR%%/%%MM%%/refresh_views_%%DATE%%.out
+std_err_file: /logs/dw/%%YEAR%%/%%MM%%/refresh_views_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 4: Notify analytics and BI teams that DW is ready */
+insert_job: dw_completion_notification   job_type: CMD
+box_name: dw_etl_box
+owner: svc_dataeng
+command: /scripts/dw/notify_completion.sh --date %%DATE%% --recipients analytics@bank.com,bi-team@bank.com
+machine: etl-server-01
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(refresh_analytical_views)
+std_out_file: /logs/dw/%%YEAR%%/%%MM%%/notify_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 5
+job_load: 1

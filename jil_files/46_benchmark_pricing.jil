@@ -1,0 +1,73 @@
+/* ============================================================
+   FILE: 46_benchmark_pricing.jil
+   DOMAIN: Benchmark & Index Pricing
+   STATUS: SUCCESS
+   UPSTREAM: 01_market_data_ingest (mkt_data_ingest_box)
+   DOWNSTREAM: 13_portfolio_nav, 31_performance_attribution, 41_esg_reporting
+   ============================================================ */
+
+insert_job: benchmark_pricing_box   job_type: BOX
+owner: svc_mktdata
+condition: success(mkt_data_ingest_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 45
+description: "Compute index levels, benchmark returns and custom blended benchmarks"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "17:00,20:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: mktdata@bank.com
+
+insert_job: fetch_index_closing_levels   job_type: CMD
+box_name: benchmark_pricing_box
+owner: svc_mktdata
+command: /scripts/benchmark/fetch_indices.py --date %%DATE%% --indices SP500,MSCI_WORLD,FTSE100,EURO_STOXX_50,BLOOMBERG_AGG
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+std_out_file: /logs/benchmark/%%YEAR%%/%%MM%%/indices_%%DATE%%.out
+std_err_file: /logs/benchmark/%%YEAR%%/%%MM%%/indices_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+insert_job: compute_benchmark_returns   job_type: CMD
+box_name: benchmark_pricing_box
+owner: svc_mktdata
+command: /scripts/benchmark/compute_returns.py --date %%DATE%% --periods 1D,1M,3M,1Y,3Y,5Y
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+condition: success(fetch_index_closing_levels)
+std_out_file: /logs/benchmark/%%YEAR%%/%%MM%%/returns_%%DATE%%.out
+std_err_file: /logs/benchmark/%%YEAR%%/%%MM%%/returns_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+insert_job: compute_custom_blended_benchmarks   job_type: CMD
+box_name: benchmark_pricing_box
+owner: svc_mktdata
+command: /scripts/benchmark/blended_benchmarks.py --date %%DATE%% --config /config/blended_benchmarks.yaml
+machine: mktdata-app-01
+profile: /etc/autosys/profiles/svc_mktdata.sh
+condition: success(compute_benchmark_returns)
+std_out_file: /logs/benchmark/%%YEAR%%/%%MM%%/blended_%%DATE%%.out
+std_err_file: /logs/benchmark/%%YEAR%%/%%MM%%/blended_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 10

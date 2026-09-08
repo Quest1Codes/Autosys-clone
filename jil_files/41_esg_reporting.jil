@@ -1,0 +1,92 @@
+/* ============================================================
+   FILE: 41_esg_reporting.jil
+   DOMAIN: ESG (Environmental, Social, Governance) Reporting
+   SCHEDULE: Weekly on Friday after NAV
+   STATUS: RUNNING (weekly)
+   UPSTREAM: 13_portfolio_nav (portfolio_nav_box)
+             46_benchmark_pricing (benchmark_pricing_box)
+   DOWNSTREAM: 30_client_reporting (ESG dashboard)
+   ============================================================ */
+
+insert_job: esg_reporting_box   job_type: BOX
+owner: svc_portfolio
+condition: success(portfolio_nav_box) & success(benchmark_pricing_box)
+days_of_week: fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Compute ESG scores, carbon footprint, SFDR/TCFD disclosures for all funds"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,03:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: esg-team@bank.com
+
+insert_job: load_esg_data_from_providers   job_type: CMD
+box_name: esg_reporting_box
+owner: svc_portfolio
+command: /scripts/esg/load_esg_data.py --date %%DATE%% --providers MSCI_ESG,SUSTAINALYTICS,CDP
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+std_out_file: /logs/esg/%%YEAR%%/%%MM%%/load_%%DATE%%.out
+std_err_file: /logs/esg/%%YEAR%%/%%MM%%/load_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+insert_job: compute_portfolio_esg_scores   job_type: CMD
+box_name: esg_reporting_box
+owner: svc_portfolio
+command: /scripts/esg/compute_scores.py --date %%DATE%% --methodology WEIGHTED_AVG
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(load_esg_data_from_providers)
+std_out_file: /logs/esg/%%YEAR%%/%%MM%%/scores_%%DATE%%.out
+std_err_file: /logs/esg/%%YEAR%%/%%MM%%/scores_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: compute_carbon_footprint   job_type: CMD
+box_name: esg_reporting_box
+owner: svc_portfolio
+command: /scripts/esg/carbon_footprint.py --date %%DATE%% --scope 1,2,3
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(load_esg_data_from_providers)
+std_out_file: /logs/esg/%%YEAR%%/%%MM%%/carbon_%%DATE%%.out
+std_err_file: /logs/esg/%%YEAR%%/%%MM%%/carbon_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: generate_sfdr_disclosure   job_type: CMD
+box_name: esg_reporting_box
+owner: svc_portfolio
+command: /scripts/esg/gen_sfdr.py --date %%DATE%% --articles 6,8,9
+machine: reporting-app-01
+profile: /etc/autosys/profiles/svc_portfolio.sh
+condition: success(compute_portfolio_esg_scores) & success(compute_carbon_footprint)
+std_out_file: /logs/esg/%%YEAR%%/%%MM%%/sfdr_%%DATE%%.out
+std_err_file: /logs/esg/%%YEAR%%/%%MM%%/sfdr_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 10

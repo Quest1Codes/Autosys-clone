@@ -27,6 +27,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "httpx",               # async HTTP client (agent callbacks)
+    "jinja2",              # WCC HTML templates (Phase 9)
+    "python-multipart",    # form data (Phase 9)
 
     # CLI
     "click",
@@ -49,6 +51,10 @@ dev = [
     "ruff",
     "black",
 ]
+pg = [
+    "asyncpg",
+    "psycopg2-binary",
+]
 
 [project.scripts]
 autosys = "autosys.cli.main:autosys"
@@ -58,6 +64,9 @@ pythonpath = ["."]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = ["-s", "--tb=short", "--no-header"]
+markers = [
+    "postgresql: requires a real PostgreSQL instance (skipped if unavailable)",
+]
 
 [tool.ruff]
 line-length = 100

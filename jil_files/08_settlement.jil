@@ -1,0 +1,125 @@
+/* ============================================================
+   FILE: 08_settlement.jil
+   DOMAIN: Settlement & Clearing
+   STATUS: FAILURE handler active (settlement fails ~0.3% of trades)
+   UPSTREAM: 04_trade_booking (trade_booking_box)
+   DOWNSTREAM: 09_payments_treasury, 27_nostro_reconciliation
+   ============================================================ */
+
+insert_job: settlement_box   job_type: BOX
+owner: svc_settlement
+condition: success(trade_booking_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 120
+description: "Generate, validate and dispatch settlement instructions via DTCC and SWIFT"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "16:00,22:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: settlement-ops@bank.com
+
+/* Step 1A: Generate DVP (Delivery vs Payment) settlement instructions */
+insert_job: generate_dvp_instructions   job_type: CMD
+box_name: settlement_box
+owner: svc_settlement
+command: /scripts/settlement/gen_dvp.sh --date %%DATE%% --venue DTCC_DTC
+machine: settlement-app-01
+profile: /etc/autosys/profiles/svc_settlement.sh
+std_out_file: /logs/settlement/%%YEAR%%/%%MM%%/dvp_%%DATE%%.out
+std_err_file: /logs/settlement/%%YEAR%%/%%MM%%/dvp_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 1B: Generate FoP (Free of Payment) instructions for internal transfers */
+insert_job: generate_fop_instructions   job_type: CMD
+box_name: settlement_box
+owner: svc_settlement
+command: /scripts/settlement/gen_fop.sh --date %%DATE%% --type INTERNAL
+machine: settlement-app-01
+profile: /etc/autosys/profiles/svc_settlement.sh
+std_out_file: /logs/settlement/%%YEAR%%/%%MM%%/fop_%%DATE%%.out
+std_err_file: /logs/settlement/%%YEAR%%/%%MM%%/fop_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Validate all instructions against SSI (Standing Settlement Instructions) */
+insert_job: validate_settlement_instructions   job_type: CMD
+box_name: settlement_box
+owner: svc_settlement
+command: /scripts/settlement/validate_instructions.py --date %%DATE%%
+machine: settlement-app-01
+profile: /etc/autosys/profiles/svc_settlement.sh
+condition: success(generate_dvp_instructions) & success(generate_fop_instructions)
+std_out_file: /logs/settlement/%%YEAR%%/%%MM%%/validate_%%DATE%%.out
+std_err_file: /logs/settlement/%%YEAR%%/%%MM%%/validate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 3: Send SWIFT MT540/MT541/MT542/MT543 messages to custodians */
+insert_job: send_swift_settlement_messages   job_type: CMD
+box_name: settlement_box
+owner: svc_settlement
+command: /scripts/settlement/send_swift.sh --date %%DATE%% --message_types MT540,MT541,MT542,MT543
+machine: swift-gateway-01
+profile: /etc/autosys/profiles/svc_settlement.sh
+condition: success(validate_settlement_instructions)
+std_out_file: /logs/settlement/%%YEAR%%/%%MM%%/swift_%%DATE%%.out
+std_err_file: /logs/settlement/%%YEAR%%/%%MM%%/swift_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 20
+
+/* Step 4: Monitor settlement confirmations and flag unmatched items */
+insert_job: monitor_settlement_confirmations   job_type: CMD
+box_name: settlement_box
+owner: svc_settlement
+command: /scripts/settlement/monitor_confirmations.py --date %%DATE%% --deadline 20:00
+machine: settlement-app-01
+profile: /etc/autosys/profiles/svc_settlement.sh
+condition: success(send_swift_settlement_messages)
+std_out_file: /logs/settlement/%%YEAR%%/%%MM%%/confirmations_%%DATE%%.out
+std_err_file: /logs/settlement/%%YEAR%%/%%MM%%/confirmations_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 10
+
+/* FAILURE HANDLER: Escalate failed settlements to operations desk */
+insert_job: escalate_settlement_failures   job_type: CMD
+box_name: settlement_box
+owner: svc_settlement
+command: /scripts/settlement/escalate_fails.sh --date %%DATE%% --notify settlement-ops@bank.com --page on-call
+machine: settlement-app-01
+profile: /etc/autosys/profiles/svc_settlement.sh
+condition: failure(monitor_settlement_confirmations)
+std_out_file: /logs/settlement/%%YEAR%%/%%MM%%/escalate_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

@@ -75,6 +75,9 @@ def _get_status(job_name) -> str:
 
 
 def _set_status(job_name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, job_name)
         row.status = status
@@ -89,6 +92,9 @@ def _enqueue(event_type, job_name=None, **kwargs):
 
 def _wait_for_status(job_name, expected, timeout=15) -> bool:
     """Poll DB until job reaches expected status or timeout."""
+    if isinstance(expected, str):
+        from autosys.models.enums import JobStatus
+        expected = JobStatus[expected].value
     deadline = time.time() + timeout
     while time.time() < deadline:
         if _get_status(job_name) == expected:
@@ -244,10 +250,11 @@ class TestMachineFiltering:
         _tick_with_agent()
         # Remote machine → dispatch skipped → job stays STARTING (not RUNNING)
         # (STARTJOB transitions to STARTING, then dispatch is skipped)
+        from autosys.models.enums import JobStatus
         status = _get_status("remote_job")
-        # Job should be STARTING (dispatched but not actually run) or INACTIVE
-        # depending on whether condition check passed first
-        assert status in ("STARTING", "INACTIVE")
+        # Job should be STARTING (dispatched but not actually run), INACTIVE
+        # (condition not met), or FAILURE (local_only=True rejects remote machine)
+        assert status in (JobStatus.STARTING.value, JobStatus.INACTIVE.value, JobStatus.FAILURE.value)
 
 
 # ===========================================================================
@@ -281,7 +288,7 @@ class TestAgentDispatch:
         with sync_session() as session:
             rows = run_repo.list_runs(session, "hist_job")
         assert len(rows) == 1
-        assert rows[0].status == "SUCCESS"
+        assert rows[0].status == 4
         assert rows[0].exit_code == 0
 
     def test_run_history_has_start_and_end_times(self):
@@ -380,7 +387,7 @@ class TestRunRepository:
             from autosys.db.schema import JobRunRow
             fetched = session.get(JobRunRow, "rid1")
         assert fetched is not None
-        assert fetched.status == "RUNNING"
+        assert fetched.status == 1
 
     def test_finish_updates_row(self):
         _seed_cmd("j")
@@ -391,7 +398,7 @@ class TestRunRepository:
         with sync_session() as session:
             from autosys.db.schema import JobRunRow
             row = session.get(JobRunRow, "rid2")
-        assert row.status    == "SUCCESS"
+        assert row.status    == 4
         assert row.exit_code == 0
         assert row.pid       == 12345
         assert row.end_time is not None
@@ -432,7 +439,10 @@ class TestRunRepository:
 class TestOutputRepository:
 
     def test_append_and_get_lines(self):
+        _seed_cmd("j")
         with sync_session() as session:
+            run_repo.start(session, "run1", "j", "echo", "localhost", "2026-06-24")
+            session.flush()
             output_repo.append(session, "run1", "j", 1, "hello")
             output_repo.append(session, "run1", "j", 2, "world")
         with sync_session() as session:
@@ -442,7 +452,10 @@ class TestOutputRepository:
         assert lines[1].content == "world"
 
     def test_get_lines_ordered_by_line_no(self):
+        _seed_cmd("j")
         with sync_session() as session:
+            run_repo.start(session, "run2", "j", "echo", "localhost", "2026-06-24")
+            session.flush()
             output_repo.append(session, "run2", "j", 3, "third")
             output_repo.append(session, "run2", "j", 1, "first")
             output_repo.append(session, "run2", "j", 2, "second")
@@ -492,7 +505,7 @@ class TestEventProcessorKillFn:
             proc.process_one_tick(session)
 
         assert "kill_me" in killed
-        assert _get_status("kill_me") == "TERMINATED"
+        assert _get_status("kill_me") == 6
 
     def test_killjob_no_kill_fn_still_terminates(self):
         """KILLJOB without kill_fn still sets status to TERMINATED."""
@@ -502,7 +515,7 @@ class TestEventProcessorKillFn:
         proc = EventProcessor()
         with sync_session() as session:
             proc.process_one_tick(session)
-        assert _get_status("no_fn_job") == "TERMINATED"
+        assert _get_status("no_fn_job") == 6
 
 
 # ===========================================================================

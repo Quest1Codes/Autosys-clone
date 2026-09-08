@@ -41,7 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from loguru import logger
@@ -53,12 +53,24 @@ from autosys.agent.protocol import (
     KillResponse,
 )
 from autosys.agent.runner import LocalJobRunner
+from autosys.agent.runners import create_runner
 from autosys.db.connection import sync_session
 from autosys.db.repository import (
     jobs as job_repo,
     runs as run_repo,
     output as output_repo,
 )
+from autosys.models.enums import JobStatus
+
+
+def _now() -> datetime:
+    """Return current UTC time (matches schema column defaults)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _exit_code_to_status(exit_code: int, max_exit_success: Optional[int]) -> str:
+    threshold = max_exit_success if max_exit_success is not None else 0
+    return "SUCCESS" if exit_code <= threshold else "FAILURE"
 
 
 class AgentServer:
@@ -166,7 +178,7 @@ class AgentServer:
         except asyncio.TimeoutError:
             logger.warning(f"[agent-server] client {peer[0]}:{peer[1]} timed out")
         except Exception as exc:
-            logger.error(f"[agent-server] error handling {peer[0]}:{peer[1]}: {exc}")
+            logger.exception("[agent-server] error handling %s:%s", *peer)
             writer.write(encode_dict({"type": "error", "reason": str(exc)}))
             await writer.drain()
         finally:
@@ -237,10 +249,11 @@ class AgentServer:
         Here we simplified: the agent writes directly to the shared DB
         instead of sending a callback, so no callback protocol is needed.
         """
-        run_id       = msg.get("run_id", "")
-        job_name     = msg.get("job_name", "")
-        command      = msg.get("command", "")
-        max_run_secs = msg.get("max_run_secs")
+        run_id           = msg.get("run_id", "")
+        job_name         = msg.get("job_name", "")
+        command          = msg.get("command", "")
+        max_run_secs     = msg.get("max_run_secs")
+        max_exit_success = msg.get("max_exit_success")
 
         if not run_id or not job_name or not command:
             return encode_message(DispatchRejected(
@@ -248,8 +261,7 @@ class AgentServer:
                 reason = "missing run_id, job_name, or command",
             ))
 
-        # Create run history record now — agent owns this since it knows the
-        # actual start time and will supply the PID on finish.
+        # Create run history record
         with sync_session() as sess:
             run_repo.start(
                 sess,
@@ -257,25 +269,36 @@ class AgentServer:
                 job_name = job_name,
                 command  = command,
                 machine  = self.machine_name,
-                run_date = datetime.now().strftime("%Y-%m-%d"),
+                run_date = _now().strftime("%Y-%m-%d"),
             )
 
-        # Build runner with output callback that writes to shared DB
-        runner = LocalJobRunner(
-            command         = command,
-            job_name        = job_name,
-            run_id          = run_id,
-            max_run_secs    = max_run_secs,
-            output_callback = self._on_output,
-        )
+        # Build runner — look up JobRow for job_type-aware dispatch
+        with sync_session() as sess:
+            job_row = job_repo.get_row(sess, job_name)
+        if job_row is not None:
+            runner = create_runner(
+                row             = job_row,
+                run_id          = run_id,
+                command         = command,
+                max_run_secs    = max_run_secs,
+                output_callback = self._on_output,
+            )
+        else:
+            runner = LocalJobRunner(
+                command         = command,
+                job_name        = job_name,
+                run_id          = run_id,
+                max_run_secs    = max_run_secs,
+                output_callback = self._on_output,
+            )
 
         with self._active_lock:
             self._active[job_name] = runner
 
-        # Launch background thread — do NOT await (must return immediately)
+        # Launch background thread
         t = threading.Thread(
             target = self._run_job_thread,
-            args   = (job_name, run_id, runner),
+            args   = (job_name, run_id, runner, max_exit_success),
             daemon = True,
             name   = f"agent-{job_name}",
         )
@@ -336,15 +359,17 @@ class AgentServer:
 
     def _run_job_thread(
         self,
-        job_name: str,
-        run_id:   str,
-        runner:   LocalJobRunner,
+        job_name:         str,
+        run_id:           str,
+        runner:           LocalJobRunner,
+        max_exit_success: Optional[int] = None,
     ) -> None:
         """
         Blocks until the subprocess exits, then updates the DB.
 
         Runs in a daemon thread so the server is never blocked.
         Uses its own DB session (the dispatch session is already committed).
+        Applies max_exit_success threshold for SUCCESS/FAILURE determination.
         """
         try:
             exit_code = runner.run()
@@ -355,17 +380,18 @@ class AgentServer:
             with self._active_lock:
                 self._active.pop(job_name, None)
 
-        status = "SUCCESS" if exit_code == 0 else "FAILURE"
-        now    = datetime.now()
+        threshold = max_exit_success if max_exit_success is not None else 0
+        status = JobStatus.SUCCESS.value if exit_code <= threshold else JobStatus.FAILURE.value
+        now    = _now()
 
         with sync_session() as session:
             job_row = job_repo.get_row(session, job_name)
             if job_row:
-                if job_row.status != "TERMINATED":
+                if job_row.status != JobStatus.TERMINATED.value:
                     job_row.status   = status
                     job_row.last_end = now
                 else:
-                    status = "TERMINATED"
+                    status = JobStatus.TERMINATED.value
 
             run_repo.finish(
                 session,

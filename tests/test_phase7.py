@@ -38,6 +38,7 @@ from autosys.db.repository        import (
 )
 from autosys.models.event         import Event
 from autosys.models.job           import BoxJob, CmdJob
+from autosys.models.enums         import JobStatus
 from autosys.models.machine       import MachineDef
 from autosys.parser.jil_parser    import JILParser, JILParseError, parse_jil
 from autosys.parser.jil_writer    import machine_to_jil
@@ -93,6 +94,9 @@ def _get_status(name) -> str:
 
 
 def _set_status(name, status):
+    if isinstance(status, str):
+        from autosys.models.enums import JobStatus
+        status = JobStatus[status].value
     with sync_session() as session:
         row = job_repo.get_row(session, name)
         if row:
@@ -366,12 +370,12 @@ class TestBoxManager:
         _seed_box("empty_box")
         _set_status("empty_box", "RUNNING")
         self._bm_tick()
-        assert _get_status("empty_box") == "SUCCESS"
+        assert _get_status("empty_box") == 4
 
     def test_child_without_condition_activated(self):
         self._make_box(children=[("child_a", None)])
         self._bm_tick()
-        assert _get_status("child_a") == "SUCCESS"  # auto_complete=True
+        assert _get_status("child_a") == 4  # auto_complete=True
 
     def test_child_with_met_condition_activated(self):
         self._make_box(children=[
@@ -380,7 +384,7 @@ class TestBoxManager:
         ])
         _set_status("child_a", "SUCCESS")
         self._bm_tick()
-        assert _get_status("child_b") == "SUCCESS"
+        assert _get_status("child_b") == 4
 
     def test_child_with_unmet_condition_stays_inactive(self):
         """
@@ -396,32 +400,32 @@ class TestBoxManager:
         # but child_b's condition was evaluated against the pre-tick snapshot
         # where child_a was still INACTIVE → child_b stays INACTIVE.
         self._bm_tick()
-        assert _get_status("child_b") == "INACTIVE"
+        assert _get_status("child_b") == 8
 
     def test_box_completes_success_when_all_children_done(self):
         self._make_box(children=[("child_a", None), ("child_b", None)])
         self._bm_tick()  # activates + auto-completes both children
         self._bm_tick()  # now all children terminal → box completes
-        assert _get_status("etl_box") == "SUCCESS"
+        assert _get_status("etl_box") == 4
 
     def test_box_fails_if_child_fails(self):
         self._make_box(children=[("child_a", None)])
         _set_status("child_a", "FAILURE")
         self._bm_tick()
-        assert _get_status("etl_box") == "FAILURE"
+        assert _get_status("etl_box") == 5
 
     def test_box_terminated_if_child_terminated(self):
         self._make_box(children=[("child_a", None)])
         _set_status("child_a", "TERMINATED")
         self._bm_tick()
-        assert _get_status("etl_box") == "TERMINATED"
+        assert _get_status("etl_box") == 6
 
     def test_box_not_completed_while_child_running(self):
         self._make_box(children=[("child_a", None)])
         _set_status("child_a", "RUNNING")
         self._bm_tick(auto_complete=False)
         # child still RUNNING → box stays RUNNING
-        assert _get_status("etl_box") == "RUNNING"
+        assert _get_status("etl_box") == 1
 
     def test_kill_children_terminates_active(self):
         self._make_box(children=[("child_a", None)])
@@ -429,7 +433,7 @@ class TestBoxManager:
         bm = BoxManager()
         with sync_session() as session:
             bm.kill_children(session, "etl_box", datetime.now())
-        assert _get_status("child_a") == "TERMINATED"
+        assert _get_status("child_a") == 6
 
     def test_kill_children_leaves_terminal_untouched(self):
         self._make_box(children=[("child_a", None), ("child_b", None)])
@@ -438,8 +442,8 @@ class TestBoxManager:
         bm = BoxManager()
         with sync_session() as session:
             bm.kill_children(session, "etl_box", datetime.now())
-        assert _get_status("child_a") == "SUCCESS"   # untouched
-        assert _get_status("child_b") == "TERMINATED"
+        assert _get_status("child_a") == 4   # untouched
+        assert _get_status("child_b") == 6
 
     def test_reset_children_sets_inactive(self):
         self._make_box(children=[("child_a", None)])
@@ -447,16 +451,16 @@ class TestBoxManager:
         bm = BoxManager()
         with sync_session() as session:
             bm.reset_children(session, "etl_box")
-        assert _get_status("child_a") == "INACTIVE"
+        assert _get_status("child_a") == 8
 
     def test_sequential_chain_two_ticks(self):
         """chain: a → b (s(a)) — two ticks needed: tick1 activates a, tick2 activates b."""
         self._make_box(children=[("a", None), ("b", "s(a)")])
         self._bm_tick(auto_complete=True)  # a gets activated+completed; b's condition now met
         self._bm_tick(auto_complete=True)  # b gets activated+completed; box completes
-        assert _get_status("a") == "SUCCESS"
-        assert _get_status("b") == "SUCCESS"
-        assert _get_status("etl_box") == "SUCCESS"
+        assert _get_status("a") == 4
+        assert _get_status("b") == 4
+        assert _get_status("etl_box") == 4
 
 
 # ===========================================================================
@@ -527,8 +531,8 @@ class TestEventProcessorBoxIntegration:
         _enqueue("STARTJOB", "box1")
         _tick()   # tick 1: processes STARTJOB event → box RUNNING
         _tick()   # tick 2: box tick activates child → child SUCCESS, box SUCCESS
-        assert _get_status("child1") == "SUCCESS"
-        assert _get_status("box1")   == "SUCCESS"
+        assert _get_status("child1") == 4
+        assert _get_status("box1")   == 4
 
     def test_startjob_box_chains_children(self):
         """
@@ -543,9 +547,9 @@ class TestEventProcessorBoxIntegration:
         _seed_cmd("cb", box_name="chain_box", condition="s(ca)")
         _enqueue("STARTJOB", "chain_box")
         _tick(n=3)
-        assert _get_status("ca")        == "SUCCESS"
-        assert _get_status("cb")        == "SUCCESS"
-        assert _get_status("chain_box") == "SUCCESS"
+        assert _get_status("ca")        == 4
+        assert _get_status("cb")        == 4
+        assert _get_status("chain_box") == 4
 
     def test_box_failure_propagates_from_failed_child(self):
         """
@@ -563,7 +567,7 @@ class TestEventProcessorBoxIntegration:
         _set_status("bad_child", "FAILURE")  # simulate job failure
         with sync_session() as session:
             proc.process_one_tick(session)   # box tick sees FAILURE → box FAILURE
-        assert _get_status("fail_box") == "FAILURE"
+        assert _get_status("fail_box") == 5
 
     def test_killjob_box_terminates_children(self):
         """
@@ -581,8 +585,8 @@ class TestEventProcessorBoxIntegration:
         _enqueue("KILLJOB", "kill_box")
         with sync_session() as session:
             proc.process_one_tick(session)
-        assert _get_status("kill_box") == "TERMINATED"
-        assert _get_status("kc1")      == "TERMINATED"
+        assert _get_status("kill_box") == 6
+        assert _get_status("kc1")      == 6
 
     def test_force_startjob_resets_children(self):
         """
@@ -601,16 +605,16 @@ class TestEventProcessorBoxIntegration:
         _set_status("fc1", "SUCCESS")
         with sync_session() as session:
             proc_no_ac.process_one_tick(session)   # box tick sees all SUCCESS → box SUCCESS
-        assert _get_status("fbox") == "SUCCESS"
+        assert _get_status("fbox") == 4
 
         # FORCE_STARTJOB with auto_complete=False — resets children then activates box
         _enqueue("FORCE_STARTJOB", "fbox")
         with sync_session() as session:
             proc_no_ac.process_one_tick(session)   # reset_children → fc1 INACTIVE → box ACTIVATED/RUNNING + fc1 STARTING
         # Child was reset and re-activated (STARTING), box is no longer SUCCESS
-        assert _get_status("fbox") in ("ACTIVATED", "RUNNING")
+        assert _get_status("fbox") in (JobStatus.ACTIVATED.value, JobStatus.RUNNING.value)
         # fc1 was reset then re-activated; stub dispatcher leaves it RUNNING
-        assert _get_status("fc1")  in ("INACTIVE", "STARTING", "RUNNING")
+        assert _get_status("fc1")  in (JobStatus.INACTIVE.value, JobStatus.STARTING.value, JobStatus.RUNNING.value)
 
     def test_box_not_completed_with_running_children(self):
         _seed_box("wait_box")
@@ -622,14 +626,14 @@ class TestEventProcessorBoxIntegration:
             proc.process_one_tick(session)   # box → RUNNING, child → STARTING
         with sync_session() as session:
             proc.process_one_tick(session)   # child still STARTING → box stays RUNNING
-        assert _get_status("wait_box") in ("RUNNING",)
+        assert _get_status("wait_box") in (JobStatus.RUNNING.value,)
 
     def test_empty_box_completes_on_first_tick(self):
         _seed_box("empty_box")
         _enqueue("STARTJOB", "empty_box")
         _tick()   # box → RUNNING
         _tick()   # box tick sees no children → box SUCCESS
-        assert _get_status("empty_box") == "SUCCESS"
+        assert _get_status("empty_box") == 4
 
 
 # ===========================================================================
@@ -745,7 +749,7 @@ class TestFullBoxPipeline:
         _tick(n=10)
 
         # The box should complete in SUCCESS
-        assert _get_status("demo_etl_box") == "SUCCESS"
+        assert _get_status("demo_etl_box") == 4
 
     def test_insert_machine_in_jil_then_job_uses_it(self, tmp_path):
         """JIL with insert_machine + insert_job that references that machine."""

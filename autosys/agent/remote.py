@@ -45,8 +45,16 @@ from autosys.agent.protocol import (
     send_message,
     DispatchRequest, KillRequest, HeartbeatRequest, StatusRequest,
 )
+from autosys.db.repository import runs as run_repo
 from autosys.db.schema import JobRow, MachineRow
+from autosys.models.enums import JobStatus
 from autosys.parser.variable_sub import substitute, UndefinedVariableError
+
+
+def _now() -> datetime:
+    """Return current time in UTC."""
+    from datetime import timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # ===========================================================================
@@ -95,7 +103,7 @@ class RemoteDispatch:
         bool
             True if the agent accepted the dispatch, False otherwise.
         """
-        now    = datetime.now()
+        now    = _now()
         run_id = str(uuid.uuid4())
 
         # %%VAR%% expansion happens on the Scheduler side
@@ -103,17 +111,17 @@ class RemoteDispatch:
         globals_dict = glob_repo.as_dict(session)
         command = _expand_command(row, globals_dict, now)
 
-        # Transition job to RUNNING — the agent creates the job_runs record
-        # when it receives the DISPATCH and actually forks the process.
+        # Transition job to RUNNING
         row.status     = "RUNNING"
         row.last_start = now
 
         # Send DISPATCH to the remote agent
         req  = DispatchRequest(
-            run_id       = run_id,
-            job_name     = row.job_name,
-            command      = command,
-            max_run_secs = (row.max_run_alarm * 60) if row.max_run_alarm else None,
+            run_id           = run_id,
+            job_name         = row.job_name,
+            command          = command,
+            max_run_secs     = (row.max_run_alarm * 60) if row.max_run_alarm else None,
+            max_exit_success = row.max_exit_success,
         )
         resp = send_message(machine_row.host, machine_row.port, req, timeout=self.timeout)
 
@@ -129,8 +137,8 @@ class RemoteDispatch:
                 row.job_name, resp,
             )
             # Roll back the optimistic RUNNING status
-            row.status = "FAILURE"
-            run_repo.finish(session, run_id, "FAILURE", -1)
+            row.status = JobStatus.FAILURE.value
+            run_repo.finish(session, run_id, JobStatus.FAILURE.value, -1)
             return False
 
     # ------------------------------------------------------------------

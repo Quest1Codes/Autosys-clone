@@ -4,7 +4,7 @@ A full-fidelity clone of **CA Workload Automation AE (AutoSys)** built in Python
 Every component maps 1-to-1 to the real AutoSys architecture. Built phase-by-phase
 so each layer is fully tested before the next is added on top of it.
 
-> **Current status:** Phases 1–7 complete · 496 tests passing · ~11,700 lines of production code
+> **Current status:** Phases 1–12 complete + migration complexity analysis · 1072 tests passing · ~18,000 lines of production code
 
 ---
 
@@ -14,23 +14,25 @@ so each layer is fully tested before the next is added on top of it.
 2. [Architecture Overview](#architecture-overview)
 3. [Project Layout](#project-layout)
 4. [Quick Start](#quick-start)
-5. [Phase 1 — Data Models & Database Schema](#phase-1--data-models--database-schema)
-6. [Phase 2 — JIL Parser & Condition Language](#phase-2--jil-parser--condition-language)
-7. [Phase 3 — State Machine & Variable Substitution](#phase-3--state-machine--variable-substitution)
-8. [Phase 4 — Event Processor (EPS)](#phase-4--event-processor-eps)
-9. [Phase 5 — System Agent (Local Execution)](#phase-5--system-agent-local-execution)
-10. [Phase 6 — Remote Dispatch via TCP](#phase-6--remote-dispatch-via-tcp)
-11. [Phase 7 — Box Orchestration & insert_machine](#phase-7--box-orchestration--insert_machine)
-12. [Phase 8 — REST API Application Server (SSA)](#phase-8--rest-api-application-server-ssa)
-13. [Phase 9 — WCC Web Dashboard](#phase-9--wcc-web-dashboard)
-14. [Phase 10 — Alarms, Notifications & NSM](#phase-10--alarms-notifications--nsm)
-15. [Phase 11 — Calendar Engine & Holiday Exclusions](#phase-11--calendar-engine--holiday-exclusions)
-16. [Phase 12 — End-to-End Integration & Production Hardening](#phase-12--end-to-end-integration--production-hardening)
-17. [How All Components Wire Together](#how-all-components-wire-together)
-18. [JIL Reference](#jil-reference)
-19. [CLI Reference](#cli-reference)
-20. [Configuration Reference](#configuration-reference)
-21. [Testing Strategy](#testing-strategy)
+5. [How It Works — Features & Components](#how-it-works--features--components)
+6. [Migration Complexity Analysis](#migration-complexity-analysis)
+7. [Phase 1 — Data Models & Database Schema](#phase-1--data-models--database-schema)
+8. [Phase 2 — JIL Parser & Condition Language](#phase-2--jil-parser--condition-language)
+9. [Phase 3 — State Machine & Variable Substitution](#phase-3--state-machine--variable-substitution)
+10. [Phase 4 — Event Processor (EPS)](#phase-4--event-processor-eps)
+11. [Phase 5 — System Agent (Local Execution)](#phase-5--system-agent-local-execution)
+12. [Phase 6 — Remote Dispatch via TCP](#phase-6--remote-dispatch-via-tcp)
+13. [Phase 7 — Box Orchestration & insert_machine](#phase-7--box-orchestration--insert_machine)
+14. [Phase 8 — REST API Application Server (SSA)](#phase-8--rest-api-application-server-ssa)
+15. [Phase 9 — WCC Web Dashboard](#phase-9--wcc-web-dashboard)
+16. [Phase 10 — Alarms, Notifications & NSM](#phase-10--alarms-notifications--nsm)
+17. [Phase 11 — Calendar Engine & Holiday Exclusions](#phase-11--calendar-engine--holiday-exclusions)
+18. [Phase 12 — End-to-End Integration & Production Hardening](#phase-12--end-to-end-integration--production-hardening)
+19. [How All Components Wire Together](#how-all-components-wire-together)
+20. [JIL Reference](#jil-reference)
+21. [CLI Reference](#cli-reference)
+22. [Configuration Reference](#configuration-reference)
+23. [Testing Strategy](#testing-strategy)
 
 ---
 
@@ -120,7 +122,7 @@ companies.
 autosys-clone/
 │
 ├── autosys/                         # Main package
-│   ├── models/                      # Pydantic data models (Phase 1)
+│   ├── models/                      # Pydantic data models
 │   │   ├── job.py                   # Job hierarchy: CmdJob, BoxJob, FilewatcherJob
 │   │   ├── event.py                 # Event model (STARTJOB, KILLJOB, …)
 │   │   ├── enums.py                 # JobStatus, JobType, EventType enums
@@ -131,78 +133,105 @@ autosys-clone/
 │   │   ├── global_var.py            # GlobalVariable model
 │   │   └── resource.py              # VirtualResource model
 │   │
-│   ├── db/                          # Database layer (Phase 1)
+│   ├── db/                          # Database layer
 │   │   ├── schema.py                # SQLAlchemy ORM table definitions
 │   │   ├── repository.py            # CRUD repositories for each table
 │   │   ├── connection.py            # Sync + async engine management
-│   │   └── migrations.py           # Schema creation / DDL
+│   │   ├── migrations.py            # Schema creation / DDL
+│   │   └── retry.py                 # Retry logic for transient DB failures
 │   │
-│   ├── parser/                      # JIL language (Phase 2)
+│   ├── parser/                      # JIL language
 │   │   ├── lexer.py                 # Tokeniser: DIRECTIVE, JOB_NAME, ATTR_NAME, VALUE
 │   │   ├── jil_parser.py            # Recursive-descent parser → JILOperation list
 │   │   ├── jil_writer.py            # Serialise Job/MachineDef back to JIL text
 │   │   ├── condition_parser.py      # Condition expression AST + evaluator
 │   │   └── variable_sub.py          # %%DATE%%, %%AUTOUSER%%, global var expansion
 │   │
-│   ├── scheduler/                   # Core scheduling engine (Phases 3–7)
+│   ├── scheduler/                   # Core scheduling engine
 │   │   ├── state_machine.py         # Job status transition rules + guards
 │   │   ├── condition_evaluator.py   # is_satisfied() + build_status_snapshot()
 │   │   ├── time_trigger.py          # start_times + days_of_week + calendar logic
 │   │   ├── event_processor.py       # EPS: dequeue → handle → dispatch loop
-│   │   └── box_manager.py           # BOX child activation + completion logic
+│   │   ├── box_manager.py           # BOX child activation + completion logic
+│   │   ├── simulation_runner.py     # Multi-cycle dry-run simulation
+│   │   ├── failure_injector.py      # Deterministic failure injection for simulation
+│   │   └── ha.py                    # High availability — distributed lock
 │   │
-│   ├── agent/                       # System Agent (Phases 5–6)
+│   ├── agent/                       # System Agent
 │   │   ├── runner.py                # LocalJobRunner: subprocess + stdout capture
 │   │   ├── dispatch.py              # Dispatch router: local vs. remote
 │   │   ├── server.py                # TCP agent server (asyncio)
 │   │   ├── remote.py                # RemoteDispatch: TCP client to remote agent
-│   │   └── protocol.py             # Newline-delimited JSON message types
+│   │   ├── protocol.py              # Newline-delimited JSON message types
+│   │   └── runners.py               # Job runners for CMD, FTP, FileWatcher types
 │   │
-│   ├── cli/                         # Click CLI (Phases 3–7+)
+│   ├── analysis/                    # Migration complexity analysis
+│   │   ├── complexity.py            # T-shirt sizing, effort, risk scoring + report
+│   │   ├── migration_signals.py     # 10 structural signals (A1-A10) from JIL
+│   │   ├── operational_risk.py      # Runtime risk scoring from run history
+│   │   ├── dependency_graph.py      # Fan-in/fan-out, dependency waves
+│   │   ├── gap_analysis.py          # Airflow gap tags (calendar, logs, etc.)
+│   │   └── box_trace.py             # BOX execution trace
+│   │
+│   ├── engine/                      # Engine & integration modules
+│   │   ├── agent_monitor.py         # Agent health monitoring
+│   │   ├── cloud_integration.py     # AWS/GCP/Azure job submission
+│   │   ├── glob_substitution.py     # %%GLOB:name%% expansion
+│   │   ├── job_type_expander.py     # Job type template expansion
+│   │   ├── monitor_evaluator.py     # FILE_MONITOR condition evaluation
+│   │   └── xinst_client.py          # Cross-instance remote job status
+│   │
+│   ├── cli/                         # Click CLI
 │   │   ├── main.py                  # Root `autosys` group
-│   │   ├── jil_cmd.py               # `autosys jil import/export/validate`
+│   │   ├── jil_cmd.py               # `autosys jil import/export/validate/show`
 │   │   ├── autorep_cmd.py           # `autosys autorep -j/-J/-q`
 │   │   ├── sendevent_cmd.py         # `autosys sendevent -E -J`
-│   │   ├── scheduler_cmd.py         # `autosys scheduler start/stop/status`
+│   │   ├── scheduler_cmd.py         # `autosys scheduler serve/start/stop`
 │   │   ├── agent_cmd.py             # `autosys agent serve/jobs/tail`
 │   │   ├── machine_cmd.py           # `autosys machine register/list/check`
-│   │   └── box_cmd.py               # `autosys box status/tree`
+│   │   ├── box_cmd.py               # `autosys box status/tree`
+│   │   ├── analyze_cmd.py           # `autosys analyze` + `autosys migration-report`
+│   │   └── autocal_cmd.py           # `autosys calendar create/list/import`
 │   │
-│   ├── app_server/                  # FastAPI REST API (Phase 8)
-│   │   ├── main.py                  # FastAPI app factory
-│   │   ├── routers/
-│   │   │   ├── jobs.py              # GET/POST /jobs, /jobs/{name}/sendevent
-│   │   │   ├── events.py            # GET /events, POST /events
-│   │   │   ├── runs.py              # GET /runs, /runs/{id}/output
-│   │   │   ├── machines.py          # GET/POST /machines
-│   │   │   └── alarms.py            # GET /alarms
+│   ├── app_server/                  # FastAPI REST API (SSA)
+│   │   ├── main.py                  # FastAPI app factory + lifespan
+│   │   ├── auth.py                  # JWT middleware
+│   │   ├── broadcaster.py           # WebSocket status broadcast
 │   │   ├── schemas.py               # Pydantic request/response schemas
-│   │   └── auth.py                  # JWT middleware (Phase 8)
+│   │   └── routers/
+│   │       ├── jobs.py              # GET/POST /jobs, /jobs/{name}/sendevent
+│   │       ├── events.py            # GET /events, POST /events
+│   │       ├── runs.py              # GET /runs, /runs/{id}/output
+│   │       ├── machines.py          # GET/POST /machines
+│   │       ├── alarms.py            # GET/POST /alarms
+│   │       ├── assessment.py        # GET /assessment/migration-report
+│   │       ├── globals.py           # Global variables CRUD
+│   │       └── metrics.py           # Prometheus metrics
 │   │
-│   ├── wcc/                         # Web UI (Phase 9)
-│   │   ├── static/                  # CSS, JS, D3.js
-│   │   ├── templates/               # Jinja2 HTML templates
-│   │   └── ws_handler.py            # WebSocket live-push handler
+│   ├── wcc/                         # WCC API server
+│   │   └── app.py                   # JSON API + SSE for React frontend
 │   │
-│   └── notifications/               # Alarm dispatcher (Phase 10)
+│   └── notifications/               # Alarm & notification system
 │       ├── alarm_manager.py         # Alarm evaluation + deduplication
-│       └── dispatcher.py            # Webhook sender (NSM / email / Slack)
+│       ├── dispatcher.py            # Multi-channel dispatch
+│       ├── config.py                # Notification channel configuration
+│       ├── remedy_notifier.py       # BMC Remedy ITSM integration
+│       └── snmp_notifier.py         # SNMP trap notifications
 │
-├── examples/
-│   └── demo_etl.jil                 # Sample ETL workflow
+├── wcc-frontend/                    # React + TypeScript WCC dashboard
+│   ├── src/
+│   │   ├── App.tsx                  # Root component with routing
+│   │   ├── api/                     # API client functions
+│   │   ├── components/              # React components (JobGrid, JobDetail, etc.)
+│   │   └── types.ts                 # TypeScript type definitions
+│   ├── package.json
+│   └── vite.config.ts
 │
-├── tests/
-│   ├── test_phase1.py               # 47  tests — DB schema + models
-│   ├── test_phase2.py               # 87  tests — JIL parser + condition lang
-│   ├── test_phase3.py               # 68  tests — state machine + var sub
-│   ├── test_phase4.py               # 112 tests — event processor
-│   ├── test_phase5.py               # 60  tests — local system agent
-│   ├── test_phase6.py               # 43  tests — remote dispatch
-│   └── test_phase7.py               # 69  tests — box orchestration
-│
-├── data/                            # Runtime SQLite DB (gitignored)
-│   └── autosys.db
-│
+├── jil_files/                       # 54 sample JIL files (297 jobs, financial domain)
+├── examples/                        # Minimal runnable JIL examples
+├── config/calendars/                # Calendar definitions (us_holidays.cal)
+├── docs/                            # Architecture and migration guides
+├── tests/                           # pytest suite (1072 tests)
 └── pyproject.toml
 ```
 
@@ -213,7 +242,8 @@ autosys-clone/
 ### Prerequisites
 
 - Python 3.10 or later
-- No external services required for Phases 1–7 (pure SQLite, no Docker needed)
+- Node.js 18+ (for WCC frontend only)
+- No external services required — pure SQLite, no Docker needed
 
 ### Install
 
@@ -225,29 +255,66 @@ cd autosys-clone
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 
-# Install the package in editable mode with dev dependencies
-pip install -e ".[dev]"
+# Install the package in editable mode
+pip install -e .
+
+# (Optional) Install frontend dependencies
+cd wcc-frontend && npm install && cd ..
 ```
 
 ### Run the tests
 
 ```bash
-pytest tests/                       # all 496 tests
+pytest tests/                       # all 1072 tests
 pytest tests/test_phase1.py -v      # one phase
 pytest tests/ -k "box"              # filter by name
 ```
 
-### Import your first workflow
+### Start the scheduler + API server
 
 ```bash
-# Import the demo ETL workflow
-autosys jil import examples/demo_etl.jil
+# Terminal 1 — start the scheduler + REST API server
+autosys scheduler serve --port 8000 --host 127.0.0.1
+#   → API at http://localhost:8000
+#   → Docs at http://localhost:8000/docs
+#   → WebSocket at ws://localhost:8000/api/v1/ws/events
+```
+
+### Start the WCC frontend (React dashboard)
+
+```bash
+# Terminal 2 — start the React dev server
+cd wcc-frontend
+npx vite --port 5173
+#   → Open http://localhost:5173 in your browser
+```
+
+### Import JIL jobs and run the migration report
+
+```bash
+# Import all sample JIL files (297 jobs across 50 boxes)
+autosys jil import jil_files/01_market_data_ingest.jil
+autosys jil import jil_files/02_reference_data_sync.jil
+# ... or import all at once:
+for f in jil_files/*.jil; do autosys jil import "$f"; done
 
 # See what was imported
-autosys autorep -J demo_etl_box
+autosys autorep -J all              # list all jobs
+autosys box tree mkt_data_ingest_box  # view box hierarchy
 
-# Trigger the box manually
-autosys sendevent -E STARTJOB -J demo_etl_box
+# Generate the migration complexity report
+autosys migration-report --cycles 20 --export migration.csv
+#   → Runs a 20-cycle dry-run simulation
+#   → Extracts 10 structural signals from JIL attributes
+#   → Scores each job for T-shirt size, effort, and risk
+#   → Exports CSV with Astronomer mapping recommendations
+```
+
+### Trigger jobs manually
+
+```bash
+# Start a specific job
+autosys sendevent -E STARTJOB -J check_source_ready
 
 # Start the scheduler daemon (processes events from the queue)
 autosys scheduler start
@@ -269,6 +336,324 @@ autosys machine register local-agent localhost 7520
 autosys sendevent -E STARTJOB -J check_source_ready
 autosys agent jobs              # see running jobs
 autosys agent tail check_source_ready   # tail output
+```
+
+### PostgreSQL Setup (Optional)
+
+The clone defaults to SQLite for zero-config development. For production or
+multi-process deployments, use PostgreSQL:
+
+```bash
+pip install -e ".[dev,pg]"
+createdb autosys
+export AUTOSYS_DB_URL="postgresql://user:pass@localhost:5432/autosys"
+pytest tests/ -m postgresql
+```
+
+---
+
+## How It Works — Features & Components
+
+The AutoSys clone is a complete batch workload scheduling system. Here's how all the pieces fit together and what each feature does:
+
+### JIL Import & Parsing
+
+The **JIL (Job Information Language)** parser reads AutoSys job definition files and imports them into the database. It handles all 50+ AutoSys attributes including `command`, `machine`, `condition`, `start_times`, `days_of_week`, `n_retrys`, `alarm_if_fail`, `box_name`, `timezone`, `notification_emailaddress`, and more.
+
+```bash
+autosys jil import jil_files/01_market_data_ingest.jil    # import one file
+autosys jil validate jil_files/03_trade_booking.jil       # validate without importing
+autosys jil export --all                                  # export all jobs as JIL text
+autosys jil show extract_sales                            # show one job definition
+```
+
+### Event-Driven Scheduler (EPS)
+
+The **Event Processor System (EPS)** is the heart of the scheduler. It runs a continuous loop that:
+
+1. **Dequeues** events from the `event_queue` table (FIFO order)
+2. **Evaluates** job conditions (e.g. `success(check_source_ready) & s(extract_sales)`)
+3. **Dispatches** eligible jobs to local or remote agents
+4. **Activates** children of running BOX jobs
+5. **Triggers** time-based jobs whose `start_times` + `days_of_week` match
+
+Event types: `STARTJOB`, `FORCE_STARTJOB`, `KILLJOB`, `JOB_ON_HOLD`, `JOB_OFF_HOLD`, `JOB_ON_ICE`, `SET_GLOBAL`, `CHANGE_STATUS`, `CHECK_HEARTBEAT`.
+
+### Job Execution — Local & Remote
+
+- **LocalJobRunner** — forks the actual subprocess, captures stdout line-by-line, enforces `max_run_alarm` timeout, handles `KILLJOB` mid-run
+- **RemoteDispatch** — sends jobs to System Agent daemons on remote machines via TCP (newline-delimited JSON protocol)
+- **System Agent** — asyncio TCP server that receives `DISPATCH` messages, runs commands, and reports exit codes back
+
+### BOX Orchestration
+
+BOX jobs are workflow containers. When a BOX starts:
+- Its children become eligible to run (their conditions are evaluated)
+- The BOX completes when all children reach a terminal state (SUCCESS/FAILURE/TERMINATED)
+- `box_terminator` jobs can force-terminate the BOX early
+- Nested boxes are supported (BOX within BOX)
+
+### REST API (SSA)
+
+FastAPI application server exposing:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/jobs` | GET | List all jobs (with filtering) |
+| `/api/v1/jobs/{name}` | GET | Job detail with runs + children |
+| `/api/v1/jobs/{name}/sendevent` | POST | Send an event to a job |
+| `/api/v1/events` | GET/POST | List / enqueue events |
+| `/api/v1/runs` | GET | Run history (optional `?job=` filter) |
+| `/api/v1/alarms` | GET/POST | List / raise alarms |
+| `/api/v1/alarms/{id}/resolve` | POST | Resolve an alarm |
+| `/api/v1/machines` | GET/POST | List / register machines |
+| `/api/v1/globals` | GET/POST | Global variable CRUD |
+| `/api/v1/assessment/migration-report` | GET | Full migration complexity report |
+| `/api/v1/ws/events` | WS | WebSocket live event stream |
+| `/health` | GET | Health check |
+| `/metrics` | GET | Prometheus metrics |
+
+### WCC Dashboard (React Frontend)
+
+The Workload Control Centre is a React + TypeScript single-page app (`wcc-frontend/`) that provides:
+
+- **Job Grid** — sortable, filterable table of all jobs with live status updates
+- **Job Detail** — definition, run history, children (for BOX jobs)
+- **Box Graph** — D3.js force-directed dependency graph
+- **Alarm Console** — active/cleared alarm list
+- **Live Updates** — SSE (Server-Sent Events) polling every 2 seconds
+
+The WCC backend (`autosys/wcc/app.py`) serves a JSON API + SSE stream consumed by the React frontend.
+
+### Alarms & Notifications
+
+- **AlarmManager** — evaluates `alarm_if_fail` and `alarm_if_terminated` flags during simulation/runtime, deduplicates alarms
+- **Notification Dispatcher** — multi-channel delivery: email, Slack, PagerDuty, SNMP traps, BMC Remedy tickets
+- **Alarm lifecycle** — raised → active → resolved (with `cleared_at` timestamp)
+
+### Calendar Engine
+
+Supports `run_calendar` and `exclude_calendar` attributes:
+- Calendars are named date sets stored in the DB
+- Holiday calendars (e.g. `us_holidays.cal`) can be imported
+- Time triggers check calendar membership before firing
+
+### High Availability
+
+- **DistributedLock** — DB-row-based lock for scheduler leader election
+- Primary/standby failover support
+- Only one EPS instance processes events at a time
+
+### Cloud & Cross-Instance Integration
+
+- **CloudIntegration** — submit jobs to AWS/GCP/Azure for execution
+- **RemoteInstanceClient** — query job status on remote AutoSys instances (xinst)
+- **MonitorEvaluator** — evaluates FILE_MONITOR conditions each tick
+- **GlobSubstitution** — expands `%%GLOB:name%%` placeholders in commands
+
+---
+
+## Migration Complexity Analysis
+
+The clone includes a full **AutoSys → Astronomer (Apache Airflow) migration assessment pipeline** that analyzes JIL job definitions and produces a comprehensive complexity report — no runtime access required.
+
+### How It Works
+
+```
+JIL Files → Import → DB → Simulation (20 cycles) → Run Stats
+                              ↓
+                    Structural Analysis (A1-A10)
+                              ↓
+                    Complexity Scoring (T-shirt + Risk)
+                              ↓
+                    Report (CLI / REST / CSV)
+```
+
+### 1. Dry-Run Simulation (`simulation_runner.py`)
+
+Runs a multi-cycle simulation that:
+- Fires `FORCE_STARTJOB` on all top-level BOX and CMD jobs
+- Processes events through the EPS with `FailureInjector` (deterministic seeded failures)
+- Resets jobs between cycles to simulate fresh daily runs
+- Accumulates `JobRunRow` history (start/end times, exit codes, retries)
+- Generates `AlarmRow` records for jobs with `alarm_if_fail: 1` that fail
+
+**FailureInjector** uses JIL attributes to determine failure rates:
+- `n_retrys >= 3` → 25% failure rate
+- `n_retrys 1-2` → 10% failure rate
+- `n_retrys 0` → 3% failure rate
+
+### 2. Structural Analysis (A1-A10) (`migration_signals.py`)
+
+Extracts 10 migration signals from JIL attributes alone — no runtime needed:
+
+| Signal | What It Detects | Migration Impact |
+|--------|----------------|------------------|
+| **A1** Machine concentration | Jobs per machine | Agent migration planning |
+| **A2** Command analysis | Script dialects (bash/ksh/python/perl), hardcoded paths | Operator mapping, log remapping |
+| **A3** Profile analysis | Shared profiles | Connection profile migration |
+| **A4** Box nesting depth | Recursive box_name depth | TaskGroup nesting complexity |
+| **A5** Cross-box dependencies | Conditions referencing jobs in different boxes | ExternalTaskSensor requirement |
+| **A6** Schedule burst | Jobs starting at the same `start_times` | Worker pool sizing |
+| **A7** Notification mapping | Email addresses, alarm_if_fail | Airflow callback migration |
+| **A8** Log path analysis | Hardcoded std_out_file/std_err_file paths | S3/GCS log routing |
+| **A9** Owner/permission | Owner groups, permission tokens | RBAC role mapping |
+| **A10** Timezone analysis | Jobs with timezone attribute | UTC schedule conversion |
+
+### 3. Complexity Scoring (`complexity.py`)
+
+Each job gets assessed on two orthogonal axes:
+
+**T-shirt Size (effort estimate):**
+
+| Size | Effort | Criteria |
+|------|--------|----------|
+| XS | 2h | Simple CMD, no deps |
+| S | 4h | Box with linear deps or one condition |
+| M | 8h | Calendar, time triggers, date_conditions, file-watchers |
+| L | 24h | look_back, virtual resources, complex conditions |
+| XL | 60h | FTP, cross-instance deps, deep BOX trees |
+
+**Operational Risk (from simulated runtime):**
+
+| Risk | Criteria |
+|------|----------|
+| NO_DATA | No run history (not simulated) |
+| NONE | 0 failures, no alarms |
+| LOW | < 10% failure rate, few alarms |
+| MEDIUM | 10-25% failure rate or active alarms |
+| HIGH | > 25% failure rate or inherited from child |
+
+BOX jobs inherit the **worst risk** from their children (risk aggregation).
+
+### 4. Report Features
+
+**CLI** (`autosys migration-report`):
+- Per-job table with size, effort, risk, drivers, and all migration signals
+- Summary with totals, risk distribution, dialect counts
+- Per-box effort breakdown (jobs, hours, size distribution, high-risk jobs per box)
+- Top 5 Astronomer mapping recommendations
+- CSV export with 20 columns including `astronomer_mapping` and `risk_mitigation`
+
+**REST API** (`GET /api/v1/assessment/migration-report`):
+
+```bash
+# Default: 20 simulation cycles
+curl http://localhost:8000/api/v1/assessment/migration-report | python3 -m json.tool
+
+# Custom: 50 cycles
+curl "http://localhost:8000/api/v1/assessment/migration-report?cycles=50"
+```
+
+Query parameters:
+- `cycles` (int, default 20) — Number of simulation cycles for runtime data generation
+
+Response structure:
+```json
+{
+  "generated_at": "2026-08-02T14:50:00",
+  "job_count": 297,
+  "simulation": {
+    "cycles": 20,
+    "total_runs": 3934,
+    "total_failures": 367,
+    "total_alarms": 488,
+    "failure_rate": 0.0933
+  },
+  "jobs": [
+    {
+      "job_name": "extract_sales",
+      "job_type": "CMD",
+      "box_name": "demo_etl_box",
+      "size": "M",
+      "effort_h": 8,
+      "risk": "LOW",
+      "risk_drivers": "1 cleared alarm(s), 1 past retried run(s)",
+      "blast_radius": 2,
+      "gap_tags": "sla-management",
+      "command_dialect": "python",
+      "machine_concentration": "XS",
+      "box_nesting_depth": 1,
+      "has_cross_box_dep": false,
+      "schedule_burst_count": 0,
+      "has_notifications": true,
+      "has_hardcoded_logs": true,
+      "timezone": "",
+      "astronomer_mapping": "PythonOperator / @task decorator + on_failure_callback / SlackNotifier + remap log paths to S3/GCS",
+      "risk_mitigation": "replace hardcoded paths with Airflow templates / XCom"
+    }
+  ],
+  "box_breakdown": [
+    {
+      "box_name": "demo_etl_box",
+      "job_count": 4,
+      "total_effort_h": 32,
+      "sizes": {"XS": 0, "S": 0, "M": 4, "L": 0, "XL": 0},
+      "risks": {"NO_DATA": 0, "NONE": 2, "LOW": 2, "MEDIUM": 0, "HIGH": 0},
+      "high_risk_jobs": []
+    }
+  ],
+  "summary": {
+    "counts": {"XS": 0, "S": 0, "M": 227, "L": 48, "XL": 22},
+    "hours": {"XS": 0, "S": 0, "M": 1816, "L": 1152, "XL": 1320},
+    "total_jobs": 297,
+    "raw_hours": 4288,
+    "platform_h": 857,
+    "testing_h": 1286,
+    "pm_h": 643,
+    "training_h": 428,
+    "total_h": 7502,
+    "total_days": 938,
+    "risk_counts": {"NO_DATA": 8, "NONE": 58, "LOW": 63, "MEDIUM": 160, "HIGH": 8},
+    "migration_signals": {
+      "cross_box_dep_count": 45,
+      "max_box_nesting": 1,
+      "max_schedule_burst": 5,
+      "notification_job_count": 297,
+      "hardcoded_log_job_count": 243,
+      "timezone_count": 62,
+      "dialect_counts": {"python": 164, "bash": 78}
+    }
+  },
+  "csv": "job_name,job_type,box_name,size,effort_h,risk,...\nextract_sales,CMD,demo_etl_box,M,8,LOW,...\n..."
+}
+```
+
+The response includes:
+- **`simulation`** — run/failure/alarm counts and failure rate
+- **`jobs`** — per-job assessment with all migration signals, Astronomer mapping, and risk mitigation
+- **`box_breakdown`** — per-box effort totals, size/risk distribution, and high-risk job list
+- **`summary`** — aggregate counts, effort breakdown (platform/testing/PM/training), risk distribution, and migration signal totals
+- **`csv`** — full CSV export as a string (20 columns including `astronomer_mapping` and `risk_mitigation`)
+
+**Astronomer Mapping Recommendations** — per job:
+- BOX jobs → `TaskGroup (nested DAG)` or `DAG with ExternalTaskSensor`
+- Python CMD → `PythonOperator / @task decorator`
+- Bash CMD → `BashOperator`
+- Cross-box deps → `ExternalTaskSensor with poke_interval tuning`
+- Notifications → `on_failure_callback / SlackNotifier`
+- Hardcoded logs → `remap log paths to S3/GCS`
+- Timezone → `timezone-aware schedule (US/Eastern → UTC)`
+- Schedule burst > 10 → `stagger start times to avoid worker saturation`
+
+**Risk Mitigation Suggestions** — per job:
+- HIGH risk → `PRIORITY: migrate early with extra testing`
+- High failure rate → `add Airflow retries + retry_delay_exponential`
+- Active alarms → `set up Airflow alerts + PagerDuty integration`
+- Hardcoded paths → `replace with Airflow templates / XCom`
+- Timezone → `convert US/Eastern schedule to UTC`
+
+### Sample Report Output
+
+With 297 imported jobs (50 BOX, 247 CMD) across 54 JIL files:
+
+```
+Simulation: 3934 runs, 367 failures, 488 alarms, 9.3% fail rate
+Total Jobs: 297    Total Effort: 7502h (938 days)
+T-shirt Sizes:  XS=0  S=0  M=227  L=48  XL=22
+Risk Levels:    NO_DATA=8  NONE=58  LOW=63  MEDIUM=160  HIGH=8
+Cross-box dependencies: 45
+Command dialects: python=164, bash=78
 ```
 
 ---
@@ -1488,7 +1873,14 @@ pytest tests/ --cov=autosys --cov-report=term-missing
 | 5 | 60 | LocalJobRunner, subprocess, stdout capture, kill |
 | 6 | 43 | TCP protocol, agent server, RemoteDispatch, machine registry |
 | 7 | 69 | BoxManager, insert_machine, box CLI commands |
-| **Total** | **496** | |
+| 8 | 40 | REST API, auth, WebSocket, alarms, globals, metrics |
+| 9 | 30 | WCC JSON API, SSE, React frontend hardening |
+| 10 | 25 | Alarm manager, notification dispatcher, SNMP/Remedy |
+| 11 | 20 | Calendar engine, holiday exclusions, CLI |
+| 12 | 15 | End-to-end integration, production hardening |
+| Migration | 50 | Simulator, structural analysis, complexity report, e2e |
+| Other | 35 | HA, cloud integration, xinst, notifications, agents |
+| **Total** | **1072** | |
 
 ---
 

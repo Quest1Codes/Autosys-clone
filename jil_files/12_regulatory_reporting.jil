@@ -1,0 +1,164 @@
+/* ============================================================
+   FILE: 12_regulatory_reporting.jil
+   DOMAIN: Regulatory Reporting
+   STATUS: INACTIVE (waits for risk + GL + stress to complete)
+   UPSTREAM: 06_risk_engine (risk_engine_box)
+             07_stress_testing (stress_test_box)
+             11_gl_posting (gl_posting_box)
+             18_liquidity_reporting (liquidity_reporting_box)
+             19_counterparty_exposure (counterparty_exposure_box)
+             17_credit_risk (credit_risk_box)
+   DOWNSTREAM: 35_audit_trail, 50_end_of_month_close
+   ============================================================ */
+
+insert_job: regulatory_box   job_type: BOX
+owner: svc_compliance
+condition: success(risk_engine_box) & success(stress_test_box) & success(gl_posting_box) & success(liquidity_reporting_box) & success(counterparty_exposure_box) & success(credit_risk_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 180
+description: "Produce and submit FINRA, SEC, CCAR, Basel, LCR, NSFR, MiFID II reports"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,04:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: regulatory-ops@bank.com
+
+/* Step 1A: Generate FINRA Order Audit Trail (OATS/CAT) */
+insert_job: generate_finra_cat_report   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/gen_finra_cat.py --date %%DATE%% --format CAT_XML
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/finra_cat_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/finra_cat_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 15
+
+/* Step 1B: Generate SEC 13F institutional holdings report (quarterly) */
+insert_job: generate_sec_13f_report   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/gen_sec_13f.py --date %%DATE%% --quarter %%QUARTER%%
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/sec_13f_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/sec_13f_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 10
+job_on_hold: 1
+
+/* Step 1C: Generate CCAR/DFAST capital adequacy report */
+insert_job: generate_ccar_dfast_report   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/gen_ccar.py --date %%DATE%% --scenarios /data/stress/results_%%DATE%%.parquet
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/ccar_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/ccar_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 20
+
+/* Step 1D: Generate Basel III capital requirement report */
+insert_job: generate_basel_capital_report   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/gen_basel.py --date %%DATE%% --framework BASEL_III --pillar PILLAR1,PILLAR2,PILLAR3
+machine: reg-app-02
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/basel_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/basel_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 20
+
+/* Step 1E: Generate MiFID II transaction report (ESMA) */
+insert_job: generate_mifid2_transaction_report   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/gen_mifid2.py --date %%DATE%% --venue ALL --format ISO20022
+machine: reg-app-02
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/mifid2_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/mifid2_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+/* Step 2: Validate all regulatory reports before submission */
+insert_job: validate_all_regulatory_reports   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/validate_reports.py --date %%DATE%% --reports FINRA_CAT,CCAR,BASEL,MIFID2
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(generate_finra_cat_report) & success(generate_ccar_dfast_report) & success(generate_basel_capital_report) & success(generate_mifid2_transaction_report)
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/validate_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/validate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 3: Submit validated reports to regulators via secure portals */
+insert_job: submit_reports_to_regulators   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/reg/submit_all.sh --date %%DATE%% --regulators FINRA,SEC,FRB,ESMA
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(validate_all_regulatory_reports)
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/submit_%%DATE%%.out
+std_err_file: /logs/reg/%%YEAR%%/%%MM%%/submit_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 10
+
+/* FAILURE HANDLER: Block submission and alert compliance officer */
+insert_job: block_submission_on_validation_fail   job_type: CMD
+box_name: regulatory_box
+owner: svc_compliance
+command: /scripts/alerts/compliance_alert.sh "REGULATORY REPORT VALIDATION FAILED %%DATE%%" --notify cco@bank.com
+machine: reg-app-01
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: failure(validate_all_regulatory_reports)
+std_out_file: /logs/reg/%%YEAR%%/%%MM%%/block_alert_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

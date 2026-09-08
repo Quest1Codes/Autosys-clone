@@ -1,0 +1,94 @@
+/* ============================================================
+   FILE: 35_audit_trail.jil
+   DOMAIN: Immutable Audit Trail & Event Log
+   SCHEDULE: End of day after all workflows complete
+   STATUS: SUCCESS
+   UPSTREAM: 04_trade_booking (trade_booking_box)
+             11_gl_posting (gl_posting_box)
+             12_regulatory_reporting (regulatory_box)
+             32_compliance_monitoring (compliance_monitoring_box)
+   DOWNSTREAM: 39_archival_purge
+   ============================================================ */
+
+insert_job: audit_trail_box   job_type: BOX
+owner: svc_audit
+condition: success(trade_booking_box) & success(gl_posting_box) & success(regulatory_box) & success(compliance_monitoring_box)
+start_times: "23:30"
+days_of_week: mo,tu,we,th,fr
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Collect, sign and archive immutable audit events for all EOD workflows"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "23:30,04:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: audit@bank.com
+
+insert_job: collect_audit_events   job_type: CMD
+box_name: audit_trail_box
+owner: svc_audit
+command: /scripts/audit/collect_events.py --date %%DATE%% --sources TRADE_DB,GL_DB,RISK_DB,COMPLIANCE_DB
+machine: audit-app-01
+profile: /etc/autosys/profiles/svc_audit.sh
+std_out_file: /logs/audit/%%YEAR%%/%%MM%%/collect_%%DATE%%.out
+std_err_file: /logs/audit/%%YEAR%%/%%MM%%/collect_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: sign_audit_events_hmac   job_type: CMD
+box_name: audit_trail_box
+owner: svc_audit
+command: /scripts/audit/sign_events.py --date %%DATE%% --algorithm HMAC_SHA256 --key_id AUDIT_SIGNING_KEY
+machine: audit-app-01
+profile: /etc/autosys/profiles/svc_audit.sh
+condition: success(collect_audit_events)
+std_out_file: /logs/audit/%%YEAR%%/%%MM%%/sign_%%DATE%%.out
+std_err_file: /logs/audit/%%YEAR%%/%%MM%%/sign_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 2
+term_run_time: 20
+job_load: 10
+
+insert_job: write_to_immutable_audit_store   job_type: CMD
+box_name: audit_trail_box
+owner: svc_audit
+command: /scripts/audit/write_immutable.sh --date %%DATE%% --store WORM_S3 --bucket audit-archive
+machine: audit-app-01
+profile: /etc/autosys/profiles/svc_audit.sh
+condition: success(sign_audit_events_hmac)
+std_out_file: /logs/audit/%%YEAR%%/%%MM%%/write_%%DATE%%.out
+std_err_file: /logs/audit/%%YEAR%%/%%MM%%/write_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: verify_audit_completeness   job_type: CMD
+box_name: audit_trail_box
+owner: svc_audit
+command: /scripts/audit/verify_completeness.py --date %%DATE%% --expected_event_types 47
+machine: audit-app-01
+profile: /etc/autosys/profiles/svc_audit.sh
+condition: success(write_to_immutable_audit_store)
+std_out_file: /logs/audit/%%YEAR%%/%%MM%%/verify_%%DATE%%.out
+std_err_file: /logs/audit/%%YEAR%%/%%MM%%/verify_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5

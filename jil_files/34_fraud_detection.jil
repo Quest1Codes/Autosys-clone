@@ -1,0 +1,91 @@
+/* ============================================================
+   FILE: 34_fraud_detection.jil
+   DOMAIN: Fraud Detection & Market Surveillance
+   STATUS: RUNNING
+   UPSTREAM: 03_trade_capture (trade_capture_box)
+             33_sanctions_screening (sanctions_screening_box)
+   DOWNSTREAM: 32_compliance_monitoring
+   ============================================================ */
+
+insert_job: fraud_detection_box   job_type: BOX
+owner: svc_compliance
+condition: success(trade_capture_box) & success(sanctions_screening_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Detect insider trading, front-running, spoofing and wash trading patterns"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: surveillance@bank.com
+
+insert_job: run_market_surveillance   job_type: CMD
+box_name: fraud_detection_box
+owner: svc_compliance
+command: /scripts/fraud/market_surveillance.py --date %%DATE%% --patterns SPOOFING,LAYERING,WASH_TRADE
+machine: compliance-app-02
+profile: /etc/autosys/profiles/svc_compliance.sh
+std_out_file: /logs/fraud/%%YEAR%%/%%MM%%/surveillance_%%DATE%%.out
+std_err_file: /logs/fraud/%%YEAR%%/%%MM%%/surveillance_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 45
+min_run_alarm: 5
+term_run_time: 50
+job_load: 30
+
+insert_job: detect_insider_trading_patterns   job_type: CMD
+box_name: fraud_detection_box
+owner: svc_compliance
+command: /scripts/fraud/insider_detection.py --date %%DATE%% --lookback_days 30
+machine: compliance-app-02
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(run_market_surveillance)
+std_out_file: /logs/fraud/%%YEAR%%/%%MM%%/insider_%%DATE%%.out
+std_err_file: /logs/fraud/%%YEAR%%/%%MM%%/insider_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 20
+
+insert_job: score_anomalous_transactions   job_type: CMD
+box_name: fraud_detection_box
+owner: svc_compliance
+command: /scripts/fraud/score_anomalies.py --date %%DATE%% --model ISOLATION_FOREST --threshold 0.92
+machine: compliance-app-02
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(run_market_surveillance)
+std_out_file: /logs/fraud/%%YEAR%%/%%MM%%/anomalies_%%DATE%%.out
+std_err_file: /logs/fraud/%%YEAR%%/%%MM%%/anomalies_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 20
+
+insert_job: generate_fraud_alerts   job_type: CMD
+box_name: fraud_detection_box
+owner: svc_compliance
+command: /scripts/fraud/gen_alerts.py --date %%DATE%% --notify surveillance@bank.com
+machine: compliance-app-02
+profile: /etc/autosys/profiles/svc_compliance.sh
+condition: success(detect_insider_trading_patterns) & success(score_anomalous_transactions)
+std_out_file: /logs/fraud/%%YEAR%%/%%MM%%/alerts_%%DATE%%.out
+std_err_file: /logs/fraud/%%YEAR%%/%%MM%%/alerts_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

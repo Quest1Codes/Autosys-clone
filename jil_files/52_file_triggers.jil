@@ -1,0 +1,219 @@
+/* ============================================================
+   FILE: 52_file_triggers.jil
+   DOMAIN: File-Triggered Pipelines (FILEWATCH jobs)
+   PURPOSE: Watch for inbound files from external counterparties and
+            trigger downstream processing pipelines on arrival.
+   PATTERNS:
+     - FILEWATCH job polls every N seconds for a file to appear.
+     - Once found (>= min_size bytes), status → SUCCESS.
+     - A BOX condition: success(watch_*) triggers the real processing.
+   ============================================================ */
+
+
+/* ============================================================
+   TRIGGER 1: SWIFT MT940 Daily Cash Statement
+   Source:    Custodian bank via SWIFT Alliance
+   Triggers:  Nostro reconciliation pipeline
+   ============================================================ */
+
+insert_job: watch_swift_mt940_file   job_type: FILEWATCH
+owner: svc_ops
+watch_file: /data/inbound/swift/MT940_%%DATE%%.fin
+watch_file_min_size: 1024
+watch_interval: 60
+machine: settlement-app-01
+start_times: "18:00"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+alarm_if_terminated: 1
+max_run_alarm: 180
+description: "Watch for SWIFT MT940 daily cash statement from custodian (post-NY close)"
+timezone: US/Eastern
+
+insert_job: swift_triggered_nostro_box   job_type: BOX
+owner: svc_ops
+condition: success(watch_swift_mt940_file)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Nostro reconciliation triggered by SWIFT MT940 file arrival"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+notification_emailaddress: ops-alerts@bank.com
+
+insert_job: parse_mt940_statement   job_type: CMD
+box_name: swift_triggered_nostro_box
+owner: svc_ops
+command: /scripts/swift/parse_mt940.py --file %%INBOUND_ROOT%%/swift/MT940_%%DATE%%.fin --date %%DATE%%
+machine: settlement-app-01
+profile: /etc/autosys/profiles/svc_ops.sh
+std_out_file: /logs/swift/%%YEAR%%/%%MM%%/parse_mt940_%%DATE%%.out
+std_err_file: /logs/swift/%%YEAR%%/%%MM%%/parse_mt940_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5
+
+insert_job: reconcile_nostro_positions   job_type: CMD
+box_name: swift_triggered_nostro_box
+owner: svc_ops
+command: /scripts/nostro/reconcile.py --date %%DATE%% --statement %%INBOUND_ROOT%%/swift/MT940_%%DATE%%.fin
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_ops.sh
+condition: success(parse_mt940_statement)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/recon_%%DATE%%.out
+std_err_file: /logs/nostro/%%YEAR%%/%%MM%%/recon_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 10
+
+insert_job: publish_nostro_recon_report   job_type: CMD
+box_name: swift_triggered_nostro_box
+owner: svc_ops
+command: /scripts/nostro/publish_report.py --date %%DATE%% --notify %%ALERT_EMAIL%%
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_ops.sh
+condition: success(reconcile_nostro_positions)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/report_%%DATE%%.out
+std_err_file: /logs/nostro/%%YEAR%%/%%MM%%/report_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5
+
+/* FAILURE HANDLER: Nostro break alert */
+insert_job: swift_nostro_break_alert   job_type: CMD
+box_name: swift_triggered_nostro_box
+owner: svc_ops
+command: /scripts/alerts/send_page.sh "NOSTRO BREAK on %%DATE%% — immediate review required" --notify %%ALERT_EMAIL%%
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_ops.sh
+condition: failure(reconcile_nostro_positions)
+std_out_file: /logs/nostro/%%YEAR%%/%%MM%%/break_alert_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1
+
+
+/* ============================================================
+   TRIGGER 2: Bloomberg EOD Price Snapshot File
+   Source:    Bloomberg Data License FTP drop
+   Triggers:  Supplement / override for live feed in mkt_data_ingest_box
+   ============================================================ */
+
+insert_job: watch_bloomberg_eod_file   job_type: FILEWATCH
+owner: svc_mktdata
+watch_file: /data/inbound/bloomberg/PRICES_%%DATE%%.csv.gz
+watch_file_min_size: 102400
+watch_interval: 30
+machine: mktdata-app-01
+start_times: "17:00"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+alarm_if_terminated: 1
+max_run_alarm: 120
+description: "Watch for Bloomberg EOD batch price file (Data License FTP drop)"
+timezone: US/Eastern
+
+
+/* ============================================================
+   TRIGGER 3: Prime Broker Trade Confirmation File
+   Source:    Prime broker SFTP (post-market-close batch)
+   Triggers:  Trade confirmation matching and booking
+   ============================================================ */
+
+insert_job: watch_prime_broker_confirms   job_type: FILEWATCH
+owner: svc_ops
+watch_file: /data/inbound/confirms/TRADECONF_%%DATE%%.csv
+watch_file_min_size: 512
+watch_interval: 60
+machine: trade-app-01
+start_times: "16:30"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+alarm_if_terminated: 1
+max_run_alarm: 120
+description: "Watch for prime broker trade confirmation file (post-US-market close)"
+timezone: US/Eastern
+
+insert_job: pb_confirms_box   job_type: BOX
+owner: svc_ops
+condition: success(watch_prime_broker_confirms)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Process prime broker trade confirmations and match against bookings"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "16:30,21:00"
+alarm_if_terminated: 1
+notification_emailaddress: ops-alerts@bank.com
+
+insert_job: match_pb_confirmations   job_type: CMD
+box_name: pb_confirms_box
+owner: svc_ops
+command: /scripts/confirms/match_confirms.py --date %%DATE%% --file %%INBOUND_ROOT%%/confirms/TRADECONF_%%DATE%%.csv
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_ops.sh
+std_out_file: /logs/confirms/%%YEAR%%/%%MM%%/match_%%DATE%%.out
+std_err_file: /logs/confirms/%%YEAR%%/%%MM%%/match_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 15
+
+insert_job: escalate_unmatched_confirms   job_type: CMD
+box_name: pb_confirms_box
+owner: svc_ops
+command: /scripts/confirms/escalate_breaks.sh --date %%DATE%% --notify %%ALERT_EMAIL%%
+machine: trade-app-01
+profile: /etc/autosys/profiles/svc_ops.sh
+condition: failure(match_pb_confirmations)
+std_out_file: /logs/confirms/%%YEAR%%/%%MM%%/escalate_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1
+
+
+/* ============================================================
+   TRIGGER 4: CLS FX Settlement Instruction File
+   Source:    CLS Bank SFTP
+   Triggers:  FX settlement and payment instruction processing
+   ============================================================ */
+
+insert_job: watch_cls_fx_settlement_file   job_type: FILEWATCH
+owner: svc_ops
+watch_file: /data/inbound/settlement/CLS_FX_SETTLE_%%DATE%%.xml
+watch_file_min_size: 2048
+watch_interval: 60
+machine: settlement-app-01
+start_times: "17:30"
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+alarm_if_terminated: 1
+max_run_alarm: 90
+description: "Watch for CLS FX settlement instruction file (pre-SWIFT cutoff)"
+timezone: US/Eastern

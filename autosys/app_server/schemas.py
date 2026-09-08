@@ -18,7 +18,7 @@ class JobResponse(BaseModel):
     """Summary view of a job — used in list responses."""
     job_name:     str
     job_type:     str
-    status:       str
+    status:       int
     machine:      Optional[str] = None
     box_name:     Optional[str] = None
     condition:    Optional[str] = None
@@ -39,13 +39,25 @@ class JobDetailResponse(JobResponse):
     run_calendar:      Optional[str]   = None
     exclude_calendar:  Optional[str]   = None
     n_retrys:          int             = 0
-    max_run_alarm:     int             = 0
-    min_run_alarm:     int             = 0
-    term_run_time:     int             = 0
+    max_run_alarm:     Optional[int]   = None
+    min_run_alarm:     Optional[int]   = None
+    term_run_time:     Optional[int]   = None
     alarm_if_terminated: bool          = False
     description:       Optional[str]   = None
     std_out_file:      Optional[str]   = None
     std_err_file:      Optional[str]   = None
+    priority:          Optional[int]   = None
+    timezone:          Optional[str]   = None
+    auto_delete:       bool            = False
+    application:       Optional[str]   = None
+    sub_application:   Optional[str]   = None
+    command_timeout:   Optional[int]   = None
+    continuous:        bool            = False
+    cpu_usage:         Optional[int]   = None
+    disk_space:        Optional[int]   = None
+    auth_string:       Optional[str]   = None
+    connection_retry:  Optional[int]   = None
+    connection_timeout: Optional[int]  = None
 
     model_config = {"from_attributes": True}
 
@@ -87,7 +99,7 @@ class EventResponse(BaseModel):
 class RunResponse(BaseModel):
     run_id:           str
     job_name:         str
-    status:           str
+    status:           int
     exit_code:        Optional[int]   = None
     machine:          Optional[str]   = None
     run_date:         Optional[str]   = None
@@ -169,6 +181,50 @@ class HealthResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# JIL import / validate
+# ---------------------------------------------------------------------------
+
+class JILImportRequest(BaseModel):
+    content: str
+    dry_run: bool = False
+
+
+class JILJobResult(BaseModel):
+    action: str   # OK | INSERTED | UPDATED | DELETED | MACHINE
+    name:   str
+    type:   str
+
+
+class JILImportResponse(BaseModel):
+    success:    bool
+    jobs:       list[JILJobResult] = []
+    n_inserted: int = 0
+    n_updated:  int = 0
+    n_deleted:  int = 0
+    n_machines: int = 0
+    error:      Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# Alarms
+# ---------------------------------------------------------------------------
+
+class AlarmResponse(BaseModel):
+    alarm_id:            str
+    job_name:            str
+    run_id:              Optional[str] = None
+    alarm_type:          str
+    message:             str
+    job_status_at_raise: Optional[str] = None
+    raised_at:           datetime
+    cleared_at:          Optional[datetime] = None
+    cleared_by:          Optional[str] = None
+    active:              bool
+
+    model_config = {"from_attributes": True}
+
+
+# ---------------------------------------------------------------------------
 # WebSocket event broadcast
 # ---------------------------------------------------------------------------
 
@@ -179,3 +235,79 @@ class WsStatusChange(BaseModel):
     old:      str
     new:      str
     ts:       str      # ISO 8601
+
+
+# ---------------------------------------------------------------------------
+# Assessment — Phase 1 migration complexity report (consumed by Shinro)
+# ---------------------------------------------------------------------------
+
+class AssessmentJobRecord(BaseModel):
+    job_name: str
+    job_type: str
+    box_name: str
+    size:     str
+    effort_h: int
+    drivers:  str
+    risk:         str = "NO_DATA"
+    risk_drivers: str = ""
+    blast_radius: int = 0
+    gap_tags:     str = ""
+
+
+class AssessmentSummaryResponse(BaseModel):
+    counts:     dict[str, int]
+    hours:      dict[str, int]
+    total_jobs: int
+    raw_hours:  int
+    platform_h: int
+    testing_h:  int
+    pm_h:       int
+    training_h: int
+    total_h:    int
+    total_days: int
+    risk_counts:         dict[str, int] = {}
+    gap_severity_counts: dict[str, int] = {}
+
+
+class AssessmentReportResponse(BaseModel):
+    """GET /api/v1/assessment/report — full T-shirt-size complexity report."""
+    generated_at: datetime
+    box_filter:   Optional[str] = None
+    job_count:    int
+    jobs:         list[AssessmentJobRecord]
+    summary:      AssessmentSummaryResponse
+
+
+class BoxTraceRequest(BaseModel):
+    max_ticks:         int  = Field(50, ge=1, le=500)
+    ignore_run_window: bool = False
+    ignore_calendar:   bool = False
+
+
+class BoxTraceTransitionEntry(BaseModel):
+    tick:     int
+    job_name: str
+    old:      int | str
+    new:      int | str
+    ts:       str
+
+
+class BoxTraceJobEntry(BaseModel):
+    job_name:       str
+    job_type:       str
+    condition:      Optional[str] = None
+    wave:           Optional[int] = None
+    activated_tick: Optional[int] = None
+    final_status:   str
+
+
+class BoxTraceResponse(BaseModel):
+    """POST /api/v1/assessment/boxes/{box_name}/trace — dry-run state-machine export."""
+    box_name:     str
+    triggered_at: str
+    completed_at: Optional[str] = None
+    outcome:      str
+    tick_count:   int
+    wave_count:   int
+    jobs:         list[BoxTraceJobEntry]
+    transitions:  list[BoxTraceTransitionEntry]

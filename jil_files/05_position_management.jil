@@ -1,0 +1,109 @@
+/* ============================================================
+   FILE: 05_position_management.jil
+   DOMAIN: Position Management
+   STATUS: SUCCESS
+   UPSTREAM: 04_trade_booking (trade_booking_box)
+   DOWNSTREAM: 06_risk_engine, 10_pnl_calculation, 13_portfolio_nav,
+               20_collateral_management, 43_custody_reporting
+   ============================================================ */
+
+insert_job: position_mgmt_box   job_type: BOX
+owner: svc_position
+condition: success(trade_booking_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Update, reconcile and publish EOD positions across all books"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "19:00,23:59"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: position-ops@bank.com
+
+/* Step 1: Compute EOD positions from all booked trades */
+insert_job: compute_eod_positions   job_type: CMD
+box_name: position_mgmt_box
+owner: svc_position
+command: /scripts/position/compute_eod_positions.py --date %%DATE%% --books ALL
+machine: position-app-01
+profile: /etc/autosys/profiles/svc_position.sh
+std_out_file: /logs/position/%%YEAR%%/%%MM%%/compute_%%DATE%%.out
+std_err_file: /logs/position/%%YEAR%%/%%MM%%/compute_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 2: Reconcile internal positions vs custodian statements */
+insert_job: reconcile_vs_custodian   job_type: CMD
+box_name: position_mgmt_box
+owner: svc_position
+command: /scripts/position/reconcile_custodian.py --date %%DATE%% --custodian STATE_STREET
+machine: position-app-01
+profile: /etc/autosys/profiles/svc_position.sh
+condition: success(compute_eod_positions)
+std_out_file: /logs/position/%%YEAR%%/%%MM%%/reconcile_%%DATE%%.out
+std_err_file: /logs/position/%%YEAR%%/%%MM%%/reconcile_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 5
+term_run_time: 25
+job_load: 10
+
+/* Step 3: Flag and report position breaks to operations */
+insert_job: flag_position_breaks   job_type: CMD
+box_name: position_mgmt_box
+owner: svc_position
+command: /scripts/position/flag_breaks.sh --date %%DATE%% --threshold 1000 --notify ops@bank.com
+machine: position-app-01
+profile: /etc/autosys/profiles/svc_position.sh
+condition: success(reconcile_vs_custodian)
+std_out_file: /logs/position/%%YEAR%%/%%MM%%/breaks_%%DATE%%.out
+std_err_file: /logs/position/%%YEAR%%/%%MM%%/breaks_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 5
+
+/* Step 4: Publish final EOD positions to downstream systems */
+insert_job: publish_eod_positions   job_type: CMD
+box_name: position_mgmt_box
+owner: svc_position
+command: /scripts/position/publish_positions.sh --date %%DATE%% --consumers RISK,PNL,NAV,DW
+machine: position-app-01
+profile: /etc/autosys/profiles/svc_position.sh
+condition: success(flag_position_breaks)
+std_out_file: /logs/position/%%YEAR%%/%%MM%%/publish_%%DATE%%.out
+std_err_file: /logs/position/%%YEAR%%/%%MM%%/publish_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* FAILURE HANDLER: Use T-1 positions if reconciliation critically fails */
+insert_job: fallback_to_prior_positions   job_type: CMD
+box_name: position_mgmt_box
+owner: svc_position
+command: /scripts/position/fallback_positions.sh --fallback_date %%YESTERDAY%% --alert risk-mgmt@bank.com
+machine: position-app-01
+profile: /etc/autosys/profiles/svc_position.sh
+condition: failure(reconcile_vs_custodian)
+std_out_file: /logs/position/%%YEAR%%/%%MM%%/fallback_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 2

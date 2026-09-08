@@ -1,0 +1,87 @@
+/* ============================================================
+   FILE: 29_trade_confirmation.jil
+   DOMAIN: Trade Confirmation & Affirmation
+   STATUS: RUNNING
+   UPSTREAM: 03_trade_capture (trade_capture_box)
+   DOWNSTREAM: 08_settlement
+   ============================================================ */
+
+insert_job: trade_confirmation_box   job_type: BOX
+owner: svc_operations
+condition: success(trade_capture_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Send, match and affirm trade confirmations via MarkitWire, ICE Link, and DTCC CTM"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "09:00,16:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: ops@bank.com
+
+insert_job: send_electronic_confirmations   job_type: CMD
+box_name: trade_confirmation_box
+owner: svc_operations
+command: /scripts/confirm/send_confirms.py --date %%DATE%% --platform MARKITWIRE,ICE_LINK
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+std_out_file: /logs/confirm/%%YEAR%%/%%MM%%/send_%%DATE%%.out
+std_err_file: /logs/confirm/%%YEAR%%/%%MM%%/send_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: match_counterparty_confirmations   job_type: CMD
+box_name: trade_confirmation_box
+owner: svc_operations
+command: /scripts/confirm/match_confirms.py --date %%DATE%% --platform DTCC_CTM
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(send_electronic_confirmations)
+std_out_file: /logs/confirm/%%YEAR%%/%%MM%%/match_%%DATE%%.out
+std_err_file: /logs/confirm/%%YEAR%%/%%MM%%/match_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+insert_job: affirm_matched_trades   job_type: CMD
+box_name: trade_confirmation_box
+owner: svc_operations
+command: /scripts/confirm/affirm_trades.py --date %%DATE%% --deadline 15:30
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: success(match_counterparty_confirmations)
+std_out_file: /logs/confirm/%%YEAR%%/%%MM%%/affirm_%%DATE%%.out
+std_err_file: /logs/confirm/%%YEAR%%/%%MM%%/affirm_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15
+
+/* FAILURE HANDLER: Escalate unaffirmed trades before 15:30 cut-off */
+insert_job: escalate_unaffirmed_trades   job_type: CMD
+box_name: trade_confirmation_box
+owner: svc_operations
+command: /scripts/confirm/escalate_unaffirmed.sh --date %%DATE%% --notify ops@bank.com --page
+machine: ops-app-01
+profile: /etc/autosys/profiles/svc_operations.sh
+condition: failure(affirm_matched_trades)
+std_out_file: /logs/confirm/%%YEAR%%/%%MM%%/escalate_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1

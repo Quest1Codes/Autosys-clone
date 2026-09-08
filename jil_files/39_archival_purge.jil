@@ -1,0 +1,92 @@
+/* ============================================================
+   FILE: 39_archival_purge.jil
+   DOMAIN: Data Archival & Retention Management
+   SCHEDULE: First Sunday of each month, 02:00
+   STATUS: RUNNING (monthly)
+   UPSTREAM: 35_audit_trail (audit_trail_box)
+             36_data_quality_checks (data_quality_box)
+   DOWNSTREAM: None
+   ============================================================ */
+
+insert_job: archival_purge_box   job_type: BOX
+owner: svc_dataeng
+condition: success(audit_trail_box) & success(data_quality_box)
+start_times: "02:00"
+days_of_week: su
+alarm_if_fail: 1
+max_run_alarm: 240
+description: "Archive aged data to cold storage (S3 Glacier) and purge per retention policy"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "02:00,12:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: data-governance@bank.com
+
+insert_job: identify_data_for_archival   job_type: CMD
+box_name: archival_purge_box
+owner: svc_dataeng
+command: /scripts/archive/identify_aged.py --retention_policy /config/data_retention.yaml --as_of %%DATE%%
+machine: etl-server-02
+profile: /etc/autosys/profiles/svc_dataeng.sh
+std_out_file: /logs/archive/%%YEAR%%/%%MM%%/identify_%%DATE%%.out
+std_err_file: /logs/archive/%%YEAR%%/%%MM%%/identify_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+insert_job: archive_trade_history_to_glacier   job_type: CMD
+box_name: archival_purge_box
+owner: svc_dataeng
+command: /scripts/archive/archive_to_glacier.sh --domain TRADE --retention_years 7 --encrypt
+machine: etl-server-02
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(identify_data_for_archival)
+std_out_file: /logs/archive/%%YEAR%%/%%MM%%/trade_archive_%%DATE%%.out
+std_err_file: /logs/archive/%%YEAR%%/%%MM%%/trade_archive_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 120
+min_run_alarm: 10
+term_run_time: 125
+job_load: 20
+
+insert_job: archive_audit_logs_to_worm   job_type: CMD
+box_name: archival_purge_box
+owner: svc_dataeng
+command: /scripts/archive/archive_audit.sh --domain AUDIT --retention_years 10 --storage WORM_S3
+machine: etl-server-02
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(identify_data_for_archival)
+std_out_file: /logs/archive/%%YEAR%%/%%MM%%/audit_archive_%%DATE%%.out
+std_err_file: /logs/archive/%%YEAR%%/%%MM%%/audit_archive_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 15
+
+insert_job: purge_expired_records   job_type: CMD
+box_name: archival_purge_box
+owner: svc_dataeng
+command: /scripts/archive/purge_expired.py --dry_run false --notify data-governance@bank.com
+machine: etl-server-02
+profile: /etc/autosys/profiles/svc_dataeng.sh
+condition: success(archive_trade_history_to_glacier) & success(archive_audit_logs_to_worm)
+std_out_file: /logs/archive/%%YEAR%%/%%MM%%/purge_%%DATE%%.out
+std_err_file: /logs/archive/%%YEAR%%/%%MM%%/purge_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 0
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15

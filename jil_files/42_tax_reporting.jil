@@ -1,0 +1,91 @@
+/* ============================================================
+   FILE: 42_tax_reporting.jil
+   DOMAIN: Tax Reporting (FATCA, CRS, 1099, Form 8949)
+   SCHEDULE: Quarterly (month-end) + annual year-end
+   STATUS: RUNNING (quarterly trigger)
+   UPSTREAM: 11_gl_posting (gl_posting_box)
+             23_dividend_processing (dividend_processing_box)
+   DOWNSTREAM: External tax authorities
+   ============================================================ */
+
+insert_job: tax_reporting_box   job_type: BOX
+owner: svc_tax
+condition: success(gl_posting_box) & success(dividend_processing_box)
+days_of_week: mo,tu,we,th,fr
+alarm_if_fail: 1
+max_run_alarm: 120
+description: "Generate FATCA, CRS, 1099-B, 1042-S and Form 8949 tax reports"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,04:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: tax-ops@bank.com
+
+insert_job: compute_realized_gains_for_tax   job_type: CMD
+box_name: tax_reporting_box
+owner: svc_tax
+command: /scripts/tax/realized_gains.py --date %%DATE%% --method FIFO --jurisdiction US,UK,EU
+machine: tax-app-01
+profile: /etc/autosys/profiles/svc_tax.sh
+std_out_file: /logs/tax/%%YEAR%%/%%MM%%/realized_gains_%%DATE%%.out
+std_err_file: /logs/tax/%%YEAR%%/%%MM%%/realized_gains_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+insert_job: generate_fatca_reports   job_type: CMD
+box_name: tax_reporting_box
+owner: svc_tax
+command: /scripts/tax/gen_fatca.py --date %%DATE%% --format IRS_XML --threshold 50000
+machine: tax-app-01
+profile: /etc/autosys/profiles/svc_tax.sh
+condition: success(compute_realized_gains_for_tax)
+std_out_file: /logs/tax/%%YEAR%%/%%MM%%/fatca_%%DATE%%.out
+std_err_file: /logs/tax/%%YEAR%%/%%MM%%/fatca_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: generate_crs_reports   job_type: CMD
+box_name: tax_reporting_box
+owner: svc_tax
+command: /scripts/tax/gen_crs.py --date %%DATE%% --oecd_format XML_V2
+machine: tax-app-01
+profile: /etc/autosys/profiles/svc_tax.sh
+condition: success(compute_realized_gains_for_tax)
+std_out_file: /logs/tax/%%YEAR%%/%%MM%%/crs_%%DATE%%.out
+std_err_file: /logs/tax/%%YEAR%%/%%MM%%/crs_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+insert_job: generate_1099_forms   job_type: CMD
+box_name: tax_reporting_box
+owner: svc_tax
+command: /scripts/tax/gen_1099.py --tax_year %%YEAR%% --types 1099B,1099DIV,1099INT
+machine: tax-app-01
+profile: /etc/autosys/profiles/svc_tax.sh
+condition: success(generate_fatca_reports) & success(generate_crs_reports)
+std_out_file: /logs/tax/%%YEAR%%/%%MM%%/1099_%%DATE%%.out
+std_err_file: /logs/tax/%%YEAR%%/%%MM%%/1099_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 15

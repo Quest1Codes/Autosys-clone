@@ -1,0 +1,93 @@
+/* ============================================================
+   FILE: 21_margin_calls.jil
+   DOMAIN: Margin Calls — Initial and Variation Margin
+   STATUS: RUNNING
+   UPSTREAM: 20_collateral_management (collateral_mgmt_box)
+             06_risk_engine (risk_engine_box)
+   DOWNSTREAM: 09_payments_treasury (cash margin outflows), 26_cash_management
+   ============================================================ */
+
+insert_job: margin_calls_box   job_type: BOX
+owner: svc_collateral
+condition: success(collateral_mgmt_box) & success(risk_engine_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 60
+description: "Compute, dispute and settle initial and variation margin calls"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "18:00,23:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: collateral-ops@bank.com
+
+/* Step 1: Compute variation margin calls across all OTC and cleared portfolios */
+insert_job: compute_variation_margin   job_type: CMD
+box_name: margin_calls_box
+owner: svc_collateral
+command: /scripts/margin/compute_vm.py --date %%DATE%% --portfolio OTC_BILATERAL,CLEARED_LCH
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+std_out_file: /logs/margin/%%YEAR%%/%%MM%%/vm_%%DATE%%.out
+std_err_file: /logs/margin/%%YEAR%%/%%MM%%/vm_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 2: Compute initial margin using SIMM (ISDA Standard Initial Margin Model) */
+insert_job: compute_initial_margin_simm   job_type: CMD
+box_name: margin_calls_box
+owner: svc_collateral
+command: /scripts/margin/compute_simm.py --date %%DATE%% --model ISDA_SIMM_v2_6
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+std_out_file: /logs/margin/%%YEAR%%/%%MM%%/simm_%%DATE%%.out
+std_err_file: /logs/margin/%%YEAR%%/%%MM%%/simm_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 3
+term_run_time: 35
+job_load: 20
+
+/* Step 3: Match calls with counterparty confirmations and dispute mismatches */
+insert_job: match_and_dispute_margin_calls   job_type: CMD
+box_name: margin_calls_box
+owner: svc_collateral
+command: /scripts/margin/match_calls.py --date %%DATE%% --tolerance 1000 --currency USD
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+condition: success(compute_variation_margin) & success(compute_initial_margin_simm)
+std_out_file: /logs/margin/%%YEAR%%/%%MM%%/match_%%DATE%%.out
+std_err_file: /logs/margin/%%YEAR%%/%%MM%%/match_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 4: Dispatch approved margin calls for settlement */
+insert_job: dispatch_margin_settlements   job_type: CMD
+box_name: margin_calls_box
+owner: svc_collateral
+command: /scripts/margin/dispatch_settlements.sh --date %%DATE%%
+machine: collateral-app-01
+profile: /etc/autosys/profiles/svc_collateral.sh
+condition: success(match_and_dispute_margin_calls)
+std_out_file: /logs/margin/%%YEAR%%/%%MM%%/dispatch_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10

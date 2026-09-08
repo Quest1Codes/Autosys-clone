@@ -1,0 +1,111 @@
+/* ============================================================
+   FILE: 07_stress_testing.jil
+   DOMAIN: Risk Management — Stress Testing
+   STATUS: SUCCESS
+   UPSTREAM: 06_risk_engine (risk_engine_box)
+   DOWNSTREAM: 12_regulatory_reporting (CCAR/DFAST inputs)
+   ============================================================ */
+
+insert_job: stress_test_box   job_type: BOX
+owner: svc_risk
+condition: success(risk_engine_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 150
+description: "Historical and hypothetical stress test scenarios for regulatory capital"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "20:00,02:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: risk-ops@bank.com
+
+/* Step 1: Load Fed/ECB-prescribed regulatory stress scenarios */
+insert_job: load_stress_scenarios   job_type: CMD
+box_name: stress_test_box
+owner: svc_risk
+command: /scripts/stress/load_scenarios.py --date %%DATE%% --source FED_DFAST --version 2025
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+std_out_file: /logs/stress/%%YEAR%%/%%MM%%/load_scenarios_%%DATE%%.out
+std_err_file: /logs/stress/%%YEAR%%/%%MM%%/load_scenarios_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 2: Run historical stress simulation (2008 GFC, 2020 COVID, 2022 rates) */
+insert_job: run_historical_stress   job_type: CMD
+box_name: stress_test_box
+owner: svc_risk
+command: /scripts/stress/run_historical.py --date %%DATE%% --scenarios GFC_2008,COVID_2020,RATES_2022
+machine: risk-compute-02
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_stress_scenarios)
+std_out_file: /logs/stress/%%YEAR%%/%%MM%%/historical_%%DATE%%.out
+std_err_file: /logs/stress/%%YEAR%%/%%MM%%/historical_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 40
+
+/* Step 3: Run hypothetical/forward-looking stress scenarios */
+insert_job: run_hypothetical_stress   job_type: CMD
+box_name: stress_test_box
+owner: svc_risk
+command: /scripts/stress/run_hypothetical.py --date %%DATE%% --scenarios RATE_UP_300BP,CREDIT_CRUNCH,EQUITY_CRASH_40PCT
+machine: risk-compute-03
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(load_stress_scenarios)
+std_out_file: /logs/stress/%%YEAR%%/%%MM%%/hypothetical_%%DATE%%.out
+std_err_file: /logs/stress/%%YEAR%%/%%MM%%/hypothetical_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 60
+min_run_alarm: 5
+term_run_time: 65
+job_load: 40
+
+/* Step 4: Aggregate all stress results into regulatory templates */
+insert_job: aggregate_stress_results   job_type: CMD
+box_name: stress_test_box
+owner: svc_risk
+command: /scripts/stress/aggregate_results.py --date %%DATE%% --output /data/stress/results_%%DATE%%.parquet
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(run_historical_stress) & success(run_hypothetical_stress)
+std_out_file: /logs/stress/%%YEAR%%/%%MM%%/aggregate_%%DATE%%.out
+std_err_file: /logs/stress/%%YEAR%%/%%MM%%/aggregate_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* Step 5: Alert risk committee if any scenario breaches capital floors */
+insert_job: stress_breach_alert   job_type: CMD
+box_name: stress_test_box
+owner: svc_risk
+command: /scripts/stress/check_capital_floors.py --date %%DATE%% --notify risk-committee@bank.com
+machine: risk-compute-01
+profile: /etc/autosys/profiles/svc_risk.sh
+condition: success(aggregate_stress_results)
+std_out_file: /logs/stress/%%YEAR%%/%%MM%%/breach_check_%%DATE%%.out
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 10
+min_run_alarm: 1
+term_run_time: 15
+job_load: 5

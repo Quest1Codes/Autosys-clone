@@ -1,0 +1,147 @@
+/* ============================================================
+   FILE: 11_gl_posting.jil
+   DOMAIN: General Ledger & Accounting
+   STATUS: INACTIVE (waiting on pnl_box + settlement_box)
+   UPSTREAM: 10_pnl_calculation (pnl_box)
+             08_settlement (settlement_box)
+             27_nostro_reconciliation (nostro_recon_box)
+             23_dividend_processing (dividend_processing_box)
+   DOWNSTREAM: 12_regulatory_reporting, 35_audit_trail, 42_tax_reporting, 44_fund_accounting,
+               50_end_of_month_close
+   ============================================================ */
+
+insert_job: gl_posting_box   job_type: BOX
+owner: svc_accounting
+condition: success(pnl_box) & success(settlement_box) & success(nostro_recon_box) & success(dividend_processing_box)
+days_of_week: mo,tu,we,th,fr
+exclude_calendar: us_market_holidays
+alarm_if_fail: 1
+max_run_alarm: 90
+description: "Post trade, cash and accrual journal entries to General Ledger"
+timezone: US/Eastern
+date_conditions: 1
+run_window: "21:00,03:00"
+alarm_if_terminated: 1
+permission: gx,wx,me,mx,ge,we
+send_report: 1
+notification_emailaddress: accounting@bank.com
+
+/* Step 1: Extract all GL-eligible events (trades, cash, fees) */
+insert_job: extract_gl_events   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/gl/extract_events.py --date %%DATE%% --event_types TRADE,CASH,FEE,ACCRUAL
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/extract_%%DATE%%.out
+std_err_file: /logs/gl/%%YEAR%%/%%MM%%/extract_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 2: Compute interest and fee accruals */
+insert_job: compute_accruals   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/gl/compute_accruals.py --date %%DATE%% --accrual_basis ACT_365
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/accruals_%%DATE%%.out
+std_err_file: /logs/gl/%%YEAR%%/%%MM%%/accruals_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 2
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 3: Post trade journal entries to GL */
+insert_job: post_trade_journal_entries   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/gl/post_trade_entries.sh --date %%DATE%% --gl_system SAP_FICO
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: success(extract_gl_events) & success(compute_accruals)
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/trade_entries_%%DATE%%.out
+std_err_file: /logs/gl/%%YEAR%%/%%MM%%/trade_entries_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 30
+min_run_alarm: 2
+term_run_time: 35
+job_load: 20
+
+/* Step 4: Post cash and settlement journal entries */
+insert_job: post_cash_journal_entries   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/gl/post_cash_entries.sh --date %%DATE%% --gl_system SAP_FICO
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: success(extract_gl_events)
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/cash_entries_%%DATE%%.out
+std_err_file: /logs/gl/%%YEAR%%/%%MM%%/cash_entries_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 15
+
+/* Step 5: Close day-end accounts and lock the ledger */
+insert_job: close_day_accounts   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/gl/close_day.sh --date %%DATE%% --lock_ledger
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: success(post_trade_journal_entries) & success(post_cash_journal_entries)
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/close_%%DATE%%.out
+std_err_file: /logs/gl/%%YEAR%%/%%MM%%/close_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 15
+min_run_alarm: 1
+term_run_time: 20
+job_load: 10
+
+/* Step 6: GL reconciliation — trial balance must net to zero */
+insert_job: gl_trial_balance_reconciliation   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/gl/trial_balance.py --date %%DATE%% --tolerance 0.01
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: success(close_day_accounts)
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/trial_balance_%%DATE%%.out
+std_err_file: /logs/gl/%%YEAR%%/%%MM%%/trial_balance_%%DATE%%.err
+alarm_if_fail: 1
+alarm_if_terminated: 1
+n_retrys: 1
+max_run_alarm: 20
+min_run_alarm: 2
+term_run_time: 25
+job_load: 10
+
+/* FAILURE HANDLER: Escalate GL out-of-balance to CFO office */
+insert_job: gl_out_of_balance_escalation   job_type: CMD
+box_name: gl_posting_box
+owner: svc_accounting
+command: /scripts/alerts/escalate_gl.sh "GL OUT OF BALANCE on %%DATE%%" --notify cfo-office@bank.com
+machine: gl-app-01
+profile: /etc/autosys/profiles/svc_accounting.sh
+condition: failure(gl_trial_balance_reconciliation)
+std_out_file: /logs/gl/%%YEAR%%/%%MM%%/escalation_%%DATE%%.out
+alarm_if_fail: 0
+alarm_if_terminated: 1
+term_run_time: 10
+job_load: 1
