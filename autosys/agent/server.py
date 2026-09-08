@@ -128,10 +128,7 @@ class AgentServer:
         )
 
         addr = self._server.sockets[0].getsockname()
-        logger.info(
-            "[agent-server] %r listening on %s:%d",
-            self.machine_name, addr[0], addr[1],
-        )
+        logger.info(f"[agent-server] {self.machine_name!r} listening on {addr[0]}:{addr[1]}")
 
         # Register in DB
         self._register_machine()
@@ -139,7 +136,7 @@ class AgentServer:
         async with self._server:
             await self._stop_event.wait()
 
-        logger.info("[agent-server] %r stopped", self.machine_name)
+        logger.info(f"[agent-server] {self.machine_name!r} stopped")
 
     def stop(self) -> None:
         """
@@ -172,17 +169,14 @@ class AgentServer:
                 return
 
             msg = decode_message(line)
-            logger.debug(
-                "[agent-server] %r from %s:%s  type=%s",
-                self.machine_name, peer[0], peer[1], msg.get("type"),
-            )
+            logger.debug(f"[agent-server] {self.machine_name!r} from {peer[0]}:{peer[1]}  type={msg.get('type')}")
 
             response = await self._route(msg)
             writer.write(response)
             await writer.drain()
 
         except asyncio.TimeoutError:
-            logger.warning("[agent-server] client %s:%s timed out", *peer)
+            logger.warning(f"[agent-server] client {peer[0]}:{peer[1]} timed out")
         except Exception as exc:
             logger.exception("[agent-server] error handling %s:%s", *peer)
             writer.write(encode_dict({"type": "error", "reason": str(exc)}))
@@ -310,10 +304,7 @@ class AgentServer:
         )
         t.start()
 
-        logger.info(
-            "[agent-server] DISPATCH accepted  job=%r  run_id=%s",
-            job_name, run_id[:8],
-        )
+        logger.info(f"[agent-server] DISPATCH accepted  job={job_name!r}  run_id={run_id[:8]}")
         return encode_message(DispatchResponse(run_id=run_id))
 
     async def _handle_kill(self, msg: dict) -> bytes:
@@ -327,13 +318,11 @@ class AgentServer:
             runner = self._active.get(job_name)
 
         if runner is None:
-            logger.warning(
-                "[agent-server] kill: no active runner for %r", job_name
-            )
+            logger.warning(f"[agent-server] kill: no active runner for {job_name!r}")
             return encode_message(KillResponse(job_name=job_name, found=False))
 
         runner.kill()
-        logger.info("[agent-server] kill: SIGTERM sent to %r", job_name)
+        logger.info(f"[agent-server] kill: SIGTERM sent to {job_name!r}")
         return encode_message(KillResponse(job_name=job_name, found=True))
 
     async def _handle_get_output(self, msg: dict) -> bytes:
@@ -385,7 +374,7 @@ class AgentServer:
         try:
             exit_code = runner.run()
         except Exception as exc:
-            logger.error("[agent-server] job %r raised: %s", job_name, exc)
+            logger.error(f"[agent-server] job {job_name!r} raised: {exc}")
             exit_code = -1
         finally:
             with self._active_lock:
@@ -412,10 +401,7 @@ class AgentServer:
                 pid       = runner.pid,
             )
 
-        logger.info(
-            "[agent-server] job %r finished  status=%s  exit_code=%d",
-            job_name, status, exit_code,
-        )
+        logger.info(f"[agent-server] job {job_name!r} finished  status={status}  exit_code={exit_code}")
 
     # ------------------------------------------------------------------
     # Output callback  (called per line from output-reader thread)
@@ -468,10 +454,7 @@ class AgentServer:
                 port         = self.port,
                 status       = "UP",
             )
-        logger.info(
-            "[agent-server] registered machine %r → %s:%d",
-            self.machine_name, self.host, self.port,
-        )
+        logger.info(f"[agent-server] registered machine {self.machine_name!r} → {self.host}:{self.port}")
 
     def _update_heartbeat(self, status: str = "UP") -> None:
         """Update the machine's last_heartbeat timestamp."""

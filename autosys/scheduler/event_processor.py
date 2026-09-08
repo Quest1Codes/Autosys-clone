@@ -267,10 +267,7 @@ class EventProcessor:
             try:
                 self._handle_event(session, ev, snapshot, now)
             except Exception as exc:
-                logger.error(
-                    "Error processing event %s (%s): %s",
-                    ev.event_id[:8], ev.event_type, exc,
-                )
+                logger.error(f"Error processing event {ev.event_id[:8]} ({ev.event_type}): {exc}")
             event_repo.mark_processed(session, ev.event_id)
             n += 1
 
@@ -283,7 +280,7 @@ class EventProcessor:
         try:
             self._box_manager.tick(session, snapshot, now)
         except Exception as exc:
-            logger.error("BoxManager.tick raised: %s", exc)
+            logger.error(f"BoxManager.tick raised: {exc}")
 
         # Refresh again after box changes (children may have been activated)
         snapshot = build_status_snapshot(session)
@@ -334,10 +331,7 @@ class EventProcessor:
                 source     = "scheduler",
             )
             event_repo.enqueue(session, ev)
-            logger.info(
-                "Time trigger: queued STARTJOB for %r at %s",
-                row.job_name, now.strftime("%H:%M"),
-            )
+            logger.info(f"Time trigger: queued STARTJOB for {row.job_name!r} at {now.strftime('%H:%M')}")
 
         # 4. Alarm evaluation (Phase 10)
         if self._alarm_manager is not None:
@@ -474,7 +468,7 @@ class EventProcessor:
         }.get(ev.event_type)
 
         if handler is None:
-            logger.debug("No handler for event type %r — skipping", ev.event_type)
+            logger.debug(f"No handler for event type {ev.event_type!r} — skipping")
             return
 
         handler(session, ev, snapshot, now)
@@ -497,7 +491,7 @@ class EventProcessor:
         """
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("STARTJOB: job %r not found", ev.job_name)
+            logger.warning(f"STARTJOB: job {ev.job_name!r} not found")
             return
 
         if not is_startable(row.status or JobStatus.INACTIVE.value):
@@ -509,10 +503,7 @@ class EventProcessor:
 
         # Evaluate condition using the snapshot from the START of this tick
         if not is_satisfied(row.condition, snapshot):
-            logger.info(
-                "STARTJOB: %r condition not satisfied — staying %s",
-                ev.job_name, row.status,
-            )
+            logger.info(f"STARTJOB: {ev.job_name!r} condition not satisfied — staying {row.status}")
             return
 
         self._activate_job(session, row, now)
@@ -535,10 +526,10 @@ class EventProcessor:
         """
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("FORCE_STARTJOB: job %r not found", ev.job_name)
+            logger.warning(f"FORCE_STARTJOB: job {ev.job_name!r} not found")
             return
 
-        logger.info("FORCE_STARTJOB: activating %r (bypassing conditions)", ev.job_name)
+        logger.info(f"FORCE_STARTJOB: activating {ev.job_name!r} (bypassing conditions)")
         # Reset children if this is a BOX restart
         if row.job_type == "BOX":
             self._box_manager.reset_children(session, ev.job_name)
@@ -561,7 +552,7 @@ class EventProcessor:
         """
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("KILLJOB: job %r not found", ev.job_name)
+            logger.warning(f"KILLJOB: job {ev.job_name!r} not found")
             return
 
         if row.status not in (JobStatus.RUNNING.value, JobStatus.STARTING.value, JobStatus.ACTIVATED.value):
@@ -574,7 +565,7 @@ class EventProcessor:
         try:
             validate_transition(ev.job_name, row.status, "TERMINATED")
         except InvalidTransitionError as exc:
-            logger.warning("KILLJOB: %s", exc)
+            logger.warning(f"KILLJOB: {exc}")
             return
 
         # If target is a BOX, kill all active children first
@@ -586,12 +577,12 @@ class EventProcessor:
             try:
                 self._kill_fn(session, row)
             except Exception as exc:
-                logger.warning("KILLJOB: kill_fn raised %s", exc)
+                logger.warning(f"KILLJOB: kill_fn raised {exc}")
 
         old_status = row.status or JobStatus.RUNNING.value
         row.status = JobStatus.TERMINATED.value
         row.last_end = now
-        logger.info("KILLJOB: %r → TERMINATED", ev.job_name)
+        logger.info(f"KILLJOB: {ev.job_name!r} → TERMINATED")
         self._emit_status_change(ev.job_name, old_status, "TERMINATED")
 
     # -- HOLD_JOB / JOB_OFF_HOLD -----------------------------------------
@@ -606,12 +597,12 @@ class EventProcessor:
         """HOLD_JOB: freeze a job in ON_HOLD state."""
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("HOLD_JOB: job %r not found", ev.job_name)
+            logger.warning(f"HOLD_JOB: job {ev.job_name!r} not found")
             return
         try:
             validate_transition(ev.job_name, row.status or "INACTIVE", "ON_HOLD")
         except InvalidTransitionError as exc:
-            logger.warning("HOLD_JOB: %s", exc)
+            logger.warning(f"HOLD_JOB: {exc}")
             return
         row.status = JobStatus.ON_HOLD.value
         logger.info("HOLD_JOB: %r → ON_HOLD", ev.job_name)
@@ -626,7 +617,7 @@ class EventProcessor:
         """JOB_OFF_HOLD: release a job from ON_HOLD back to INACTIVE."""
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("JOB_OFF_HOLD: job %r not found", ev.job_name)
+            logger.warning(f"JOB_OFF_HOLD: job {ev.job_name!r} not found")
             return
         if row.status != JobStatus.ON_HOLD.value:
             logger.info(
@@ -649,12 +640,12 @@ class EventProcessor:
         """JOB_ON_ICE: freeze a job for the current cycle."""
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("JOB_ON_ICE: job %r not found", ev.job_name)
+            logger.warning(f"JOB_ON_ICE: job {ev.job_name!r} not found")
             return
         try:
             validate_transition(ev.job_name, row.status or "INACTIVE", "ON_ICE")
         except InvalidTransitionError as exc:
-            logger.warning("JOB_ON_ICE: %s", exc)
+            logger.warning(f"JOB_ON_ICE: {exc}")
             return
         row.status = JobStatus.ON_ICE.value
         logger.info("JOB_ON_ICE: %r → ON_ICE", ev.job_name)
@@ -669,7 +660,7 @@ class EventProcessor:
         """JOB_OFF_ICE: release a job from ON_ICE."""
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("JOB_OFF_ICE: job %r not found", ev.job_name)
+            logger.warning(f"JOB_OFF_ICE: job {ev.job_name!r} not found")
             return
         if row.status != JobStatus.ON_ICE.value:
             logger.info(
@@ -698,13 +689,10 @@ class EventProcessor:
         """
         row = job_repo.get_row(session, ev.job_name)
         if row is None:
-            logger.warning("CHANGE_STATUS: job %r not found", ev.job_name)
+            logger.warning(f"CHANGE_STATUS: job {ev.job_name!r} not found")
             return
         if not ev.new_status:
-            logger.warning(
-                "CHANGE_STATUS: event for %r has no new_status — skipping",
-                ev.job_name,
-            )
+            logger.warning(f"CHANGE_STATUS: event for {ev.job_name!r} has no new_status — skipping")
             return
 
         old_status  = row.status
@@ -755,10 +743,7 @@ class EventProcessor:
             return
 
         glob_repo.set(session, ev.global_name, ev.global_value)
-        logger.info(
-            "SET_GLOBAL: %s = %r",
-            ev.global_name.upper(), ev.global_value,
-        )
+        logger.info(f"SET_GLOBAL: {ev.global_name.upper()} = {ev.global_value!r}")
 
         # Re-evaluate waiting jobs in case this variable change unblocked them.
         # Rebuild snapshot to include updated globals in condition evaluation.
@@ -808,9 +793,7 @@ class EventProcessor:
 
         machine_row = machine_repo.get(session, machine_name)
         if machine_row is None:
-            logger.warning(
-                "CHECK_HEARTBEAT: machine %r not registered", machine_name
-            )
+            logger.warning(f"CHECK_HEARTBEAT: machine {machine_name!r} not registered")
             return
 
         rd    = RemoteDispatch()
@@ -820,13 +803,9 @@ class EventProcessor:
         machine_repo.update_heartbeat(session, machine_name, status=new_status)
 
         if alive:
-            logger.info(
-                "CHECK_HEARTBEAT: %r responded — status=UP", machine_name
-            )
+            logger.info(f"CHECK_HEARTBEAT: {machine_name!r} responded — status=UP")
         else:
-            logger.warning(
-                "CHECK_HEARTBEAT: %r did not respond — status=DOWN", machine_name
-            )
+            logger.warning(f"CHECK_HEARTBEAT: {machine_name!r} did not respond — status=DOWN")
 
     # ------------------------------------------------------------------
     # Job activation helpers
@@ -876,14 +855,14 @@ class EventProcessor:
         try:
             validate_transition(row.job_name, row.status or "INACTIVE", "STARTING")
         except InvalidTransitionError as exc:
-            logger.warning("activate_cmd: %s", exc)
+            logger.warning(f"activate_cmd: {exc}")
             return
 
         old_status = row.status or "INACTIVE"
         row.status = JobStatus.STARTING.value
         row.last_start = now
         row.last_run_date = now.strftime("%Y-%m-%d")
-        logger.info("STARTJOB: %r → STARTING", row.job_name)
+        logger.info(f"STARTJOB: {row.job_name!r} → STARTING")
         self._emit_status_change(row.job_name, old_status, "STARTING")
 
         # Call the dispatcher (stub in Phase 4, real AgentDispatch in Phase 5+)
@@ -964,14 +943,14 @@ class EventProcessor:
         try:
             validate_transition(row.job_name, row.status or "INACTIVE", "ACTIVATED")
         except InvalidTransitionError as exc:
-            logger.warning("activate_box: %s", exc)
+            logger.warning(f"activate_box: {exc}")
             return
 
         old_status = row.status or "INACTIVE"
         row.status = JobStatus.ACTIVATED.value
         row.last_start = now
         row.last_run_date = now.strftime("%Y-%m-%d")
-        logger.info("STARTJOB: BOX %r → ACTIVATED", row.job_name)
+        logger.info(f"STARTJOB: BOX {row.job_name!r} → ACTIVATED")
         self._emit_status_change(row.job_name, old_status, "ACTIVATED")
 
         # Cascade: start children whose conditions are satisfied
@@ -1005,10 +984,7 @@ class EventProcessor:
             if not is_startable(child.status or JobStatus.INACTIVE.value):
                 continue
             if is_satisfied(child.condition, snapshot):
-                logger.info(
-                    "BOX cascade: starting child %r of %r",
-                    child.job_name, box_name,
-                )
+                logger.info(f"BOX cascade: starting child {child.job_name!r} of {box_name!r}")
                 self._activate_cmd(session, child, now)
                 # Update snapshot so subsequent siblings see this child's new status
                 snapshot[child.job_name] = _ns(child.status)
@@ -1052,12 +1028,12 @@ class EventProcessor:
         elif any(s == "FAILURE" for s in vals):
             box_row.status = JobStatus.FAILURE.value
             box_row.last_end = now
-            logger.info("BOX %r → FAILURE (child failed)", box_row.job_name)
+            logger.info(f"BOX {box_row.job_name!r} → FAILURE (child failed)")
             self._emit_status_change(box_row.job_name, old, "FAILURE")
         elif all(s == "SUCCESS" for s in vals):
             box_row.status = JobStatus.SUCCESS.value
             box_row.last_end = now
-            logger.info("BOX %r → SUCCESS (all children succeeded)", box_row.job_name)
+            logger.info(f"BOX {box_row.job_name!r} → SUCCESS (all children succeeded)")
             self._emit_status_change(box_row.job_name, old, "SUCCESS")
         elif any(s == "INACTIVE" for s in vals):
             # Some children haven't run yet — BOX stays ACTIVATED

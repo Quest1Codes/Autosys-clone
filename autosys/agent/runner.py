@@ -113,10 +113,7 @@ class LocalJobRunner:
         This method is designed to be called from a background thread so it
         can block without stalling the event processor loop.
         """
-        logger.info(
-            "[agent] Running %r  cmd=%r",
-            self.job_name, self.command[:80],
-        )
+        logger.info(f"[agent] Running {self.job_name!r}  cmd={self.command[:80]!r}")
 
         # Merge stderr into stdout so we get a single chronological stream.
         # This matches AutoSys default behaviour (stdout_file captures both).
@@ -128,7 +125,7 @@ class LocalJobRunner:
             text      = True,
         )
         self.pid = self._proc.pid
-        logger.debug("[agent] %r started  pid=%d", self.job_name, self.pid)
+        logger.debug(f"[agent] {self.job_name!r} started  pid={self.pid}")
 
         # Start output reader
         self._reader_thread = threading.Thread(
@@ -142,10 +139,7 @@ class LocalJobRunner:
         try:
             self.exit_code = self._proc.wait(timeout=self.max_run_secs)
         except subprocess.TimeoutExpired:
-            logger.warning(
-                "[agent] %r exceeded max_run_alarm (%ds) — killing",
-                self.job_name, self.max_run_secs,
-            )
+            logger.warning(f"[agent] {self.job_name!r} exceeded max_run_alarm ({self.max_run_secs}s) — killing")
             self.kill()
             self.exit_code = -1
 
@@ -153,10 +147,7 @@ class LocalJobRunner:
         if self._reader_thread.is_alive():
             self._reader_thread.join(timeout=5)
 
-        logger.info(
-            "[agent] %r finished  exit_code=%d  pid=%d",
-            self.job_name, self.exit_code, self.pid,
-        )
+        logger.info(f"[agent] {self.job_name!r} finished  exit_code={self.exit_code}  pid={self.pid}")
         return self.exit_code
 
     def kill(self, wait_secs: float = 5.0) -> None:
@@ -172,18 +163,12 @@ class LocalJobRunner:
         if proc is None or proc.poll() is not None:
             return   # already finished
 
-        logger.info(
-            "[agent] kill: sending SIGTERM to %r (pid=%d)",
-            self.job_name, proc.pid,
-        )
+        logger.info(f"[agent] kill: sending SIGTERM to {self.job_name!r} (pid={proc.pid})")
         proc.terminate()
         try:
             proc.wait(timeout=wait_secs)
         except subprocess.TimeoutExpired:
-            logger.warning(
-                "[agent] kill: SIGTERM timed out for %r — sending SIGKILL",
-                self.job_name,
-            )
+            logger.warning(f"[agent] kill: SIGTERM timed out for {self.job_name!r} — sending SIGKILL")
             proc.kill()
 
     # ------------------------------------------------------------------
@@ -211,12 +196,9 @@ class LocalJobRunner:
                 self._line_no += 1
                 line_no = self._line_no
 
-            logger.debug("[%s] %s", self.job_name, content)
+            logger.debug(f"[{self.job_name}] {content}")
             if self.output_callback:
                 try:
                     self.output_callback(self.run_id, line_no, "stdout", content)
                 except Exception as exc:
-                    logger.warning(
-                        "[agent] output_callback error for %r line %d: %s",
-                        self.job_name, line_no, exc,
-                    )
+                    logger.warning(f"[agent] output_callback error for {self.job_name!r} line {line_no}: {exc}")

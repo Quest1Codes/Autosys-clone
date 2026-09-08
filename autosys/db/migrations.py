@@ -91,7 +91,7 @@ def _ensure_localhost_agent(session) -> None:
 def _ensure_calendars(session) -> None:
     """Load calendar .cal files from config/calendars/ into the DB."""
     if not _CALENDARS_DIR.exists():
-        logger.debug("No calendars directory found at %s — skipping", _CALENDARS_DIR)
+        logger.debug(f"No calendars directory found at {_CALENDARS_DIR} — skipping")
         return
 
     for cal_file in sorted(_CALENDARS_DIR.glob("*.cal")):
@@ -111,14 +111,14 @@ def _ensure_calendars(session) -> None:
                 date.fromisoformat(token)   # validate
                 dates.append(token)
             except ValueError:
-                logger.warning("Skipping invalid date %r in %s", token, cal_file)
+                logger.warning(f"Skipping invalid date {token!r} in {cal_file}")
 
         session.add(CalendarRow(
             calendar_name = cal_name,
             dates_json    = json.dumps(dates),
             description   = f"Loaded from {cal_file.name}",
         ))
-        logger.info("Seeded calendar: %s (%d dates)", cal_name, len(dates))
+        logger.info(f"Seeded calendar: {cal_name} ({len(dates)} dates)")
 
 
 # ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ async def _seed_defaults_async() -> None:
                     dates_json    = json.dumps(dates),
                     description   = f"Loaded from {cal_file.name}",
                 ))
-                logger.info("Seeded calendar: %s (%d dates) (async)", cal_name, len(dates))
+                logger.info(f"Seeded calendar: {cal_name} ({len(dates)} dates) (async)")
 
 
 # ---------------------------------------------------------------------------

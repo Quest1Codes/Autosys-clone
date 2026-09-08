@@ -758,6 +758,7 @@ import time), so tests can safely `monkeypatch.setenv()` between test cases.
 ---
 
 ## Phase 2 — JIL Parser & Condition Language
+autosys machine register local-agent localhost 7520
 
 **Goal:** Parse JIL files into structured Pydantic objects and evaluate
 dependency conditions.

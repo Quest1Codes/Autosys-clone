@@ -195,10 +195,7 @@ class AgentDispatch:
             name   = f"agent-{row.job_name}",
         )
         t.start()
-        logger.info(
-            "[agent] local dispatch %r  run_id=%s  machine=%s",
-            row.job_name, run_id[:8], machine,
-        )
+        logger.info(f"[agent] local dispatch {row.job_name!r}  run_id={run_id[:8]}  machine={machine}")
 
     def _dispatch_remote(self, session: Session, row: JobRow, machine: str) -> None:
         """Send a DISPATCH message to a registered remote agent server."""
@@ -237,11 +234,11 @@ class AgentDispatch:
             with self._lock:
                 entry = self._active.get(row.job_name)
             if entry is None:
-                logger.warning("[agent] kill: no active local runner for %r", row.job_name)
+                logger.warning(f"[agent] kill: no active local runner for {row.job_name!r}")
                 return
             runner, run_id = entry
             runner.kill()
-            logger.info("[agent] kill: SIGTERM sent to %r (run_id=%s)", row.job_name, run_id[:8])
+            logger.info(f"[agent] kill: SIGTERM sent to {row.job_name!r} (run_id={run_id[:8]})")
         elif not self.local_only:
             # Remote kill
             from autosys.db.repository import machines as machine_repo
@@ -250,7 +247,7 @@ class AgentDispatch:
             if machine_row:
                 RemoteDispatch().kill(session, row, machine_row)
             else:
-                logger.warning("[agent] kill: machine %r not registered", machine)
+                logger.warning(f"[agent] kill: machine {machine!r} not registered")
 
     # ------------------------------------------------------------------
     # Background thread — blocks until subprocess finishes
@@ -453,5 +450,5 @@ def _expand_command(
             strict        = False,
         )
     except UndefinedVariableError as exc:
-        logger.warning("[agent] variable expansion: %s", exc)
+        logger.warning(f"[agent] variable expansion: {exc}")
         return command

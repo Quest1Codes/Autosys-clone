@@ -121,16 +121,10 @@ def is_satisfied(
     except ConditionParseError as exc:
         # Malformed condition → treat as unsatisfied and warn.
         # Real AutoSys raises an alarm in this case.
-        logger.warning(
-            "Condition parse error for %r: %s — treating as unsatisfied",
-            condition_str, exc,
-        )
+        logger.warning(f"Condition parse error for {condition_str!r}: {exc} — treating as unsatisfied")
         return False
     except Exception as exc:
-        logger.error(
-            "Unexpected error evaluating condition %r: %s",
-            condition_str, exc,
-        )
+        logger.error(f"Unexpected error evaluating condition {condition_str!r}: {exc}")
         return False
 
 

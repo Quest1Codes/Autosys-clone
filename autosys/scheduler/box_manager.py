@@ -334,7 +334,7 @@ class BoxManager:
                     )
             child.status  = JobStatus.INACTIVE.value
             child.last_end = None
-            logger.debug("BOX %r: reset child %r → INACTIVE", box_name, child.job_name)
+            logger.debug(f"BOX {box_name!r}: reset child {child.job_name!r} → INACTIVE")
 
     # ------------------------------------------------------------------
     # Condition evaluation helper
