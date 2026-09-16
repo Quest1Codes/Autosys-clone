@@ -206,6 +206,18 @@ class JILImportResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Execution mode (dry-run / real-run toggle)
+# ---------------------------------------------------------------------------
+
+class ExecutionModeResponse(BaseModel):
+    dry_run: bool
+
+
+class SetExecutionModeRequest(BaseModel):
+    dry_run: bool
+
+
+# ---------------------------------------------------------------------------
 # Alarms
 # ---------------------------------------------------------------------------
 

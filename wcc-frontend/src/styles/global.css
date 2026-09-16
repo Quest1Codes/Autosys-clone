@@ -156,6 +156,23 @@ body {
   background: rgba(255,255,255,0.25);
 }
 
+.exec-mode-btn {
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-family: var(--wcc-font);
+  cursor: pointer;
+}
+.exec-mode-btn:disabled { cursor: default; opacity: 0.85; }
+.exec-mode-btn.dry-run { background: rgba(0,166,80,0.35); }
+.exec-mode-btn.dry-run:hover:not(:disabled) { background: rgba(0,166,80,0.55); }
+.exec-mode-btn.real-run { background: rgba(230,140,0,0.45); }
+.exec-mode-btn.real-run:hover:not(:disabled) { background: rgba(230,140,0,0.65); }
+
 /* ── Navigation Tabs ─────────────────────────────────────── */
 
 .wcc-nav {
