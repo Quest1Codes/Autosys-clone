@@ -1,0 +1,46 @@
+# Offline distribution compose file — used after `docker load` from one of
+# the autosys-clone-<arch>.tar.gz files. No source tree or registry needed.
+#
+#   docker load -i autosys-clone-<arch>.tar.gz
+#   docker tag autosys-clone:<arch>     autosys-clone:latest
+#   docker tag autosys-clone-web:<arch> autosys-clone-web:latest
+#   docker compose -f docker-compose.offline.yml up -d
+#
+# Then open http://localhost:8080  (login: admin / admin)
+
+services:
+  api:
+    image: autosys-clone:latest
+    command: ["autosys", "scheduler", "serve", "--host", "0.0.0.0", "--port", "9000", "--dry-run"]
+    ports:
+      - "9000:9000"
+    volumes:
+      - autosys-data:/app/data
+    environment:
+      AUTOSYS_DB_URL: sqlite:///data/autosys.db
+      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
+      AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
+    restart: unless-stopped
+
+  wcc:
+    image: autosys-clone:latest
+    command: ["autosys", "scheduler", "wcc", "--host", "0.0.0.0", "--port", "8080"]
+    volumes:
+      - autosys-data:/app/data
+    environment:
+      AUTOSYS_DB_URL: sqlite:///data/autosys.db
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  web:
+    image: autosys-clone-web:latest
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+      - wcc
+    restart: unless-stopped
+
+volumes:
+  autosys-data:

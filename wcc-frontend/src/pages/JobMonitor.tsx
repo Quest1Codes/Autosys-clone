@@ -160,6 +160,31 @@ const JobMonitor: React.FC = () => {
     setTimeout(loadJobs, 600);
   };
 
+  const handleRunAllBoxes = async () => {
+    const topLevelBoxes = jobs.filter(j => j.job_type === 'BOX' && !j.box_name);
+    if (topLevelBoxes.length === 0) {
+      showToast('No top-level BOX jobs found', 'info');
+      return;
+    }
+    const ok = window.confirm(
+      `Force-start all ${topLevelBoxes.length} top-level box(es)?\n\n` +
+      topLevelBoxes.map(b => `  • ${b.job_name}`).join('\n')
+    );
+    if (!ok) return;
+
+    let sent = 0;
+    for (const box of topLevelBoxes) {
+      try {
+        await sendEvent(box.job_name, 'FORCE_STARTJOB');
+        sent++;
+      } catch {
+        showToast(`Failed to start ${box.job_name}`, 'error');
+      }
+    }
+    showToast(`FORCE_STARTJOB sent to ${sent}/${topLevelBoxes.length} box(es)`, 'success');
+    setTimeout(loadJobs, 600);
+  };
+
   const applyFilters = () => {
     setAppliedFilters({ name: filterName, status: filterStatus, machine: filterMachine });
   };
@@ -219,6 +244,9 @@ const JobMonitor: React.FC = () => {
         <div className="toolbar-sep" />
         <button className="toolbar-btn" onClick={() => setShowJilImport(true)} title="Import JIL">
           📂 Import JIL
+        </button>
+        <button className="toolbar-btn" onClick={handleRunAllBoxes} title="Force-start every top-level BOX">
+          ▶▶▶ Run All Boxes
         </button>
         <div className="toolbar-sep" />
         <button className="toolbar-btn" onClick={loadJobs} title="Refresh">

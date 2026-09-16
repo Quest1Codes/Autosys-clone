@@ -16,6 +16,27 @@ const ACTION_COLOR: Record<string, string> = {
   MACHINE:  '#6A0DAD',
 };
 
+// webkitdirectory/directory aren't in React's HTMLInputElement typings, but
+// every Chromium/Firefox browser honours them for folder selection.
+const FOLDER_INPUT_PROPS = {
+  webkitdirectory: 'true',
+  directory: 'true',
+} as unknown as React.InputHTMLAttributes<HTMLInputElement>;
+
+interface FolderFileResult {
+  name: string;
+  status: 'pending' | 'ok' | 'error';
+  detail: string;
+}
+
+const readFileText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve((reader.result as string) ?? '');
+    reader.onerror = () => reject(reader.error);
+    reader.readAsText(file);
+  });
+
 const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
   const { showToast } = useToast();
   const [jilText, setJilText]       = useState('');
@@ -24,6 +45,12 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
   const [mode, setMode]             = useState<'validate' | 'import'>('validate');
   const [dragging, setDragging]     = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const [folderFiles, setFolderFiles]     = useState<File[]>([]);
+  const [folderResults, setFolderResults] = useState<FolderFileResult[]>([]);
+  const [folderRunning, setFolderRunning] = useState(false);
+  const [stopOnError, setStopOnError]     = useState(false);
+  const folderRef = useRef<HTMLInputElement>(null);
 
   const loadFile = (file: File) => {
     const reader = new FileReader();
@@ -75,6 +102,60 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
     }
   };
 
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+      .filter(f => f.name.toLowerCase().endsWith('.jil'))
+      // Preserve the numeric-prefix ordering convention (00_globals, 01_..., ...)
+      // used throughout jil_files/, so globals/machines import before the
+      // jobs that reference them.
+      .sort((a, b) =>
+        (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name)
+      );
+    setFolderFiles(files);
+    setFolderResults(files.map(f => ({ name: f.name, status: 'pending', detail: '' })));
+  };
+
+  const runFolderImport = async (dryRun: boolean) => {
+    if (folderFiles.length === 0) return;
+    setFolderRunning(true);
+    const results: FolderFileResult[] = folderFiles.map(f => ({ name: f.name, status: 'pending', detail: '' }));
+    setFolderResults([...results]);
+
+    let ok = 0, failed = 0;
+    let anyRealSuccess = false;
+    for (let i = 0; i < folderFiles.length; i++) {
+      try {
+        const text = await readFileText(folderFiles[i]);
+        const res = await importJIL(text, dryRun);
+        if (res.success) {
+          ok++;
+          if (!dryRun) anyRealSuccess = true;
+          results[i] = {
+            name: folderFiles[i].name,
+            status: 'ok',
+            detail: `+${res.n_inserted} ~${res.n_updated} -${res.n_deleted}${res.n_machines ? ` 🖥${res.n_machines}` : ''}`,
+          };
+        } else {
+          failed++;
+          results[i] = { name: folderFiles[i].name, status: 'error', detail: res.error ?? 'unknown error' };
+          if (stopOnError) break;
+        }
+      } catch {
+        failed++;
+        results[i] = { name: folderFiles[i].name, status: 'error', detail: 'request failed' };
+        if (stopOnError) break;
+      }
+      setFolderResults([...results]);
+    }
+
+    setFolderRunning(false);
+    showToast(
+      `${dryRun ? 'Dry-run' : 'Import'} complete: ${ok} ok, ${failed} failed`,
+      failed ? 'error' : 'success'
+    );
+    if (anyRealSuccess) onImported();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -115,6 +196,70 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
               style={{ display: 'none' }}
               onChange={e => e.target.files?.[0] && loadFile(e.target.files[0])}
             />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#888', flexShrink: 0 }}>
+            <div style={{ flex: 1, borderTop: '1px solid #DDD' }} />
+            or import a whole folder
+            <div style={{ flex: 1, borderTop: '1px solid #DDD' }} />
+          </div>
+
+          {/* Folder import */}
+          <div style={{ flexShrink: 0, border: '1px solid #DDD', borderRadius: 4, padding: '8px 10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <button className="wcc-btn wcc-btn-secondary" onClick={() => folderRef.current?.click()} disabled={folderRunning}>
+                📁 Choose Folder
+              </button>
+              <input
+                ref={folderRef}
+                type="file"
+                multiple
+                accept=".jil"
+                {...FOLDER_INPUT_PROPS}
+                style={{ display: 'none' }}
+                onChange={handleFolderSelect}
+              />
+              <span style={{ fontSize: 11, color: '#555' }}>
+                {folderFiles.length > 0 ? `${folderFiles.length} .jil file(s) selected` : 'No folder selected'}
+              </span>
+              <label style={{ fontSize: 11, color: '#555', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+                <input type="checkbox" checked={stopOnError} onChange={e => setStopOnError(e.target.checked)} />
+                Stop on first error
+              </label>
+            </div>
+
+            {folderFiles.length > 0 && (
+              <>
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button className="wcc-btn wcc-btn-secondary" onClick={() => runFolderImport(true)} disabled={folderRunning}>
+                    {folderRunning ? '…' : '⟳ Dry Run All'}
+                  </button>
+                  <button className="wcc-btn wcc-btn-primary" onClick={() => runFolderImport(false)} disabled={folderRunning}>
+                    {folderRunning ? 'Importing…' : '⬆ Import All'}
+                  </button>
+                </div>
+
+                <div style={{ maxHeight: 160, overflow: 'auto', marginTop: 8 }}>
+                  <table className="wcc-table" style={{ fontSize: 11 }}>
+                    <thead>
+                      <tr><th>File</th><th>Result</th></tr>
+                    </thead>
+                    <tbody>
+                      {folderResults.map((r, i) => (
+                        <tr key={i}>
+                          <td style={{ fontFamily: 'monospace' }}>{r.name}</td>
+                          <td>
+                            {r.status === 'pending' && <span style={{ color: '#AAA' }}>…</span>}
+                            {r.status === 'ok' && <span style={{ color: '#00A650' }}>✓ {r.detail}</span>}
+                            {r.status === 'error' && <span style={{ color: '#CC0000' }}>✗ {r.detail}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Text editor */}

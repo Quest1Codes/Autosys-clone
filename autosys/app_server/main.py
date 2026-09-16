@@ -40,6 +40,7 @@ from autosys.app_server.broadcaster import EventBroadcaster
 from autosys.app_server.deps        import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas     import (
     TokenRequest, TokenResponse, HealthResponse,
+    ExecutionModeResponse, SetExecutionModeRequest,
 )
 from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment, metrics as metrics_router
 from autosys.db.connection          import sync_session
@@ -55,6 +56,42 @@ _broadcaster = EventBroadcaster()
 def get_broadcaster() -> EventBroadcaster:
     """FastAPI dependency — returns the module-level broadcaster."""
     return _broadcaster
+
+
+# ---------------------------------------------------------------------------
+# EPS processor construction — shared by startup and the live mode toggle
+# ---------------------------------------------------------------------------
+
+def _build_eps_processor(dry_run: bool, eps_poll_interval: float):
+    """
+    Build an ``EventProcessor`` wired for either dry-run (stub dispatcher,
+    instant completion, failure injection + alarms) or real execution
+    (``AgentDispatch``, real subprocess dispatch). Shared by the initial
+    ``create_app`` startup and by ``PUT /api/v1/settings/execution-mode``
+    so both paths build an identical, correctly-paired dispatcher +
+    ``auto_complete`` combination.
+    """
+    from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
+    if dry_run:
+        from autosys.notifications.alarm_manager import AlarmManager
+        from autosys.scheduler.failure_injector import FailureInjector
+        return EventProcessor(
+            poll_interval    = eps_poll_interval,
+            on_status_change = _broadcaster.publish_sync,
+            dispatch_fn      = _stub_dispatch,
+            auto_complete    = True,
+            alarm_manager    = AlarmManager(),
+            failure_injector = FailureInjector(seed=42),
+        )
+    from autosys.agent.dispatch import AgentDispatch
+    agent = AgentDispatch(local_only=False)
+    return EventProcessor(
+        poll_interval    = eps_poll_interval,
+        on_status_change = _broadcaster.publish_sync,
+        dispatch_fn      = agent.dispatch,
+        kill_fn          = agent.kill,
+        auto_complete    = False,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -97,32 +134,16 @@ def create_app(
         app.state.broadcaster = _broadcaster
         logger.info("AutoSys App Server starting")
 
-        eps_task: Optional[asyncio.Task] = None
-        ha_lock = None
+        app.state.dry_run    = dry_run
+        app.state.ha         = ha
+        app.state.tie_breaker = tie_breaker
+        app.state.eps_task   = None
         if start_eps:
-            from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
-            if dry_run:
-                from autosys.notifications.alarm_manager import AlarmManager
-                from autosys.scheduler.failure_injector import FailureInjector
-                processor = EventProcessor(
-                    poll_interval    = eps_poll_interval,
-                    on_status_change = _broadcaster.publish_sync,
-                    dispatch_fn      = _stub_dispatch,
-                    auto_complete    = True,
-                    alarm_manager    = AlarmManager(),
-                    failure_injector = FailureInjector(seed=42),
-                )
-                logger.info("Event Processor running in DRY-RUN mode (stub dispatcher + failure injection + alarms)")
-            else:
-                from autosys.agent.dispatch import AgentDispatch
-                agent = AgentDispatch(local_only=False)
-                processor = EventProcessor(
-                    poll_interval    = eps_poll_interval,
-                    on_status_change = _broadcaster.publish_sync,
-                    dispatch_fn      = agent.dispatch,
-                    kill_fn          = agent.kill,
-                    auto_complete    = False,
-                )
+            processor = _build_eps_processor(dry_run, eps_poll_interval)
+            logger.info(
+                "Event Processor running in {} mode",
+                "DRY-RUN (stub dispatcher + failure injection + alarms)" if dry_run else "REAL",
+            )
             # HA mode: wrap processor with distributed lock
             if ha:
                 from autosys.scheduler.ha import DistributedLock
@@ -135,7 +156,7 @@ def create_app(
                     logger.info("HA: running as standby tie-breaker")
                 else:
                     logger.info("HA: running as primary")
-            eps_task = asyncio.create_task(
+            app.state.eps_task = asyncio.create_task(
                 processor.run_forever(),
                 name="eps-background",
             )
@@ -143,6 +164,7 @@ def create_app(
 
         yield
 
+        eps_task: Optional[asyncio.Task] = app.state.eps_task
         if eps_task is not None and not eps_task.done():
             eps_task.cancel()
             try:
@@ -188,6 +210,9 @@ def create_app(
 
     # --- Health ---
     _register_health_routes(app)
+
+    # --- Settings (execution-mode toggle) ---
+    _register_settings_routes(app, eps_poll_interval, start_eps)
 
     # --- Static UI ---
     _mount_static(app)
@@ -306,6 +331,54 @@ def _register_health_routes(app: FastAPI) -> None:
             "secondary_db": sec.get_status(),
             "instance_id": lock.instance_id,
         }
+
+
+# ---------------------------------------------------------------------------
+# Settings — live dry-run / real-run toggle
+# ---------------------------------------------------------------------------
+
+def _register_settings_routes(app: FastAPI, eps_poll_interval: float, start_eps: bool) -> None:
+
+    @app.get("/api/v1/settings/execution-mode", response_model=ExecutionModeResponse, tags=["settings"])
+    def get_execution_mode():
+        return ExecutionModeResponse(dry_run=getattr(app.state, "dry_run", True))
+
+    @app.put("/api/v1/settings/execution-mode", response_model=ExecutionModeResponse, tags=["settings"])
+    async def set_execution_mode(
+        body: SetExecutionModeRequest,
+        user: CurrentUser = Depends(get_current_user),
+    ):
+        """
+        Switch the running Event Processor between dry-run (stub dispatcher,
+        no real subprocesses) and real execution (``AgentDispatch``), without
+        restarting the container. Admin only.
+        """
+        user.require_role("admin")
+
+        if not start_eps:
+            raise HTTPException(
+                status_code = status.HTTP_409_CONFLICT,
+                detail      = "This server was not started with an Event Processor (autosys scheduler serve).",
+            )
+
+        old_task: Optional[asyncio.Task] = getattr(app.state, "eps_task", None)
+        if old_task is not None and not old_task.done():
+            old_task.cancel()
+            try:
+                await old_task
+            except asyncio.CancelledError:
+                pass
+
+        processor = _build_eps_processor(body.dry_run, eps_poll_interval)
+        if getattr(app.state, "ha", False):
+            from autosys.scheduler.ha import DistributedLock
+            processor.ha_lock = DistributedLock(heartbeat_timeout=int(eps_poll_interval * 5))
+            processor.is_standby = getattr(app.state, "tie_breaker", False)
+
+        app.state.dry_run  = body.dry_run
+        app.state.eps_task = asyncio.create_task(processor.run_forever(), name="eps-background")
+        logger.info("Execution mode switched to {} by {}", "DRY-RUN" if body.dry_run else "REAL", user.username)
+        return ExecutionModeResponse(dry_run=body.dry_run)
 
 
 # ---------------------------------------------------------------------------
