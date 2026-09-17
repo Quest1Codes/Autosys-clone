@@ -14,8 +14,8 @@ was only what software should terminate it.
 
 ## What we chose
 
-**frp** ([fatedier/frp](https://github.com/fatedier/frp)), with the client binary
-`frpc` baked into the simulator image itself.
+**frp** ([fatedier/frp](https://github.com/fatedier/frp)) in **STCP mode**, with
+the client binary `frpc` baked into the simulator image itself.
 
 Client-side setup is one command — no tunnel tool to install, no key file, no
 ports to open:
@@ -24,12 +24,26 @@ ports to open:
 docker run -d --name autosys-clone -p 9000:9000 \
   -e AUTOSYS_AUTH_ENABLED=false \
   -e FRP_SERVER=<relay-ip> -e FRP_SERVER_PORT=7000 \
-  -e FRP_TOKEN=<token> -e FRP_REMOTE_PORT=9000 \
+  -e FRP_TOKEN=<token> -e FRP_STCP_KEY=<stcp-secret> \
   <image> autosys scheduler serve --host 0.0.0.0 --port 9000 --dry-run
 ```
 
-`docker-entrypoint.sh` starts `frpc` only when `FRP_SERVER` and `FRP_TOKEN` are
-both present, so the image behaves exactly as before when they're absent.
+`docker-entrypoint.sh` starts `frpc` only when `FRP_SERVER`, `FRP_TOKEN` and
+`FRP_STCP_KEY` are all present, so the image behaves exactly as before when
+they're absent.
+
+**Why STCP and not a plain forwarded TCP port** (frp's `type = "tcp"`, which is
+what an earlier version of this doc described): a forwarded port needs the
+relay's security group to allowlist the client's IP. In testing, a client on
+carrier-grade NAT moved to a different address mid-session — twice, within the
+same test session — breaking the allowlist outright, and there is no CIDR range
+that fixes this reliably since the pool's boundaries aren't known ahead of time.
+STCP opens no public data port on the relay at all: the simulator registers a
+proxy, and Shinro's own `frpc` **visitor** (`tools/frp_visitor/` in the Shinro
+repo) pairs with it through the relay's control port using a shared
+`secretKey`. The relay's security group now only needs `7000/tcp` open, for
+auth — nothing to allowlist, and nothing world-reachable regardless of either
+side's network.
 
 ## Why frp and not a reverse SSH tunnel
 
@@ -63,10 +77,11 @@ surface needing `GatewayPorts` changes to a config that also governs admin
 access, restricted `authorized_keys` entries per client, fail2ban, and a key
 rotation process.
 
-**5. Multi-client works without bookkeeping.**
-SSH reverse tunnels need a hand-assigned relay port per client. frp allocates
-from a configured range and identifies clients by proxy name. This doesn't
-matter at one concurrent engagement; it matters at the second.
+**5. No CIDR to maintain, ever.**
+SSH reverse tunnels (and frp's own plain `type = "tcp"` mode) need a relay
+security group rule scoped to the client's IP. STCP needs none — nothing
+inbound is opened for the proxy/visitor pairing at all, so there's no rule to
+keep in sync with a client's network, including one that moves mid-session.
 
 **Latency was not a deciding factor.** Both approaches are TCP relays through the
 same extra hop, so the geographic cost is identical. The workload is ~85KB per
@@ -78,9 +93,9 @@ TCP-over-TCP head-of-line blocking on lossy links; SSH cannot.)
 
 Re-evaluate if any of these become true:
 
-- More than a handful of concurrent client tunnels — consider frp's `type = "http"`
-  proxies with subdomain routing instead of TCP port allocation (needs a wildcard
-  DNS record pointing at the relay)
+- More than one concurrent client engagement — STCP as built here uses one
+  fixed proxy name (`autosys-sim`) and one shared `secretKey`, so a second
+  simultaneous client would collide with the first (see blocker #4 below)
 - Clients on lossy links — switch the transport to QUIC/KCP
 - The relay becomes engagement-critical — it's currently a single point of
   failure with no HA
@@ -92,19 +107,24 @@ cp frps.toml.example frps.toml     # set a real auth.token
 docker compose up -d
 ```
 
+No `allowPorts` or port-range configuration is needed for STCP — that setting
+only applies to frp's plain `tcp`/`udp` proxy types, which this relay doesn't use.
+
 Security group on the relay host:
 
-| Port        | Source              | Why                                    |
-|-------------|---------------------|----------------------------------------|
-| 7000/tcp    | anywhere            | clients' `frpc` connects here          |
-| 9000–9100/tcp | Shinro's egress IP only | forwarded simulator ports       |
+| Port     | Source   | Why                                              |
+|----------|----------|---------------------------------------------------|
+| 7000/tcp | anywhere | both the client's `frpc` and Shinro's `frpc` visitor authenticate here |
 
-**Do not open 9000–9100 to the world.** A tunnelled simulator runs with
-`AUTOSYS_AUTH_ENABLED=false`, so anything that can reach the forwarded port has
-full API access to the client's job data.
+That's the only port. Nothing else needs to be open — STCP proxies and
+visitors never bind a public port on the relay.
 
-Shinro reaches a tunnelled simulator at `http://<relay-ip>:<forwarded-port>`,
-configured via `SIMULATOR_RELAY_*` settings in Shinro's `apps/api/.env`.
+Shinro reaches a tunnelled simulator at `http://frp-visitor:<bind-port>` — an
+internal hostname on Shinro's own `shinro` docker network, not the relay's
+public IP. `SIMULATOR_RELAY_*` and `SIMULATOR_STCP_KEY` in Shinro's
+`apps/api/.env` configure both the client-facing `docker run` command and the
+`frp-visitor` sidecar (`tools/frp_visitor/` in the Shinro repo) that does the
+pairing.
 
 ## Open blockers
 
@@ -127,9 +147,10 @@ configured via `SIMULATOR_RELAY_*` settings in Shinro's `apps/api/.env`.
    per-run random secret, plus passing a real credential to Shinro's
    `run_autosys_assessment_tool` (which already accepts `auth_token`).
 
-4. **Single fixed forwarded port.** `SIMULATOR_RELAY_REMOTE_PORT` is one value,
-   so two concurrent client tunnels would collide. Fine while engagements are
-   sequential; needs per-conversation port allocation before they aren't.
+4. **Single fixed proxy name and secret.** The simulator always registers as
+   `autosys-sim` with one shared `SIMULATOR_STCP_KEY`, so a second concurrent
+   client would collide with the first. Fine while engagements are sequential;
+   needs a per-conversation proxy name and secret before they aren't.
 
 5. **amd64 only in practice.** The Dockerfile takes `TARGETARCH` and builds
    multi-arch under `buildx`, but published tags should be confirmed to include
