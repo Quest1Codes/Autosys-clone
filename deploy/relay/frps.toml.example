@@ -1,0 +1,29 @@
+# frps (relay server) config. Copy to frps.toml and fill in a real token.
+#
+# This runs on a host with a public IP. Client simulators dial OUT to it, so
+# nothing inbound needs opening on the client side.
+
+# Control port that frpc clients connect to.
+bindPort = 7000
+
+# Shared secret. Clients pass the same value as FRP_TOKEN. Generate with:
+#   openssl rand -hex 24
+# Anyone holding this can open a tunnel through the relay -- treat it like a
+# credential, rotate it between engagements.
+auth.token = "CHANGE_ME"
+
+# Ports a client is allowed to claim. Without this, any authenticated client
+# could bind any port on the relay, including ones other services use.
+allowPorts = [{ start = 9000, end = 9100 }]
+
+# Drop tunnels whose client has gone away rather than holding the port open.
+transport.heartbeatTimeout = 90
+
+log.level = "info"
+
+# Optional dashboard (http://<relay>:7500). Leave commented unless you've
+# restricted 7500 by security group -- it's a login page on a public IP.
+# webServer.addr = "0.0.0.0"
+# webServer.port = 7500
+# webServer.user = "admin"
+# webServer.password = "CHANGE_ME_TOO"

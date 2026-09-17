@@ -1,0 +1,21 @@
+# Relay deployment. Run this on the public-IP host.
+#
+#   cp frps.toml.example frps.toml   # then set a real auth.token
+#   docker compose up -d
+#
+# Security-group rules the host needs:
+#   7000/tcp  inbound from anywhere  -- clients' frpc connects here
+#   9000-9100/tcp inbound from Shinro's egress IP ONLY -- the forwarded
+#             simulator ports. Do not open these to the world: a tunnelled
+#             simulator runs with auth disabled.
+
+services:
+  frps:
+    build: .
+    image: autosys-relay-frps:0.71.0
+    container_name: frps
+    restart: unless-stopped
+    network_mode: host  # forwarded ports are allocated dynamically at runtime,
+                        # so they can't be enumerated in a ports: list
+    volumes:
+      - ./frps.toml:/etc/frp/frps.toml:ro
