@@ -128,10 +128,13 @@ pairing.
 
 ## Open blockers
 
-1. **No relay host yet.** Needs a public-IP host to run `frps`. Vishy has an EC2
-   used to demo this pattern; we need its IP and deploy access, or a new
-   instance. The AWS key currently in Shinro's `.env` is scoped to Bedrock and S3
-   only — `ec2:DescribeInstances` is denied — so it can't provision one.
+1. **Relay has no Elastic IP.** `frps` is live on a dedicated EC2 instance
+   (`i-0df3fd45298346aa6`, `autosys-simulator-relay`), currently at
+   `34.226.194.254`. The AWS account is at its Elastic IP allocation limit, so
+   the instance runs on an ephemeral public IP — stopping/restarting it changes
+   the address, and `SIMULATOR_RELAY_HOST` (Shinro's root `.env` and
+   `apps/api/.env`) must be updated by hand afterward. Get an EIP freed up (or
+   the limit raised) before relying on this surviving a reboot unattended.
 
 2. **Docker Hub is a personal account.** The image is published under an
    individual's namespace because there's no `quest1codes` Docker Hub org yet.
