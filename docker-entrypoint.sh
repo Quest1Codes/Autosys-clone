@@ -54,4 +54,50 @@ else
   echo "[entrypoint] frp tunnel disabled (set FRP_SERVER, FRP_TOKEN and FRP_STCP_KEY to enable)"
 fi
 
+# No command given: this is the client-facing `docker run <image>` path --
+# start everything a real engagement needs from the one container: the
+# assessment API + EPS (9000, what the frp tunnel above exposes to Shinro),
+# the WCC dashboard backend (127.0.0.1-only -- nginx is the only thing that
+# talks to it), and nginx (8080, the client's own browser talks to this and
+# only this to log in and load their JIL files). A command IS still honoured
+# below for the multi-container compose files in this repo, which run
+# `serve`/`wcc` as separate containers.
+if [ "$#" -eq 0 ]; then
+  PIDS=()
+  cleanup() {
+    trap - TERM INT
+    for pid in "${PIDS[@]}"; do
+      kill "$pid" 2>/dev/null || true
+    done
+  }
+  trap cleanup TERM INT
+
+  # Every `autosys` invocation runs schema init (create_all_sync) via the CLI's
+  # root callback before its subcommand -- starting serve and wcc in the same
+  # instant races two of these against a fresh sqlite file and hits "database
+  # is locked". Running one command synchronously first does it exactly once.
+  echo "[entrypoint] initializing database schema"
+  autosys scheduler status >/dev/null 2>&1 || true
+
+  echo "[entrypoint] starting AutoSys API server on :9000 (dry-run)"
+  autosys scheduler serve --host 0.0.0.0 --port 9000 --dry-run &
+  PIDS+=("$!")
+
+  echo "[entrypoint] starting WCC dashboard backend on 127.0.0.1:8090"
+  autosys scheduler wcc --host 127.0.0.1 --port 8090 &
+  PIDS+=("$!")
+
+  echo "[entrypoint] starting nginx on :8080 (WCC UI, JIL upload)"
+  nginx -g "daemon off;" &
+  PIDS+=("$!")
+
+  set +e
+  wait -n
+  EXIT_CODE=$?
+  set -e
+  echo "[entrypoint] a service exited (code ${EXIT_CODE}) -- stopping the others"
+  cleanup
+  exit "${EXIT_CODE}"
+fi
+
 exec "$@"

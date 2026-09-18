@@ -21,16 +21,22 @@ Client-side setup is one command — no tunnel tool to install, no key file, no
 ports to open:
 
 ```
-docker run -d --name autosys-clone -p 9000:9000 \
+docker run -d --name autosys-clone -p 9000:9000 -p 8080:8080 \
   -e AUTOSYS_AUTH_ENABLED=false \
   -e FRP_SERVER=<relay-ip> -e FRP_SERVER_PORT=7000 \
   -e FRP_TOKEN=<token> -e FRP_STCP_KEY=<stcp-secret> \
-  <image> autosys scheduler serve --host 0.0.0.0 --port 9000 --dry-run
+  <image>
 ```
 
-`docker-entrypoint.sh` starts `frpc` only when `FRP_SERVER`, `FRP_TOKEN` and
-`FRP_STCP_KEY` are all present, so the image behaves exactly as before when
-they're absent.
+With no trailing command, `docker-entrypoint.sh` starts all three pieces a
+real engagement needs from this one image: the assessment API + EPS (9000 —
+the only port frp tunnels, and all Shinro itself ever reads), the WCC
+dashboard backend (loopback-only), and nginx (8080 — the client's own
+browser, never tunnelled, for logging into WCC and loading their JIL files).
+A command IS still honoured, unchanged, for the `serve`/`wcc` split used by
+the `docker-compose*.yml` files in this repo. `frpc` itself starts only when
+`FRP_SERVER`, `FRP_TOKEN` and `FRP_STCP_KEY` are all present, so the image
+behaves exactly as before when they're absent.
 
 **Why STCP and not a plain forwarded TCP port** (frp's `type = "tcp"`, which is
 what an earlier version of this doc described): a forwarded port needs the

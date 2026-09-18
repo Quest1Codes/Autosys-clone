@@ -80,6 +80,7 @@ job_output/
 config/autosys.conf
 *.conf
 !nginx.conf
+!nginx.bundled.conf
 .env
 .env.*
 !.env.example
