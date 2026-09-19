@@ -85,6 +85,14 @@ EXPOSE 9000 8080
 # Either way the frp tunnel (only ever for port 9000) starts first when
 # FRP_SERVER/FRP_TOKEN/FRP_STCP_KEY are set.
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# CMD must be explicitly empty: python:3.11-slim's own default is
+# `CMD ["python3"]`, which this stage never overrode -- so a plain
+# `docker run <image>` (no trailing command) was actually passing "python3"
+# as the entrypoint's "$@", silently skipping the "no command -> bundle
+# mode" branch in docker-entrypoint.sh and falling through to `exec python3`,
+# which exits(0) immediately on EOF from stdin. Confirmed in testing: only
+# the frp-tunnel-enabled log line appeared, then the container exited clean.
+CMD []
 
 # ---------------------------------------------------------------------------
 # Stage 3 — nginx front door

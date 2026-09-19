@@ -38,6 +38,17 @@ auth.token = "${FRP_TOKEN}"
 # drops mid-session -- this is the reconnect behaviour raw ssh -R lacks.
 loginFailExit = false
 
+# tcpMux is on by default, and when it is, frp's application-level heartbeat
+# (transport.heartbeatInterval/heartbeatTimeout) is not sent at all -- the
+# tcp-mux (yamux) layer's own keepalive is what actually keeps the control
+# connection alive, controlled by tcpMuxKeepaliveInterval (default 30s).
+# Confirmed in testing: with the 30s default, some clients' NAT/carrier-NAT
+# idle-connection timeout kills the TCP connection before the next keepalive,
+# and the tunnel cycles fully offline and back on a ~90s clock forever.
+# Sending one every 5s keeps traffic flowing often enough that most NATs
+# never consider the connection idle in the first place.
+transport.tcpMuxKeepaliveInterval = 5
+
 [[proxies]]
 name = "${FRP_PROXY_NAME}"
 type = "stcp"
