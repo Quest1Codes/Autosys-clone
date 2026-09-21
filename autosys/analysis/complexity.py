@@ -88,12 +88,17 @@ class JobAssessment:
     # keep working when a caller doesn't supply run_stats.
     risk:         str = "NO_DATA"
     risk_drivers: str = ""
+    # Where the risk verdict's run history came from: "history" (rows already
+    # in the DB), "simulated" (scratch-DB dry run, see simulated_risk.py) or
+    # "none" (NO_DATA). BOX jobs that inherit risk inherit the source too.
+    risk_source:  str = "none"
     # Cross-job blast radius — how many other jobs' conditions reference
     # this one (see dependency_graph.fan_in_counts).
     blast_radius: int = 0
     # Airflow gap tags — see gap_analysis.GAP_CATALOGUE.
     gap_tags:     str = ""
     # Migration signals from JIL structural analysis (A1-A10)
+    machine:               str = ""
     machine_concentration: str = ""
     command_dialect:       str = ""
     box_nesting_depth:     int = 0
@@ -282,6 +287,7 @@ def build_report(
     box_pattern: Optional[str] = None,
     run_stats: Optional[dict[str, RunStats]] = None,
     migration_signals: Optional[dict] = None,
+    risk_sources: Optional[dict[str, str]] = None,
 ) -> list[JobAssessment]:
     """
     Score every job and return a list of JobAssessment results.
@@ -300,6 +306,10 @@ def build_report(
     JobAssessment is enriched with machine concentration, command dialect,
     box nesting depth, cross-box deps, schedule burst, notifications, log
     paths, and timezone signals.
+
+    *risk_sources* optionally labels where each job's run_stats came from
+    ({job_name: "history" | "simulated"}); jobs absent from it are labelled
+    "history" if they have run_stats and "none" otherwise.
     """
     all_by_name: dict[str, JobRow] = {r.job_name: r for r in rows}
     # Blast radius is a global-graph property — computed once over the full,
@@ -383,16 +393,25 @@ def build_report(
             drivers  = "; ".join(drivers),
             risk         = risk,
             risk_drivers = "; ".join(risk_drivers),
+            risk_source  = (
+                (risk_sources or {}).get(r.job_name)
+                or ("history" if r.job_name in (run_stats or {}) else "none")
+            ),
             blast_radius = blast_radius.get(r.job_name, 0),
             gap_tags     = ", ".join(compute_gap_tags(r)),
+            machine = (
+                migration_signals.get("machine_concentration", {})
+                .get("by_job", {}).get(r.job_name, {}).get("machine", "")
+                if migration_signals else ""
+            ),
             machine_concentration = (
                 migration_signals.get("machine_concentration", {})
                 .get("by_job", {}).get(r.job_name, {}).get("score", "")
                 if migration_signals else ""
             ),
             command_dialect = (
-                migration_signals.get("command_analysis", {})
-                .get(r.job_name, {}).get("dialect", "")
+                (migration_signals.get("command_analysis", {})
+                 .get(r.job_name, {}).get("dialect") or "")
                 if migration_signals else ""
             ),
             box_nesting_depth = (
@@ -446,7 +465,8 @@ def build_report(
         worst = max(children, key=lambda c: _risk_order.get(c.risk, 0))
         if _risk_order.get(worst.risk, 0) > _risk_order.get(a.risk, 0):
             a.risk = worst.risk
-            a.risk_drivers = f"inherited from child {worst.job_name}: {worst.risk_drivers}"
+            a.risk_source = worst.risk_source
+            a.risk_drivers =f"inherited from child {worst.job_name}: {worst.risk_drivers}"
 
     return results
 
@@ -474,6 +494,8 @@ def compute_summary(results: list[JobAssessment]) -> AssessmentSummary:
             severity = GAP_CATALOGUE[tag][0]
             gap_severity_counts[severity] += 1
         # Migration signal aggregation
+        if rec.machine:
+            machine_names.add(rec.machine)
         if rec.command_dialect:
             dialect_counts[rec.command_dialect] = dialect_counts.get(rec.command_dialect, 0) + 1
         if rec.has_cross_box_dep:

@@ -262,8 +262,22 @@ class AssessmentJobRecord(BaseModel):
     drivers:  str
     risk:         str = "NO_DATA"
     risk_drivers: str = ""
+    # "history" | "simulated" | "none" — see AssessmentSimulation.
+    risk_source:  str = "none"
     blast_radius: int = 0
     gap_tags:     str = ""
+    # Migration signals from JIL structural analysis (A1-A10) and the derived
+    # Astronomer mapping / risk mitigation suggestions.
+    machine_concentration: str  = ""
+    command_dialect:       str  = ""
+    box_nesting_depth:     int  = 0
+    has_cross_box_dep:     bool = False
+    schedule_burst_count:  int  = 0
+    has_notifications:     bool = False
+    has_hardcoded_logs:    bool = False
+    timezone:              str  = ""
+    astronomer_mapping:    str  = ""
+    risk_mitigation:       str  = ""
 
 
 class AssessmentSummaryResponse(BaseModel):
@@ -279,15 +293,46 @@ class AssessmentSummaryResponse(BaseModel):
     total_days: int
     risk_counts:         dict[str, int] = {}
     gap_severity_counts: dict[str, int] = {}
+    machine_count:       int = 0
+    migration_signals:   dict[str, Any] = {}
+
+
+class AssessmentSimulation(BaseModel):
+    """
+    Provenance of the operational-risk numbers in the report.
+
+    status:
+      "not_needed" every job already has run history in the DB
+      "ready"      simulated history was used for jobs that had none
+      "pending"    a simulation is still running — risk for jobs without
+                   history is NO_DATA for now; call again shortly
+      "failed"     the simulation errored (see ``error``)
+      "skipped"    not attempted (real execution mode, or disabled)
+    Simulated numbers come from the deterministic FailureInjector (failure rate
+    derived from each job's n_retrys), not from real executions.
+    """
+    status:         str
+    reason:         str = ""
+    error:          str = ""
+    cycles:         int = 0
+    seed:           int = 0
+    total_runs:     int = 0
+    total_failures: int = 0
+    total_alarms:   int = 0
+    failure_rate:   float = 0.0
+    jobs_simulated: int = 0
 
 
 class AssessmentReportResponse(BaseModel):
     """GET /api/v1/assessment/report — full T-shirt-size complexity report."""
-    generated_at: datetime
-    box_filter:   Optional[str] = None
-    job_count:    int
-    jobs:         list[AssessmentJobRecord]
-    summary:      AssessmentSummaryResponse
+    generated_at:   datetime
+    box_filter:     Optional[str] = None
+    job_count:      int
+    execution_mode: str = "dry_run"     # "dry_run" | "real"
+    simulation:     AssessmentSimulation = AssessmentSimulation(status="skipped")
+    jobs:           list[AssessmentJobRecord]
+    box_breakdown:  list[dict[str, Any]] = []
+    summary:        AssessmentSummaryResponse
 
 
 class BoxTraceRequest(BaseModel):

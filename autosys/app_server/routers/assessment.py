@@ -1,28 +1,49 @@
 """
 Assessment router — Phase 1 migration-assessment export for Shinro.
 
-GET  /api/v1/assessment/report               Full T-shirt-size complexity report (JSON).
+GET  /api/v1/assessment/report               Full complexity report (JSON): T-shirt size, effort,
+                                             operational risk, gap tags, and the A1-A10 migration
+                                             signals. Risk for jobs with no run history is filled
+                                             in by a background dry-run simulation (see below).
+GET  /api/v1/assessment/migration-report     Same data plus a CSV export; always simulates and
+                                             blocks until the simulation finishes.
 POST /api/v1/assessment/boxes/{box}/trace     Dry-run state-machine trace for one BOX.
 
-Both endpoints are read-only: the trace endpoint drives a box through the
-same dry-run stub-dispatch machinery as `autosys scheduler serve --dry-run`,
-then rolls back the session so nothing is persisted.
+The trace endpoint drives a box through the same dry-run stub-dispatch machinery as
+`autosys scheduler serve --dry-run`, then rolls back the session so nothing is persisted.
+
+Automatic simulation
+--------------------
+A freshly imported JIL has no run history, so every job would score NO_DATA risk. When the
+server is in dry-run mode, jobs without history get simulated history from
+`analysis.simulated_risk`, which runs the dry-run machinery against a throwaway in-memory DB —
+the live DB (job statuses, event queue, history) is never touched. Jobs that already have
+history keep it. Each job's `risk_source` says which one it got, and `simulation.status`
+reports whether the simulation is ready, still pending, failed or skipped. In real execution
+mode nothing is simulated.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from autosys.analysis.box_trace import (
     BoxNotFoundError, NotABoxError, run_box_trace,
 )
-from autosys.analysis.complexity import build_report, compute_summary
+from autosys.analysis import simulated_risk
+from autosys.analysis.complexity import (
+    AssessmentSummary, JobAssessment, astronomer_mapping, box_effort_breakdown,
+    build_report, compute_summary, export_csv, risk_mitigation,
+)
+from autosys.analysis.migration_signals import run_all_structural_analyses
 from autosys.analysis.operational_risk import fetch_run_stats
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas import (
-    AssessmentJobRecord, AssessmentReportResponse, AssessmentSummaryResponse,
+    AssessmentJobRecord, AssessmentReportResponse, AssessmentSimulation,
+    AssessmentSummaryResponse,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
 )
 from autosys.db.repository import jobs as job_repo
@@ -30,38 +51,138 @@ from autosys.db.repository import jobs as job_repo
 router = APIRouter(prefix="/api/v1/assessment", tags=["assessment"])
 
 
+@dataclass
+class _Assessment:
+    results:    list[JobAssessment]
+    summary:    AssessmentSummary
+    signals:    dict
+    simulation: AssessmentSimulation
+    mode:       str
+
+
+def _assess(
+    session:  Session,
+    request:  Request,
+    *,
+    box:      str | None,
+    cycles:   int,
+    simulate: bool,
+    wait_s:   float | None,
+    force:    bool = False,
+) -> _Assessment:
+    """
+    Score every job, filling in simulated risk for jobs that have no run history.
+
+    *force* simulates even in real execution mode (safe because the simulation is
+    isolated); *wait_s* bounds how long to wait for it (None = until it finishes).
+    """
+    rows      = job_repo.list_all(session)
+    live      = fetch_run_stats(session, [r.job_name for r in rows])
+    dry_run   = getattr(request.app.state, "dry_run", True)
+    mode      = "dry_run" if dry_run else "real"
+    # BOX jobs never have run rows of their own (they inherit risk from their
+    # children), so only non-BOX jobs count as "missing history".
+    uncovered = [
+        r.job_name for r in rows
+        if r.job_name not in live and (r.job_type or "").upper() != "BOX"
+    ]
+
+    sim_stats: dict = {}
+    if not rows or not uncovered:
+        sim = AssessmentSimulation(status="not_needed")
+    elif not simulate or not simulated_risk.simulation_enabled():
+        sim = AssessmentSimulation(status="skipped", reason="simulation disabled")
+    elif not dry_run and not force:
+        sim = AssessmentSimulation(
+            status="skipped", reason="real execution mode — simulated risk is never mixed into real history",
+        )
+    else:
+        out = simulated_risk.ensure_simulation(session, cycles=cycles, wait_s=wait_s)
+        sim_stats = out.stats
+        sim = AssessmentSimulation(
+            status=out.status, error=out.error, cycles=out.cycles, seed=out.seed,
+            total_runs=out.summary.get("total_runs", 0),
+            total_failures=out.summary.get("total_failures", 0),
+            total_alarms=out.summary.get("total_alarms", 0),
+            failure_rate=round(out.summary.get("failure_rate", 0.0), 4),
+        )
+
+    # Live history wins per job; simulated stats only fill jobs that have none.
+    merged  = {**sim_stats, **live}
+    sources = {name: "history" for name in live}
+    sources.update({name: "simulated" for name in sim_stats if name not in live})
+    sim.jobs_simulated = sum(1 for v in sources.values() if v == "simulated")
+
+    signals = run_all_structural_analyses(session) if rows else {}
+    results = build_report(
+        rows, box, run_stats=merged, migration_signals=signals, risk_sources=sources,
+    )
+    return _Assessment(results, compute_summary(results), signals, sim, mode)
+
+
+def _job_record(a: JobAssessment) -> AssessmentJobRecord:
+    return AssessmentJobRecord(
+        job_name=a.job_name, job_type=a.job_type, box_name=a.box_name,
+        size=a.size, effort_h=a.effort_h, drivers=a.drivers,
+        risk=a.risk, risk_drivers=a.risk_drivers, risk_source=a.risk_source,
+        blast_radius=a.blast_radius, gap_tags=a.gap_tags,
+        machine_concentration=a.machine_concentration, command_dialect=a.command_dialect,
+        box_nesting_depth=a.box_nesting_depth, has_cross_box_dep=a.has_cross_box_dep,
+        schedule_burst_count=a.schedule_burst_count, has_notifications=a.has_notifications,
+        has_hardcoded_logs=a.has_hardcoded_logs, timezone=a.timezone,
+        astronomer_mapping=astronomer_mapping(a), risk_mitigation=risk_mitigation(a),
+    )
+
+
+def _summary_response(s: AssessmentSummary) -> AssessmentSummaryResponse:
+    return AssessmentSummaryResponse(
+        counts=s.counts, hours=s.hours, total_jobs=s.total_jobs,
+        raw_hours=s.raw_hours, platform_h=s.platform_h,
+        testing_h=s.testing_h, pm_h=s.pm_h, training_h=s.training_h,
+        total_h=s.total_h, total_days=s.total_days,
+        risk_counts=s.risk_counts, gap_severity_counts=s.gap_severity_counts,
+        machine_count=s.machine_count,
+        migration_signals={
+            "cross_box_dep_count":     s.cross_box_dep_count,
+            "max_box_nesting":         s.max_box_nesting,
+            "max_schedule_burst":      s.max_schedule_burst,
+            "notification_job_count":  s.notification_job_count,
+            "hardcoded_log_job_count": s.hardcoded_log_job_count,
+            "timezone_count":          s.timezone_count,
+            "dialect_counts":          s.dialect_counts,
+        },
+    )
+
+
 @router.get("/report", response_model=AssessmentReportResponse)
 def get_report(
-    box:     str | None    = Query(None, description="SQL LIKE pattern to restrict to matching BOX jobs and their children, e.g. '%risk%'."),
-    session: Session        = Depends(get_session),
-    _user:   CurrentUser    = Depends(get_current_user),
+    request:  Request,
+    box:      str | None = Query(None, description="SQL LIKE pattern to restrict to matching BOX jobs and their children, e.g. '%risk%'."),
+    simulate: bool       = Query(True, description="Fill in risk for jobs with no run history from a dry-run simulation (dry-run mode only)."),
+    session:  Session     = Depends(get_session),
+    _user:    CurrentUser = Depends(get_current_user),
 ):
-    """T-shirt-size every job (optionally filtered to a BOX pattern) and estimate effort."""
-    rows      = job_repo.list_all(session)
-    run_stats = fetch_run_stats(session, [r.job_name for r in rows])
-    results   = build_report(rows, box, run_stats=run_stats)
-    summary   = compute_summary(results)
+    """
+    T-shirt-size every job (optionally filtered to a BOX pattern), estimate effort, and
+    score operational risk.
 
+    Jobs with no run history get simulated risk (``risk_source: "simulated"``) — the
+    simulation runs in the background on a scratch DB and is cached, so the first call
+    after importing JIL may report ``simulation.status: "pending"``; call again shortly.
+    """
+    a = _assess(
+        session, request, box=box, cycles=simulated_risk.DEFAULT_CYCLES,
+        simulate=simulate, wait_s=simulated_risk.default_wait_s(),
+    )
     return AssessmentReportResponse(
-        generated_at = datetime.now(),
-        box_filter   = box,
-        job_count    = len(results),
-        jobs         = [
-            AssessmentJobRecord(
-                job_name=r.job_name, job_type=r.job_type, box_name=r.box_name,
-                size=r.size, effort_h=r.effort_h, drivers=r.drivers,
-                risk=r.risk, risk_drivers=r.risk_drivers,
-                blast_radius=r.blast_radius, gap_tags=r.gap_tags,
-            )
-            for r in results
-        ],
-        summary = AssessmentSummaryResponse(
-            counts=summary.counts, hours=summary.hours, total_jobs=summary.total_jobs,
-            raw_hours=summary.raw_hours, platform_h=summary.platform_h,
-            testing_h=summary.testing_h, pm_h=summary.pm_h, training_h=summary.training_h,
-            total_h=summary.total_h, total_days=summary.total_days,
-            risk_counts=summary.risk_counts, gap_severity_counts=summary.gap_severity_counts,
-        ),
+        generated_at   = datetime.now(),
+        box_filter     = box,
+        job_count      = len(a.results),
+        execution_mode = a.mode,
+        simulation     = a.simulation,
+        jobs           = [_job_record(r) for r in a.results],
+        box_breakdown  = box_effort_breakdown(a.results),
+        summary        = _summary_response(a.summary),
     )
 
 
@@ -116,96 +237,29 @@ def trace_box(
 
 @router.get("/migration-report")
 def get_migration_report(
-    cycles:  int = Query(20, description="Number of simulation cycles for runtime data generation."),
+    request: Request,
+    cycles:  int = Query(simulated_risk.DEFAULT_CYCLES, ge=1, le=200, description="Number of simulation cycles for runtime data generation."),
     session: Session = Depends(get_session),
     _user:   CurrentUser = Depends(get_current_user),
 ):
     """
-    JIL-only migration complexity report with simulated runtime data.
+    Full migration report: the same data as ``/report`` plus a CSV export.
 
-    Runs a multi-cycle dry-run simulation to generate JobRunRow/AlarmRow
-    history, then combines structural JIL signals with the complexity
-    scoring model to produce a comprehensive assessment.
+    Always simulates (even in real execution mode — the simulation is isolated) and
+    blocks until it finishes, so unlike ``/report`` it never returns "pending".
     """
-    from autosys.analysis.migration_signals import run_all_structural_analyses
-    from autosys.scheduler.simulation_runner import run_simulation
-    from autosys.analysis.complexity import box_effort_breakdown, astronomer_mapping, risk_mitigation, export_csv
-
-    rows = job_repo.list_all(session)
-    if not rows:
+    if not job_repo.list_all(session):
         raise HTTPException(status_code=404, detail="No jobs found. Import JIL files first.")
 
-    # Run simulation
-    sim_result = run_simulation(session, cycles=cycles, ticks_per_cycle=10, seed=42)
-
-    # Fetch run stats from simulated history
-    run_stats = fetch_run_stats(session, [r.job_name for r in rows])
-
-    # Run structural analyses
-    signals = run_all_structural_analyses(session)
-
-    # Build enriched report
-    results = build_report(rows, run_stats=run_stats, migration_signals=signals)
-    summary = compute_summary(results)
-
+    a = _assess(
+        session, request, box=None, cycles=cycles, simulate=True, wait_s=None, force=True,
+    )
     return {
         "generated_at": datetime.now().isoformat(),
-        "job_count": len(results),
-        "simulation": {
-            "cycles": sim_result["cycles"],
-            "total_runs": sim_result["total_runs"],
-            "total_failures": sim_result["total_failures"],
-            "total_alarms": sim_result["total_alarms"],
-            "failure_rate": round(sim_result["failure_rate"], 4),
-        },
-        "jobs": [
-            {
-                "job_name": r.job_name,
-                "job_type": r.job_type,
-                "box_name": r.box_name,
-                "size": r.size,
-                "effort_h": r.effort_h,
-                "drivers": r.drivers,
-                "risk": r.risk,
-                "risk_drivers": r.risk_drivers,
-                "blast_radius": r.blast_radius,
-                "gap_tags": r.gap_tags,
-                "machine_concentration": r.machine_concentration,
-                "command_dialect": r.command_dialect,
-                "box_nesting_depth": r.box_nesting_depth,
-                "has_cross_box_dep": r.has_cross_box_dep,
-                "schedule_burst_count": r.schedule_burst_count,
-                "has_notifications": r.has_notifications,
-                "has_hardcoded_logs": r.has_hardcoded_logs,
-                "timezone": r.timezone,
-                "astronomer_mapping": astronomer_mapping(r),
-                "risk_mitigation": risk_mitigation(r),
-            }
-            for r in results
-        ],
-        "box_breakdown": box_effort_breakdown(results),
-        "summary": {
-            "counts": summary.counts,
-            "hours": summary.hours,
-            "total_jobs": summary.total_jobs,
-            "raw_hours": summary.raw_hours,
-            "platform_h": summary.platform_h,
-            "testing_h": summary.testing_h,
-            "pm_h": summary.pm_h,
-            "training_h": summary.training_h,
-            "total_h": summary.total_h,
-            "total_days": summary.total_days,
-            "risk_counts": summary.risk_counts,
-            "gap_severity_counts": summary.gap_severity_counts,
-            "migration_signals": {
-                "cross_box_dep_count": summary.cross_box_dep_count,
-                "max_box_nesting": summary.max_box_nesting,
-                "max_schedule_burst": summary.max_schedule_burst,
-                "notification_job_count": summary.notification_job_count,
-                "hardcoded_log_job_count": summary.hardcoded_log_job_count,
-                "timezone_count": summary.timezone_count,
-                "dialect_counts": summary.dialect_counts,
-            },
-        },
-        "csv": export_csv(results),
+        "job_count": len(a.results),
+        "simulation": a.simulation.model_dump(),
+        "jobs": [_job_record(r).model_dump() for r in a.results],
+        "box_breakdown": box_effort_breakdown(a.results),
+        "summary": _summary_response(a.summary).model_dump(),
+        "csv": export_csv(a.results),
     }

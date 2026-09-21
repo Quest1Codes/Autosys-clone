@@ -31,6 +31,15 @@ def isolated_db(tmp_path, monkeypatch):
     _conn.reset_engines()
 
 
+@pytest.fixture(autouse=True)
+def fresh_sim_cache():
+    """The simulated-risk cache is process-global; isolate it per test."""
+    from autosys.analysis import simulated_risk
+    simulated_risk.reset_cache()
+    yield
+    simulated_risk.reset_cache()
+
+
 @pytest.fixture()
 def ssa_client(isolated_db) -> Generator[TestClient, None, None]:
     from autosys.app_server.main import create_app
@@ -604,7 +613,9 @@ class TestAssessmentReportAPI:
                 _seed_run(session, "a", JobStatus.FAILURE.value)
             session.commit()
 
-        r = ssa_client.get("/api/v1/assessment/report")
+        # simulate=false: this test is about seeded history -> risk, not the
+        # automatic simulation (covered in TestSimulatedRisk below).
+        r = ssa_client.get("/api/v1/assessment/report", params={"simulate": "false"})
         assert r.status_code == 200
         data = r.json()
 
@@ -659,3 +670,277 @@ class TestBoxTraceAPI:
 
         job = ssa_client.get("/api/v1/jobs/seq_box").json()
         assert job["status"] == JobStatus.INACTIVE.value
+
+
+
+# ---------------------------------------------------------------------------
+# Automatic dry-run simulation feeding the report's operational risk
+# ---------------------------------------------------------------------------
+
+@pytest.fixture()
+def sim_client(isolated_db) -> Generator[TestClient, None, None]:
+    """Like ssa_client, but in dry-run mode (create_app defaults to real mode)."""
+    from autosys.app_server.main import create_app
+    app = create_app(start_eps=False, dry_run=True)
+    with TestClient(app, raise_server_exceptions=True) as c:
+        yield c
+
+def _report(client, **params):
+    r = client.get("/api/v1/assessment/report", params=params)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _wait_for_ready(client, timeout_s: float = 60.0, **params):
+    import time
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        data = _report(client, **params)
+        if data["simulation"]["status"] != "pending":
+            return data
+        time.sleep(0.2)
+    raise AssertionError("simulation never left 'pending'")
+
+
+def _seed_boxes(isolated_db):
+    from autosys.db.connection import sync_session
+    with sync_session() as session:
+        _seed_sequential_box(session)
+        session.commit()
+
+
+class TestSimulatedRisk:
+
+    def test_empty_db_needs_no_simulation(self, sim_client):
+        assert _report(sim_client)["simulation"]["status"] == "not_needed"
+
+    def test_jobs_without_history_get_simulated_risk(self, sim_client, isolated_db, monkeypatch):
+        monkeypatch.setenv("AUTOSYS_REPORT_SIM_WAIT_S", "60")
+        _seed_boxes(isolated_db)
+
+        data = _report(sim_client)
+        sim = data["simulation"]
+        assert sim["status"] == "ready"
+        assert sim["total_runs"] > 0
+        assert sim["cycles"] == 20
+        assert sim["jobs_simulated"] == 3        # a, b, c — the BOX inherits from them
+
+        for j in data["jobs"]:
+            assert j["risk_source"] == "simulated"
+            assert j["risk"] != "NO_DATA"
+        assert data["summary"]["risk_counts"]["NO_DATA"] == 0
+
+    def test_simulation_leaves_live_db_untouched(self, sim_client, isolated_db, monkeypatch):
+        from sqlalchemy import func, select
+        from autosys.db.connection import sync_session
+        from autosys.db.schema import AlarmRow, EventQueueRow, JobRow, JobRunRow
+        monkeypatch.setenv("AUTOSYS_REPORT_SIM_WAIT_S", "60")
+        _seed_boxes(isolated_db)
+
+        with sync_session() as s:
+            before = {r.job_name: (r.status, r.last_start) for r in s.scalars(select(JobRow))}
+
+        assert _report(sim_client)["simulation"]["status"] == "ready"
+
+        with sync_session() as s:
+            after = {r.job_name: (r.status, r.last_start) for r in s.scalars(select(JobRow))}
+            assert after == before
+            for model in (JobRunRow, AlarmRow, EventQueueRow):
+                assert s.scalar(select(func.count()).select_from(model)) == 0
+
+    def test_live_history_wins_over_simulated(self, sim_client, isolated_db, monkeypatch):
+        from autosys.db.connection import sync_session
+        from autosys.models.enums import JobStatus
+        monkeypatch.setenv("AUTOSYS_REPORT_SIM_WAIT_S", "60")
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            for _ in range(5):
+                _seed_run(session, "a", JobStatus.FAILURE.value)
+            session.commit()
+
+        data = _report(sim_client)
+        by_name = {j["job_name"]: j for j in data["jobs"]}
+        assert by_name["a"]["risk_source"] == "history"
+        assert by_name["a"]["risk"] == "HIGH"
+        assert by_name["b"]["risk_source"] == "simulated"
+        assert by_name["c"]["risk_source"] == "simulated"
+        assert data["simulation"]["jobs_simulated"] == 2   # b, c
+
+    def test_fully_covered_db_needs_no_simulation(self, sim_client, isolated_db):
+        from autosys.db.connection import sync_session
+        from autosys.models.enums import JobStatus
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            for name in ("a", "b", "c"):        # BOX jobs have no run rows of their own
+                _seed_run(session, name, JobStatus.SUCCESS.value)
+            session.commit()
+
+        data = _report(sim_client)
+        assert data["simulation"]["status"] == "not_needed"
+        assert all(j["risk_source"] == "history" for j in data["jobs"])   # box inherits history
+
+    def test_simulate_false_skips(self, sim_client, isolated_db):
+        _seed_boxes(isolated_db)
+        data = _report(sim_client, simulate="false")
+        assert data["simulation"]["status"] == "skipped"
+        assert all(j["risk"] == "NO_DATA" and j["risk_source"] == "none" for j in data["jobs"])
+
+    def test_env_switch_disables_simulation(self, sim_client, isolated_db, monkeypatch):
+        monkeypatch.setenv("AUTOSYS_REPORT_SIMULATE", "0")
+        _seed_boxes(isolated_db)
+        assert _report(sim_client)["simulation"]["status"] == "skipped"
+
+    def test_real_execution_mode_never_simulates(self, sim_client, isolated_db):
+        _seed_boxes(isolated_db)
+        sim_client.app.state.dry_run = False
+        data = _report(sim_client)
+        assert data["execution_mode"] == "real"
+        assert data["simulation"]["status"] == "skipped"
+        assert all(j["risk"] == "NO_DATA" for j in data["jobs"])
+
+    def test_pending_then_ready_and_cached(self, sim_client, isolated_db, monkeypatch):
+        import threading
+        from autosys.analysis import simulated_risk
+        monkeypatch.setenv("AUTOSYS_REPORT_SIM_WAIT_S", "0.05")
+        _seed_boxes(isolated_db)
+
+        gate, calls, real = threading.Event(), [], simulated_risk._simulate
+
+        def slow(snap, cycles, seed):
+            calls.append(1)
+            gate.wait(timeout=30)
+            return real(snap, cycles, seed)
+
+        monkeypatch.setattr(simulated_risk, "_simulate", slow)
+
+        first = _report(sim_client)
+        assert first["simulation"]["status"] == "pending"
+        assert all(j["risk"] == "NO_DATA" for j in first["jobs"])
+        assert first["job_count"] == 4                      # the report itself is still complete
+
+        # A second request while it is in flight must not start another run.
+        assert _report(sim_client)["simulation"]["status"] == "pending"
+        assert len(calls) == 1
+
+        gate.set()
+        ready = _wait_for_ready(sim_client)
+        assert ready["simulation"]["status"] == "ready"
+        assert all(j["risk_source"] == "simulated" for j in ready["jobs"])
+
+        _report(sim_client)
+        assert len(calls) == 1                              # cached
+
+    def test_cache_ignores_runtime_status_but_not_definitions(self, isolated_db):
+        from autosys.analysis import simulated_risk as sr
+        from autosys.db.connection import sync_session
+        from autosys.db.schema import JobRow
+        _seed_boxes(isolated_db)
+
+        def key():
+            with sync_session() as s:
+                return sr._snapshot_key(sr.take_snapshot(s), 20, 42)
+
+        k0 = key()
+        with sync_session() as s:                            # live scheduler churn
+            s.get(JobRow, "a").status = 4
+            s.commit()
+        assert key() == k0
+
+        with sync_session() as s:                            # real definition change
+            s.get(JobRow, "b").n_retrys = 3
+            s.commit()
+        assert key() != k0
+
+    def test_failed_simulation_does_not_break_report(self, sim_client, isolated_db, monkeypatch):
+        from autosys.analysis import simulated_risk
+        monkeypatch.setenv("AUTOSYS_REPORT_SIM_WAIT_S", "30")
+        _seed_boxes(isolated_db)
+
+        def boom(snap, cycles, seed):
+            raise RuntimeError("scratch db exploded")
+
+        monkeypatch.setattr(simulated_risk, "_simulate", boom)
+        data = _report(sim_client)
+        assert data["simulation"]["status"] == "failed"
+        assert "scratch db exploded" in data["simulation"]["error"]
+        assert data["job_count"] == 4
+        assert all(j["risk"] == "NO_DATA" for j in data["jobs"])
+
+    def test_jil_import_warms_the_simulation(self, sim_client, isolated_db, monkeypatch):
+        import time
+        from autosys.analysis import simulated_risk
+        monkeypatch.setenv("AUTOSYS_REPORT_WARM_DELAY_S", "0.05")
+
+        jil = """
+insert_job: warm_box
+job_type: BOX
+
+insert_job: warm_cmd
+job_type: CMD
+command: echo hi
+machine: m1
+box_name: warm_box
+"""
+        r = sim_client.post("/api/v1/jil/import", json={"content": jil})
+        assert r.status_code == 200 and r.json()["success"]
+
+        deadline = time.time() + 60
+        while time.time() < deadline:
+            with simulated_risk._lock:
+                states = list(simulated_risk._states.values())
+            if states and states[0].status == "ready":
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("import did not trigger a simulation")
+
+        # ...so the very next report is already answered from cache.
+        monkeypatch.setenv("AUTOSYS_REPORT_SIM_WAIT_S", "0")
+        assert _report(sim_client)["simulation"]["status"] == "ready"
+
+    def test_dry_run_jil_import_does_not_warm(self, sim_client, monkeypatch):
+        from autosys.analysis import simulated_risk
+        monkeypatch.setenv("AUTOSYS_REPORT_WARM_DELAY_S", "0.05")
+        sim_client.post("/api/v1/jil/import", json={
+            "content": "insert_job: x\njob_type: CMD\ncommand: echo hi\nmachine: m1\n",
+            "dry_run": True,
+        })
+        import time
+        time.sleep(0.4)
+        assert simulated_risk._states == {}
+
+    def test_report_carries_migration_signals(self, sim_client, isolated_db):
+        _seed_boxes(isolated_db)
+        data = _report(sim_client, simulate="false")
+        job_a = next(j for j in data["jobs"] if j["job_name"] == "a")
+        for field in (
+            "risk_source", "machine_concentration", "command_dialect", "box_nesting_depth",
+            "has_cross_box_dep", "schedule_burst_count", "has_notifications",
+            "has_hardcoded_logs", "timezone", "astronomer_mapping", "risk_mitigation",
+        ):
+            assert field in job_a
+        assert job_a["machine_concentration"]
+        assert job_a["astronomer_mapping"]
+        assert data["summary"]["machine_count"] == 1        # m1
+        assert "dialect_counts" in data["summary"]["migration_signals"]
+        assert {b["box_name"] for b in data["box_breakdown"]} >= {"seq_box"}
+
+    def test_migration_report_blocks_and_is_isolated(self, sim_client, isolated_db):
+        from sqlalchemy import func, select
+        from autosys.db.connection import sync_session
+        from autosys.db.schema import JobRunRow
+        _seed_boxes(isolated_db)
+
+        r = sim_client.get("/api/v1/assessment/migration-report", params={"cycles": 3})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["simulation"]["status"] == "ready"
+        assert data["simulation"]["cycles"] == 3
+        assert data["csv"].startswith("job_name,")
+        assert all(j["risk_source"] == "simulated" for j in data["jobs"])
+
+        with sync_session() as s:                            # previously this wrote history
+            assert s.scalar(select(func.count()).select_from(JobRunRow)) == 0
+
+    def test_migration_report_empty_db_404(self, sim_client):
+        assert sim_client.get("/api/v1/assessment/migration-report").status_code == 404

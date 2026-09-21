@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from autosys.analysis import simulated_risk
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas import (
     JILImportRequest, JILImportResponse, JILJobResult,
@@ -84,6 +85,7 @@ def validate_jil(
 @router.post("/import", response_model=JILImportResponse)
 def import_jil(
     body:    JILImportRequest,
+    request: Request,
     session: Session     = Depends(get_session),
     user:    CurrentUser = Depends(get_current_user),
 ) -> JILImportResponse:
@@ -176,6 +178,18 @@ def import_jil(
                     n_updated += 1
 
         results.append(JILJobResult(action=action, name=name, type=jtype))
+
+    # New/changed job definitions have no run history yet — start simulating it in
+    # the background so the assessment report has risk data by the time it is asked
+    # for (see analysis/simulated_risk.py).  Debounced: a bulk import is one call
+    # per file.  Only in dry-run mode; real mode never mixes in simulated history.
+    if (
+        not body.dry_run
+        and (n_inserted or n_updated or n_deleted)
+        and getattr(request.app.state, "dry_run", True)
+        and simulated_risk.simulation_enabled()
+    ):
+        simulated_risk.schedule_warm()
 
     return JILImportResponse(
         success=True,

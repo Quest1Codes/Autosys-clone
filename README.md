@@ -408,7 +408,8 @@ FastAPI application server exposing:
 | `/api/v1/alarms/{id}/resolve` | POST | Resolve an alarm |
 | `/api/v1/machines` | GET/POST | List / register machines |
 | `/api/v1/globals` | GET/POST | Global variable CRUD |
-| `/api/v1/assessment/migration-report` | GET | Full migration complexity report |
+| `/api/v1/assessment/report` | GET | Complexity report incl. migration signals; auto-simulates risk for jobs with no history |
+| `/api/v1/assessment/migration-report` | GET | Same, plus CSV; always simulates and blocks until done |
 | `/api/v1/ws/events` | WS | WebSocket live event stream |
 | `/health` | GET | Health check |
 | `/metrics` | GET | Prometheus metrics |
@@ -547,6 +548,26 @@ curl "http://localhost:8000/api/v1/assessment/migration-report?cycles=50"
 
 Query parameters:
 - `cycles` (int, default 20) — Number of simulation cycles for runtime data generation
+
+**`GET /api/v1/assessment/report`** returns the same per-job fields (including the A1-A10 migration
+signals, `astronomer_mapping` and `risk_mitigation`) and the same `box_breakdown`, and it runs the
+simulation for you when it is needed:
+
+- Jobs that already have run history keep it (`risk_source: "history"`). Jobs with none get simulated
+  history (`risk_source: "simulated"`); a job that never ran stays `"none"` / `NO_DATA`.
+- The simulation runs in the background against a throwaway in-memory copy of the job definitions, so the
+  live DB (job statuses, event queue, run history) is never touched. It is cached per job set — importing
+  or changing JIL re-simulates, live status churn does not.
+- `POST /api/v1/jil/import` starts it automatically (debounced, so a bulk import runs it once), and so
+  does server startup. On ~300 jobs it takes ~20s; a request that arrives before it finishes waits up to
+  3s, then answers with `simulation.status: "pending"` and `NO_DATA` risk — call again shortly.
+- `simulation.status` is one of `not_needed`, `ready`, `pending`, `failed`, `skipped`. It is `skipped`
+  in real execution mode (simulated numbers are never mixed into real history) or when disabled.
+- Query: `simulate=false` skips it for one call. Env: `AUTOSYS_REPORT_SIMULATE=0` disables it,
+  `AUTOSYS_REPORT_SIM_WAIT_S` (default 3) is the per-request wait, `AUTOSYS_REPORT_WARM_DELAY_S`
+  (default 5) is the post-import debounce.
+- Simulated failure rates come from `FailureInjector` (derived from each job's `n_retrys`), not from real
+  executions — treat them as a proxy for how retry-heavy a job is configured, not production reliability.
 
 Response structure:
 ```json

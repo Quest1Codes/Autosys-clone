@@ -36,6 +36,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
+from autosys.analysis import simulated_risk
 from autosys.app_server.broadcaster import EventBroadcaster
 from autosys.app_server.deps        import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas     import (
@@ -138,6 +139,10 @@ def create_app(
         app.state.ha         = ha
         app.state.tie_breaker = tie_breaker
         app.state.eps_task   = None
+        # The simulated-risk cache is in-memory, so a restart loses it — rebuild it
+        # for whatever JIL is already in the DB (no-op on an empty DB).
+        if dry_run and simulated_risk.simulation_enabled():
+            simulated_risk.schedule_warm(delay_s=0)
         if start_eps:
             processor = _build_eps_processor(dry_run, eps_poll_interval)
             logger.info(
