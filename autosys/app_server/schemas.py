@@ -278,6 +278,14 @@ class AssessmentJobRecord(BaseModel):
     timezone:              str  = ""
     astronomer_mapping:    str  = ""
     risk_mitigation:       str  = ""
+    # Indicative Otto Token Budget (pre-pilot ROM, see ai_token_estimate.py)
+    # -- additive, LOW-confidence planning fields, not a usage or cost quote.
+    ai_route:                 str = ""
+    ai_pattern_key:           str = ""
+    ai_estimate_role:         str = ""
+    estimated_otto_tokens_min: int = 0
+    estimated_otto_tokens_max: int = 0
+    ai_estimate_confidence:   str = ""
 
 
 class AssessmentSummaryResponse(BaseModel):
@@ -323,6 +331,21 @@ class AssessmentSimulation(BaseModel):
     jobs_simulated: int = 0
 
 
+class AITokenBudgetResponse(BaseModel):
+    """Indicative Otto Token Budget -- pre-pilot ROM, see ai_token_estimate.py.
+    Not a usage quote, cost estimate, or contractual commitment."""
+    min_tokens: int
+    max_tokens: int
+    confidence: str
+    calibration_status: str
+    pattern_count: int
+    architecture_pattern_count: int
+    by_route: dict[str, dict[str, int]] = {}
+    by_tier:  dict[str, dict[str, int]] = {}
+    disclaimer:   str = ""
+    pricing_note: str = ""
+
+
 class AssessmentReportResponse(BaseModel):
     """GET /api/v1/assessment/report — full T-shirt-size complexity report."""
     generated_at:   datetime
@@ -333,6 +356,7 @@ class AssessmentReportResponse(BaseModel):
     jobs:           list[AssessmentJobRecord]
     box_breakdown:  list[dict[str, Any]] = []
     summary:        AssessmentSummaryResponse
+    ai_token_budget: Optional[AITokenBudgetResponse] = None
 
 
 class BoxTraceRequest(BaseModel):

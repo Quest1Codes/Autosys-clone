@@ -628,6 +628,33 @@ class TestAssessmentReportAPI:
         assert data["summary"]["risk_counts"]["HIGH"] == 2  # job "a" + seq_box (inherited)
         assert "gap_severity_counts" in data["summary"]
 
+    def test_report_includes_ai_token_budget_fields(self, ssa_client, isolated_db):
+        """Indicative Otto Token Budget -- additive contract, not a usage/cost
+        quote. See ai_token_estimate.py."""
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            session.commit()
+
+        r = ssa_client.get("/api/v1/assessment/report")
+        assert r.status_code == 200
+        data = r.json()
+
+        budget = data["ai_token_budget"]
+        assert budget is not None
+        assert budget["confidence"] == "LOW"
+        assert budget["calibration_status"] == "NOT_CALIBRATED"
+        assert budget["min_tokens"] <= budget["max_tokens"]
+
+        job_a = next(j for j in data["jobs"] if j["job_name"] == "a")
+        for field in (
+            "ai_route", "ai_pattern_key", "ai_estimate_role",
+            "estimated_otto_tokens_min", "estimated_otto_tokens_max",
+            "ai_estimate_confidence",
+        ):
+            assert field in job_a
+        assert job_a["estimated_otto_tokens_min"] <= job_a["estimated_otto_tokens_max"]
+
 
 class TestBoxTraceAPI:
 

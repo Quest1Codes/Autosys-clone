@@ -97,6 +97,12 @@ class JobAssessment:
     blast_radius: int = 0
     # Airflow gap tags — see gap_analysis.GAP_CATALOGUE.
     gap_tags:     str = ""
+    # Dependency-chain depth (see dependency_graph.dependency_wave) — already
+    # computed by build_report() to feed score_job()'s wave-depth signal, but
+    # previously discarded after scoring. Exposed here so downstream analyses
+    # (e.g. ai_token_estimate.py's pattern clustering) don't have to re-derive
+    # it by regex-scraping the free-text `drivers` string.
+    wave_depth:   int = 1
     # Migration signals from JIL structural analysis (A1-A10)
     machine:               str = ""
     machine_concentration: str = ""
@@ -378,9 +384,8 @@ def build_report(
         wave_depth_by_name[r.job_name] = 1
 
     for r in ordered:
-        size, drivers = score_job(
-            r, all_by_name, wave_depth_by_name.get(r.job_name, 1)
-        )
+        wave_depth = wave_depth_by_name.get(r.job_name, 1)
+        size, drivers = score_job(r, all_by_name, wave_depth)
         risk, risk_drivers = score_operational_risk(
             r, (run_stats or {}).get(r.job_name)
         )
@@ -391,6 +396,7 @@ def build_report(
             size     = size,
             effort_h = EFFORT_HOURS[size],
             drivers  = "; ".join(drivers),
+            wave_depth = wave_depth,
             risk         = risk,
             risk_drivers = "; ".join(risk_drivers),
             risk_source  = (
