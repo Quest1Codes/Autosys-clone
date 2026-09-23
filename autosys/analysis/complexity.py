@@ -13,6 +13,14 @@ Complexity sizes (from docs/strategy-and-approach.md)
   M   Calendar, time triggers, date_conditions, or file-watchers. 4-8 h per DAG
   L   look_back, virtual resources, complex conditions.         1-3 days per DAG
   XL  FTP jobs, cross-instance deps, deep BOX trees.             1+ week per DAG
+
+Two rules keep the tiers honest about what they are measuring, both added
+after the reference estate scored implausibly high (see score_job):
+
+  * An attribute whose Airflow equivalent is a keyword argument is not a
+    complexity signal, however operationally significant it is.
+  * A dependency chain spanning N boxes is one design decision, so it is
+    charged once - at the box the chain ends at - not N times.
 """
 
 from __future__ import annotations
@@ -22,7 +30,11 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
-from autosys.analysis.dependency_graph import dependency_wave, fan_in_counts
+from autosys.analysis.dependency_graph import (
+    dependency_wave,
+    fan_in_counts,
+    upstream_closure,
+)
 from autosys.analysis.gap_analysis import GAP_CATALOGUE, compute_gap_tags
 from autosys.analysis.operational_risk import RISK_LEVELS, RunStats, score_operational_risk
 from autosys.db.schema import JobRow
@@ -171,17 +183,27 @@ def score_job(
     row: JobRow,
     all_rows: dict[str, "JobRow"],
     wave_depth: int = 1,
+    chain_interior: bool = False,
 ) -> tuple[str, list[str]]:
     """
     Assign a T-shirt size to *row* and return (size, [driver_strings]).
 
     Priority: XL -> L -> M -> S -> XS.
 
-    *wave_depth* is the job's dependency-chain depth within its box (see
-    dependency_graph.dependency_wave), precomputed once per box by
-    build_report — a box where success(a)->success(b)->success(c) chains
-    deep can't be trivially parallelised into independent Airflow tasks,
-    which the &/| operator count below can't see on its own.
+    *wave_depth* is the job's dependency-chain depth within its scope (see
+    dependency_graph.dependency_wave), precomputed by build_report — a chain
+    where success(a)->success(b)->success(c) runs deep can't be trivially
+    parallelised into independent Airflow tasks, which the &/| operator count
+    below can't see on its own.
+
+    *chain_interior* says this row sits upstream of another row that is
+    already being charged for the same chain (see
+    dependency_graph.upstream_closure). Splitting a long chain into separate
+    DAGs is one design decision covering the whole chain, so only the node the
+    chain ends at carries the XL re-architecture driver; interior members drop
+    to L, which is the coordinated-migration cost they genuinely still carry.
+    Without this, a single N-box business flow manufactures N XL "projects" —
+    on the reference estate that was 22 XL boxes standing for 4 real chains.
     """
     xl: list[str] = []
     l:  list[str] = []
@@ -190,10 +212,13 @@ def score_job(
 
     jt = (row.job_type or "CMD").upper()
 
-    if wave_depth >= WAVE_DEPTH_XL_THRESHOLD:
-        xl.append(f"dependency chain depth={wave_depth}")
+    if wave_depth >= WAVE_DEPTH_XL_THRESHOLD and not chain_interior:
+        xl.append(f"dependency chain depth={wave_depth} (chain terminal)")
     elif wave_depth >= WAVE_DEPTH_L_THRESHOLD:
-        l.append(f"dependency chain depth={wave_depth}")
+        l.append(
+            f"dependency chain depth={wave_depth}"
+            + (" (inside a longer chain)" if chain_interior else "")
+        )
 
     # ---- XL signals -------------------------------------------------------
     if jt == "FTP":
@@ -228,8 +253,11 @@ def score_job(
     if row.max_exit_success is not None:
         l.append(f"max_exit_success={row.max_exit_success}")
 
-    if (row.n_retrys or 0) >= 3:
-        l.append(f"n_retrys={row.n_retrys}")
+    # NOTE: n_retrys is deliberately *not* scored at any tier — see the
+    # "direct parameter mappings" note in the M block below. A high retry
+    # count says the job is flaky, not that it is hard to translate, and
+    # flakiness is already the operational_risk axis's job (simulated_risk.py
+    # seeds its failure injector from this same attribute).
 
     # ---- M signals --------------------------------------------------------
     if row.run_calendar:
@@ -252,10 +280,18 @@ def score_job(
         m.append("must_complete_times")
     if row.timezone:
         m.append(f"timezone={row.timezone}")
-    if row.term_run_time:
-        m.append(f"term_run_time={row.term_run_time}m")
-    if (row.n_retrys or 0) in (1, 2):
-        m.append(f"n_retrys={row.n_retrys}")
+    # Direct parameter mappings are NOT complexity signals.
+    #
+    #   term_run_time  ->  execution_timeout=timedelta(minutes=N)
+    #   n_retrys       ->  retries=N
+    #
+    # Both are one line in a DAG with no design decision attached, and
+    # neither appears in gap_analysis.GAP_CATALOGUE — the scorer itself does
+    # not consider them capability gaps. Scoring them as M put 163 of the
+    # reference estate's 227 M-tier jobs there on those two attributes alone
+    # (~1,300 raw hours), which is why M looked implausibly large. Anything
+    # whose Airflow equivalent is a keyword argument belongs here as a
+    # comment, not in a bucket.
     if 1 <= op_count <= 2:
         m.append(f"compound condition ({op_count} operators)")
     if 1 <= len(biz_vars) < 3:
@@ -383,9 +419,22 @@ def build_report(
     for r in orphans:
         wave_depth_by_name[r.job_name] = 1
 
+    # Boxes upstream of a box that already crosses the XL depth threshold are
+    # covered by that box's chain-splitting design decision, so they must not
+    # each be charged a full re-architecture (see score_job's chain_interior).
+    # Scoped to the root graph only: a chain *within* one box is a genuine
+    # per-box parallelisation problem and is never shared with another box.
+    deep_roots = {
+        name for name in root_scope
+        if wave_depth_by_name.get(name, 1) >= WAVE_DEPTH_XL_THRESHOLD
+    }
+    chain_interior = upstream_closure(deep_roots, root_conditions, root_scope)
+
     for r in ordered:
         wave_depth = wave_depth_by_name.get(r.job_name, 1)
-        size, drivers = score_job(r, all_by_name, wave_depth)
+        size, drivers = score_job(
+            r, all_by_name, wave_depth, r.job_name in chain_interior
+        )
         risk, risk_drivers = score_operational_risk(
             r, (run_stats or {}).get(r.job_name)
         )
