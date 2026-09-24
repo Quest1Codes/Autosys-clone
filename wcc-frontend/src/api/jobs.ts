@@ -28,6 +28,10 @@ export const fetchJob = async (name: string): Promise<Job> => {
   return res.data;
 };
 
+// Goes through `api` (baseURL /api/v1, port 9000), not `wccApi` -- sendevent
+// lives on the main app server, not the WCC read-only dashboard backend.
+// Requires the "operator" or "admin" role server-side (V2); `api`'s request
+// interceptor already attaches the logged-in user's bearer token.
 export const sendEvent = async (
   jobName: string,
   eventType: EventType,
@@ -37,8 +41,4 @@ export const sendEvent = async (
     event_type: eventType,
     ...(newStatus ? { new_status: newStatus } : {}),
   });
-};
-
-export const deleteJob = async (name: string): Promise<void> => {
-  await api.delete(`/jobs/${encodeURIComponent(name)}`);
 };

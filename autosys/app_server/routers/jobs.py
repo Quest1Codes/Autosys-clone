@@ -1,5 +1,19 @@
 """
-Jobs router — GET/DELETE jobs, POST sendevent.
+Jobs router — GET jobs, POST sendevent (STARTJOB/KILLJOB/hold/ice/...).
+
+V1 removed sendevent outright because it was reachable by anyone with zero
+login (AUTOSYS_AUTH_ENABLED defaulted false, with a well-known default
+admin/admin fallback). That was the actual problem, not "a UI to run jobs
+in a sandbox simulator" -- V2 fixed auth for real (see auth.py: enabled by
+default, no baked-in users or JWT secret, and the real serve entrypoint
+refuses to start misconfigured), so this is restored here requiring the
+"operator" or "admin" role via require_role() below, same as before V1.
+
+DELETE /{job_name} stays removed: deleting an already-imported job
+definition is a different class of action from running it, and wasn't
+part of what V2 was asked to bring back. JIL import
+(autosys/app_server/routers/jil.py) remains the write path for adding
+definitions.
 """
 from __future__ import annotations
 
@@ -122,20 +136,6 @@ def get_job(
     if row is None:
         raise HTTPException(status_code=404, detail=f"Job '{job_name}' not found")
     return _row_to_detail(row)
-
-
-@router.delete("/{job_name}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_job(
-    job_name: str,
-    session:  Session     = Depends(get_session),
-    user:     CurrentUser = Depends(get_current_user),
-):
-    """Delete a job definition."""
-    user.require_role("admin")
-    row = job_repo.get_row(session, job_name)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f"Job '{job_name}' not found")
-    job_repo.delete(session, job_name)
 
 
 @router.post("/{job_name}/sendevent", response_model=SendEventResponse,

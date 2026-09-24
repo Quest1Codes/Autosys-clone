@@ -9,14 +9,33 @@ that maps to the same three roles:
   operator  — can enqueue events (STARTJOB, KILLJOB, …)
   admin     — full access including DELETE and machine management
 
-Auth is controlled by the AUTOSYS_AUTH_ENABLED environment variable.
-When set to "false" (the default for development), all requests are treated
-as role "admin" without requiring a token.  Set to "true" for production.
+Auth is controlled by the AUTOSYS_AUTH_ENABLED environment variable, which
+now defaults to "true" -- this used to default to "false" ("all requests
+are admin, no token required"), which combined with a well-known default
+JWT secret and default admin/admin/operator/viewer accounts meant anyone
+who could reach this server at all was an anonymous admin for free. There
+is no baked-in fallback for the JWT secret or the user list any more
+either: both must be supplied, and `autosys scheduler serve` (the actual
+network-facing entrypoint -- see cli/scheduler_cmd.py's `_require_real_auth`)
+refuses to start if they aren't, or if auth is off, or if the secret is
+still the old well-known default. `create_app()` itself does not enforce
+this -- it stays a plain factory so tests can construct an app without
+standing up real credentials; the enforcement lives at the operational
+boundary, where a real, network-reachable instance actually starts.
 
 Users are defined in AUTOSYS_USERS as a JSON mapping:
   {"admin": {"password": "secret", "role": "admin"}}
 
 For production, replace this with an LDAP lookup or EEM integration.
+
+Read live from os.environ on every call (not cached at module-import time):
+tests set AUTOSYS_AUTH_ENABLED/AUTOSYS_USERS/AUTOSYS_JWT_SECRET per-test via
+monkeypatch, and a module-level constant computed once at first import
+would freeze on whatever value happened to be set the first time any test
+in the whole run touched this module -- every later test's monkeypatch
+would then silently have no effect. Confirmed this was already happening:
+running TestAuthRouter's tests together made the auth-disabled test fail
+depending on run order, even before this rewrite.
 """
 from __future__ import annotations
 
@@ -31,24 +50,25 @@ from loguru import logger
 # Configuration
 # ---------------------------------------------------------------------------
 
-AUTH_ENABLED: bool = os.environ.get("AUTOSYS_AUTH_ENABLED", "false").lower() == "true"
+_INSECURE_DEFAULT_SECRET = "dev-secret-change-in-production"
 
-# Sentinel used by deps.py to short-circuit token validation
-AuthDisabled = not AUTH_ENABLED
 
-_JWT_SECRET: str = os.environ.get("AUTOSYS_JWT_SECRET", "dev-secret-change-in-production")
-_JWT_TTL:    int = int(os.environ.get("AUTOSYS_JWT_TTL", "3600"))
+def is_auth_enabled() -> bool:
+    return os.environ.get("AUTOSYS_AUTH_ENABLED", "true").lower() == "true"
 
-# Default users when no AUTOSYS_USERS env var is set.
-_DEFAULT_USERS: dict[str, dict] = {
-    "admin":    {"password": "admin",    "role": "admin"},
-    "operator": {"password": "operator", "role": "operator"},
-    "viewer":   {"password": "viewer",   "role": "viewer"},
-}
 
-_USERS: dict[str, dict] = json.loads(
-    os.environ.get("AUTOSYS_USERS", json.dumps(_DEFAULT_USERS))
-)
+def _jwt_secret() -> str:
+    return os.environ.get("AUTOSYS_JWT_SECRET", "")
+
+
+_JWT_TTL: int = int(os.environ.get("AUTOSYS_JWT_TTL", "3600"))
+
+
+def _users() -> dict[str, dict]:
+    raw = os.environ.get("AUTOSYS_USERS")
+    if not raw:
+        return {}
+    return json.loads(raw)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +103,7 @@ def encode_token(username: str, role: str, ttl: int = _JWT_TTL) -> str:
         "iat":  int(time.time()),
         "exp":  int(time.time()) + ttl,
     }).encode())
-    sig = _sign(f"{header}.{payload}", _JWT_SECRET)
+    sig = _sign(f"{header}.{payload}", _jwt_secret())
     return f"{header}.{payload}.{sig}"
 
 
@@ -93,7 +113,7 @@ def decode_token(token: str) -> dict:
     if len(parts) != 3:
         raise ValueError("Malformed token")
     header, payload, sig = parts
-    expected = _sign(f"{header}.{payload}", _JWT_SECRET)
+    expected = _sign(f"{header}.{payload}", _jwt_secret())
     if not hmac.compare_digest(sig, expected):
         raise ValueError("Invalid signature")
     claims = json.loads(_b64url_decode(payload))
@@ -108,7 +128,50 @@ def decode_token(token: str) -> dict:
 
 def authenticate(username: str, password: str) -> Optional[dict]:
     """Return user dict if credentials are valid, else None."""
-    user = _USERS.get(username)
+    user = _users().get(username)
     if user and user["password"] == password:
         return user
     return None
+
+
+# ---------------------------------------------------------------------------
+# Startup validation for the real, network-facing entrypoint
+# ---------------------------------------------------------------------------
+
+def startup_check_errors() -> list[str]:
+    """
+    Checks that must all pass before this server is allowed to actually
+    start serving real network traffic. Returns a human-readable problem
+    per failed check; empty list means OK to start.
+
+    Deliberately not called from create_app() -- that stays a plain
+    factory so tests can build an app without standing up real
+    credentials. Called instead from the CLI's `serve` command
+    (cli/scheduler_cmd.py), which is the actual network-facing entrypoint;
+    that is where "no client-facing deployment can run with auth off"
+    actually gets enforced.
+    """
+    errors: list[str] = []
+
+    if not is_auth_enabled():
+        errors.append(
+            "AUTOSYS_AUTH_ENABLED must be 'true' -- this server refuses to "
+            "start with auth disabled."
+        )
+
+    secret = _jwt_secret()
+    if not secret:
+        errors.append("AUTOSYS_JWT_SECRET must be set.")
+    elif secret == _INSECURE_DEFAULT_SECRET:
+        errors.append(
+            f"AUTOSYS_JWT_SECRET must not be the well-known default "
+            f"({_INSECURE_DEFAULT_SECRET!r})."
+        )
+
+    if not _users():
+        errors.append(
+            "AUTOSYS_USERS must be set to a JSON mapping of at least one "
+            'user, e.g. {"admin": {"password": "...", "role": "admin"}}.'
+        )
+
+    return errors

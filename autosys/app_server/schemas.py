@@ -206,14 +206,10 @@ class JILImportResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Execution mode (dry-run / real-run toggle)
+# Execution mode (read-only -- see main.py's _register_settings_routes)
 # ---------------------------------------------------------------------------
 
 class ExecutionModeResponse(BaseModel):
-    dry_run: bool
-
-
-class SetExecutionModeRequest(BaseModel):
     dry_run: bool
 
 

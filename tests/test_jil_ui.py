@@ -17,7 +17,7 @@ TestImport
     test_import_invalid_jil          — parse error → success=False, DB untouched
 
 TestUIRoute
-    test_ui_endpoint_returns_html    — GET /ui → 200 with HTML body
+    test_ui_endpoint_removed          — GET /ui → 404 (V1 removed this surface)
 """
 from __future__ import annotations
 
@@ -224,8 +224,9 @@ class TestImport:
 
 class TestUIRoute:
 
-    def test_ui_endpoint_returns_html(self, client):
+    def test_ui_endpoint_removed(self, client):
+        """V1 removed the /ui static page and its /static mount entirely."""
         resp = client.get("/ui")
-        assert resp.status_code == 200
-        assert "text/html" in resp.headers["content-type"]
-        assert "AutoSys JIL Runner" in resp.text
+        assert resp.status_code == 404
+        resp = client.get("/static/index.html")
+        assert resp.status_code == 404

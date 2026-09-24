@@ -24,15 +24,12 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from pathlib import Path
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
@@ -41,7 +38,7 @@ from autosys.app_server.broadcaster import EventBroadcaster
 from autosys.app_server.deps        import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas     import (
     TokenRequest, TokenResponse, HealthResponse,
-    ExecutionModeResponse, SetExecutionModeRequest,
+    ExecutionModeResponse,
 )
 from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment, metrics as metrics_router
 from autosys.db.connection          import sync_session
@@ -67,10 +64,8 @@ def _build_eps_processor(dry_run: bool, eps_poll_interval: float):
     """
     Build an ``EventProcessor`` wired for either dry-run (stub dispatcher,
     instant completion, failure injection + alarms) or real execution
-    (``AgentDispatch``, real subprocess dispatch). Shared by the initial
-    ``create_app`` startup and by ``PUT /api/v1/settings/execution-mode``
-    so both paths build an identical, correctly-paired dispatcher +
-    ``auto_complete`` combination.
+    (``AgentDispatch``, real subprocess dispatch). Used by ``create_app``
+    startup.
     """
     from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
     if dry_run:
@@ -185,12 +180,25 @@ def create_app(
         description = "REST API for the AutoSys workload scheduler clone.",
         version     = "0.1.0",
         lifespan    = lifespan,
+        # Interactive docs can invoke PUT/POST/DELETE endpoints straight from
+        # a browser form. No client-facing deployment of this server has any
+        # legitimate reason to expose that.
+        docs_url    = None,
+        redoc_url   = None,
+        openapi_url = None,
     )
 
-    # CORS — allow all origins in development; tighten in production via env var
+    # CORS — no browser code needs to reach this API cross-origin: the WCC
+    # frontend is served by nginx and calls it via a same-origin relative
+    # path (/api/v1/..., see nginx.conf), and Shinro's tool-execution worker
+    # calls it server-to-server, which CORS does not govern at all. Default
+    # is therefore "no origins allowed"; a deployment that genuinely needs
+    # browser JS to call this cross-origin sets AUTOSYS_CORS_ORIGINS to an
+    # explicit comma-separated allowlist (e.g. WCC's own Ingress hostname).
+    _cors_origins = [o.strip() for o in os.environ.get("AUTOSYS_CORS_ORIGINS", "").split(",") if o.strip()]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins     = ["*"],
+        allow_origins     = _cors_origins,
         allow_credentials = True,
         allow_methods     = ["*"],
         allow_headers     = ["*"],
@@ -216,11 +224,8 @@ def create_app(
     # --- Health ---
     _register_health_routes(app)
 
-    # --- Settings (execution-mode toggle) ---
-    _register_settings_routes(app, eps_poll_interval, start_eps)
-
-    # --- Static UI ---
-    _mount_static(app)
+    # --- Settings (execution-mode, read-only) ---
+    _register_settings_routes(app)
 
     return app
 
@@ -237,9 +242,17 @@ def _register_auth_routes(app: FastAPI) -> None:
         Exchange username + password for a JWT access token.
 
         Users are configured via the AUTOSYS_USERS environment variable
-        (JSON object).  Defaults: admin/admin, operator/operator, viewer/viewer.
+        (JSON object) -- there is no baked-in default any more.
         """
-        from autosys.app_server.auth import authenticate, encode_token, _JWT_TTL
+        from autosys.app_server.auth import authenticate, encode_token, is_auth_enabled, _JWT_TTL
+        if not is_auth_enabled():
+            # Defense in depth: with auth off, get_current_user() already
+            # hands out anonymous-admin to everyone, so a minted token here
+            # would be meaningless at best. Refuse rather than mint one.
+            raise HTTPException(
+                status_code = status.HTTP_409_CONFLICT,
+                detail      = "Auth is disabled on this server; no token is needed or issued.",
+            )
         user = authenticate(body.username, body.password)
         if user is None:
             raise HTTPException(
@@ -339,69 +352,20 @@ def _register_health_routes(app: FastAPI) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Settings — live dry-run / real-run toggle
+# Settings — dry-run / real-run mode, read-only
 # ---------------------------------------------------------------------------
+#
+# The mode is fixed for the lifetime of the process, chosen by create_app's
+# own dry_run parameter (i.e. how "autosys scheduler serve" was invoked).
+# There used to be a PUT here that let anyone flip a running server between
+# dry-run and real execution over the network -- removed outright, not
+# gated behind auth, because no client-facing deployment of this server
+# should be able to do that at all. GET stays: it's just a read of which
+# mode this process is running in, and the WCC header badge (and V3's
+# planned estate-overview page) both want it.
 
-def _register_settings_routes(app: FastAPI, eps_poll_interval: float, start_eps: bool) -> None:
+def _register_settings_routes(app: FastAPI) -> None:
 
     @app.get("/api/v1/settings/execution-mode", response_model=ExecutionModeResponse, tags=["settings"])
     def get_execution_mode():
         return ExecutionModeResponse(dry_run=getattr(app.state, "dry_run", True))
-
-    @app.put("/api/v1/settings/execution-mode", response_model=ExecutionModeResponse, tags=["settings"])
-    async def set_execution_mode(
-        body: SetExecutionModeRequest,
-        user: CurrentUser = Depends(get_current_user),
-    ):
-        """
-        Switch the running Event Processor between dry-run (stub dispatcher,
-        no real subprocesses) and real execution (``AgentDispatch``), without
-        restarting the container. Admin only.
-        """
-        user.require_role("admin")
-
-        if not start_eps:
-            raise HTTPException(
-                status_code = status.HTTP_409_CONFLICT,
-                detail      = "This server was not started with an Event Processor (autosys scheduler serve).",
-            )
-
-        old_task: Optional[asyncio.Task] = getattr(app.state, "eps_task", None)
-        if old_task is not None and not old_task.done():
-            old_task.cancel()
-            try:
-                await old_task
-            except asyncio.CancelledError:
-                pass
-
-        processor = _build_eps_processor(body.dry_run, eps_poll_interval)
-        if getattr(app.state, "ha", False):
-            from autosys.scheduler.ha import DistributedLock
-            processor.ha_lock = DistributedLock(heartbeat_timeout=int(eps_poll_interval * 5))
-            processor.is_standby = getattr(app.state, "tie_breaker", False)
-
-        app.state.dry_run  = body.dry_run
-        app.state.eps_task = asyncio.create_task(processor.run_forever(), name="eps-background")
-        logger.info("Execution mode switched to {} by {}", "DRY-RUN" if body.dry_run else "REAL", user.username)
-        return ExecutionModeResponse(dry_run=body.dry_run)
-
-
-# ---------------------------------------------------------------------------
-# Static UI
-# ---------------------------------------------------------------------------
-
-_STATIC_DIR = Path(__file__).parent / "static"
-
-
-def _mount_static(app: FastAPI) -> None:
-    """Serve the single-page JIL UI at GET /ui and its static assets."""
-
-    if not _STATIC_DIR.exists():
-        logger.warning("Static directory not found: {}", _STATIC_DIR)
-        return
-
-    @app.get("/ui", tags=["ui"], include_in_schema=False)
-    def serve_ui():
-        return FileResponse(str(_STATIC_DIR / "index.html"))
-
-    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

@@ -16,10 +16,11 @@ import os
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 from loguru import logger
 from sqlalchemy import select, func, text
 
+from autosys.app_server.deps import get_current_user, CurrentUser
 from autosys.db.connection import sync_session
 from autosys.db.schema import JobRow, EventQueueRow, EventHistoryRow, JobRunRow, MachineRow
 
@@ -48,7 +49,7 @@ def _collect_metrics() -> str:
         lines.append("# TYPE autosys_jobs_total gauge")
         for status_code, count in rows:
             label = status_map.get(status_code, f"UNKNOWN_{status_code}")
-            lines.append(f'autsys_jobs_total{{status="{label}"}} {count}')
+            lines.append(f'autosys_jobs_total{{status="{label}"}} {count}')
 
         # --- Event queue depth ---
         queue_depth = session.execute(
@@ -80,7 +81,7 @@ def _collect_metrics() -> str:
             if start and end:
                 duration = (end - start).total_seconds()
                 durations.append(duration)
-                lines.append(f'autsys_job_run_duration_seconds{{job_name="{job_name}"}} {duration:.3f}')
+                lines.append(f'autosys_job_run_duration_seconds{{job_name="{job_name}"}} {duration:.3f}')
 
         # --- Agent heartbeat age ---
         machines = session.execute(
@@ -92,14 +93,20 @@ def _collect_metrics() -> str:
         for name, hb in machines:
             if hb:
                 age = (now - hb).total_seconds()
-                lines.append(f'autsys_agent_heartbeat_seconds{{machine="{name}"}} {age:.1f}')
+                lines.append(f'autosys_agent_heartbeat_seconds{{machine="{name}"}} {age:.1f}')
 
     return "\n".join(lines) + "\n"
 
 
 @router.get("/metrics")
-def get_metrics():
-    """Return Prometheus-format metrics."""
+def get_metrics(_user: CurrentUser = Depends(get_current_user)):
+    """
+    Return Prometheus-format metrics.
+
+    Requires auth (any role) -- this is Fidelity's own platform team's
+    monitoring surface, not the client-facing "what does this estate look
+    like" answer (that's V3's estate-overview page in WCC).
+    """
     if not _is_metrics_enabled():
         return Response(content="", media_type="text/plain", status_code=404)
 

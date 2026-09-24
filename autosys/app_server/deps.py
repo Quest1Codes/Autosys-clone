@@ -53,12 +53,14 @@ def get_current_user(
     """
     Validate the Bearer JWT and return the current user.
 
-    If AUTOSYS_AUTH_ENABLED is false (the default for development and tests),
-    returns an anonymous admin user so all endpoints work without a token.
+    If AUTOSYS_AUTH_ENABLED is false (only ever true in tests now -- the
+    real network-facing entrypoint refuses to start that way, see
+    auth.startup_check_errors()), returns an anonymous admin user so tests
+    can hit endpoints without a token.
     """
-    from autosys.app_server.auth import AUTH_ENABLED, decode_token
+    from autosys.app_server.auth import is_auth_enabled, decode_token
 
-    if not AUTH_ENABLED:
+    if not is_auth_enabled():
         return CurrentUser(username="anon", role="admin")
 
     if creds is None:

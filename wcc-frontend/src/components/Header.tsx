@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useToast } from '../contexts/ToastContext';
-import { getExecutionMode, setExecutionMode } from '../api/settings';
+import { getExecutionMode } from '../api/settings';
 import type { SSEStatus } from '../hooks/useSSE';
 import quest1Logo from '../assets/quest1-logo.svg';
 
@@ -11,8 +10,7 @@ interface Props {
 }
 
 const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
-  const { username, isAdmin, logout } = useAuth();
-  const { showToast } = useToast();
+  const { username, logout } = useAuth();
   const navigate = useNavigate();
   const [dryRun, setDryRun] = useState<boolean | null>(null);
 
@@ -25,24 +23,6 @@ const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
     navigate('/login');
   };
 
-  const handleToggleMode = useCallback(async () => {
-    if (dryRun === null) return;
-    const next = !dryRun;
-    if (next === false) {
-      const ok = window.confirm(
-        'Switch to REAL RUN?\n\nJobs will execute real commands/scripts instead of being simulated.'
-      );
-      if (!ok) return;
-    }
-    try {
-      const res = await setExecutionMode(next);
-      setDryRun(res.dry_run);
-      showToast(`Execution mode: ${res.dry_run ? 'DRY RUN' : 'REAL RUN'}`, 'success');
-    } catch {
-      showToast('Failed to change execution mode', 'error');
-    }
-  }, [dryRun, showToast]);
-
   return (
     <>
       <header className="wcc-header">
@@ -53,14 +33,12 @@ const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
         <div className="wcc-header-spacer" />
         <div className="wcc-header-right">
           {dryRun !== null && (
-            <button
+            <span
               className={`exec-mode-btn ${dryRun ? 'dry-run' : 'real-run'}`}
-              disabled={!isAdmin}
-              onClick={handleToggleMode}
-              title={isAdmin ? 'Click to toggle execution mode' : 'Admin only'}
+              title="Execution mode for this server (fixed for its lifetime, set by how it was started)"
             >
               {dryRun ? 'DRY RUN' : 'REAL RUN'}
-            </button>
+            </span>
           )}
           <div className="live-indicator">
             <span className={`live-dot ${sseStatus === 'live' ? '' : 'disconnected'}`} />

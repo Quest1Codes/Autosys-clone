@@ -5,7 +5,7 @@ Phase 8 — REST API Application Server (SSA)
 Tests cover every router and the key behaviours of the App Server:
 
   TestHealthEndpoints       — /health + /health/ready
-  TestJobsRouter            — GET /jobs, GET /jobs/{name}, DELETE, sendevent
+  TestJobsRouter            — GET /jobs, GET /jobs/{name} (DELETE + sendevent removed by V1)
   TestEventsRouter          — GET /events, GET /events/history
   TestRunsRouter            — GET /runs, GET /runs/{run_id}, output
   TestMachinesRouter        — GET/POST/DELETE /machines, heartbeat
@@ -17,7 +17,9 @@ Tests cover every router and the key behaviours of the App Server:
   TestStatusChangeBroadcast — EPS emits status-change events
 
 All tests use FastAPI's TestClient (sync) via an isolated SQLite DB fixture.
-Auth is disabled (AUTOSYS_AUTH_ENABLED=false, the default) so no tokens needed.
+Auth defaults to enabled now, but this file's isolated_db fixture explicitly
+disables it (AUTOSYS_AUTH_ENABLED=false) so most tests don't need tokens;
+TestAuthRouter overrides that per-test to exercise the real auth path.
 """
 from __future__ import annotations
 
@@ -87,6 +89,24 @@ def _seed_box(session: Session, name: str = "test_box") -> None:
     row = JobRow(job_name=name, job_type="BOX", status=8)
     session.add(row)
     session.commit()
+
+
+def _enqueue(session: Session, job_name: str, event_type: str, attribute: str | None = None):
+    """
+    Enqueue an event directly at the repo layer.
+
+    V1 removed POST /api/v1/jobs/{name}/sendevent (no client-facing deployment
+    should be able to force job state changes over the network) -- this
+    mirrors exactly what that route used to do internally, so tests of the
+    event queue / EPS / broadcaster still exercise the real enqueue path
+    without going through the now-removed HTTP surface.
+    """
+    from autosys.db.repository import events as event_repo
+    from autosys.models.event import Event
+    ev = Event(event_type=event_type.upper(), job_name=job_name, source="internal", attribute=attribute)
+    event_repo.enqueue(session, ev)
+    session.commit()
+    return ev
 
 
 # ===========================================================================
@@ -168,15 +188,16 @@ class TestJobsRouter:
         body = client.get("/api/v1/jobs/s_job").json()
         assert body["status"] == 4
 
-    def test_delete_job(self, client, session):
+    def test_delete_job_route_removed(self, client, session):
+        """V1 removed DELETE /api/v1/jobs/{name} -- no client-facing
+        deployment should be able to delete a job definition over the
+        network. The job repo's own delete() is exercised directly
+        elsewhere (test_phase3.py); this just proves the HTTP surface for
+        it is gone."""
         _seed_cmd(session, "delete_me")
         resp = client.delete("/api/v1/jobs/delete_me")
-        assert resp.status_code == 204
-        assert client.get("/api/v1/jobs/delete_me").status_code == 404
-
-    def test_delete_job_not_found(self, client):
-        resp = client.delete("/api/v1/jobs/ghost")
-        assert resp.status_code == 404
+        assert resp.status_code in (404, 405)
+        assert client.get("/api/v1/jobs/delete_me").status_code == 200
 
     def test_sendevent_startjob(self, client, session):
         _seed_cmd(session, "ev_job")
@@ -223,6 +244,28 @@ class TestJobsRouter:
         )
         assert resp.status_code == 202
 
+    def test_sendevent_requires_operator_or_admin_role(self, client, session, monkeypatch):
+        """V1 removed this route because auth was off by default (anyone =
+        anonymous admin). V2 fixed that for real, so now check the role
+        enforcement that was always in the route but never reachable."""
+        monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
+        monkeypatch.setenv(
+            "AUTOSYS_USERS",
+            '{"view_only": {"password": "pw", "role": "viewer"}}',
+        )
+        _seed_cmd(session, "role_check_job")
+        login = client.post(
+            "/api/v1/auth/token", json={"username": "view_only", "password": "pw"}
+        )
+        assert login.status_code == 200
+        token = login.json()["access_token"]
+        resp = client.post(
+            "/api/v1/jobs/role_check_job/sendevent",
+            json={"event_type": "STARTJOB"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403
+
     def test_list_jobs_filter_by_box(self, client, session):
         _seed_box(session, "parent_box")
         _seed_cmd(session, "child_a", box_name="parent_box")
@@ -248,7 +291,7 @@ class TestEventsRouter:
 
     def test_list_events_shows_pending(self, client, session):
         _seed_cmd(session, "ev2_job")
-        client.post("/api/v1/jobs/ev2_job/sendevent", json={"event_type": "STARTJOB"})
+        _enqueue(session, "ev2_job", "STARTJOB")
         resp = client.get("/api/v1/events")
         assert resp.status_code == 200
         assert len(resp.json()) == 1
@@ -256,7 +299,7 @@ class TestEventsRouter:
 
     def test_list_events_has_job_name(self, client, session):
         _seed_cmd(session, "named_ev_job")
-        client.post("/api/v1/jobs/named_ev_job/sendevent", json={"event_type": "STARTJOB"})
+        _enqueue(session, "named_ev_job", "STARTJOB")
         events = client.get("/api/v1/events").json()
         assert events[0]["job_name"] == "named_ev_job"
 
@@ -270,7 +313,7 @@ class TestEventsRouter:
         from autosys.db.connection import sync_session as ss
         from autosys.scheduler.event_processor import EventProcessor
         _seed_cmd(session, "hist_job")
-        client.post("/api/v1/jobs/hist_job/sendevent", json={"event_type": "STARTJOB"})
+        _enqueue(session, "hist_job", "STARTJOB")
         # Run the EPS once to process the event
         proc = EventProcessor(auto_complete=True)
         with ss() as s:
@@ -513,6 +556,7 @@ class TestAuthRouter:
 
     def test_login_valid_credentials(self, client, monkeypatch):
         monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
+        monkeypatch.setenv("AUTOSYS_USERS", '{"admin": {"password": "admin", "role": "admin"}}')
         resp = client.post("/api/v1/auth/token",
                            json={"username": "admin", "password": "admin"})
         assert resp.status_code == 200
@@ -523,8 +567,26 @@ class TestAuthRouter:
 
     def test_login_invalid_credentials(self, client, monkeypatch):
         monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
+        monkeypatch.setenv("AUTOSYS_USERS", '{"admin": {"password": "admin", "role": "admin"}}')
         resp = client.post("/api/v1/auth/token",
                            json={"username": "admin", "password": "wrongpassword"})
+        assert resp.status_code == 401
+
+    def test_login_rejected_when_auth_disabled(self, client):
+        """Auth disabled means every request is already anonymous-admin --
+        minting a token in that state would be meaningless, so /auth/token
+        refuses outright instead (defense in depth alongside removing the
+        baked-in default users)."""
+        resp = client.post("/api/v1/auth/token",
+                           json={"username": "admin", "password": "admin"})
+        assert resp.status_code == 409
+
+    def test_login_rejected_without_configured_users(self, client, monkeypatch):
+        """No baked-in default users any more -- AUTOSYS_USERS unset means
+        nobody can log in, not "fall back to admin/admin"."""
+        monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
+        resp = client.post("/api/v1/auth/token",
+                           json={"username": "admin", "password": "admin"})
         assert resp.status_code == 401
 
     def test_token_encode_decode_roundtrip(self):
@@ -548,7 +610,9 @@ class TestAuthRouter:
             decode_token(tampered)
 
     def test_auth_disabled_allows_access_without_token(self, client):
-        """When auth is disabled (default), all endpoints work without a token."""
+        """When auth is disabled (this file's isolated_db fixture sets it so
+        for every test here -- auth now defaults to enabled), all endpoints
+        work without a token."""
         resp = client.get("/api/v1/jobs")
         assert resp.status_code == 200
 
