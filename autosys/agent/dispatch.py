@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import socket
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -61,6 +62,35 @@ from autosys.models.event import Event
 def _now() -> datetime:
     """Return current time in UTC (matches schema column defaults)."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+# A run record is created by dispatch() inside the EPS tick's own
+# still-open session/transaction; _run_job's background thread finishes it
+# later from a session of its own. If the thread gets there before the
+# tick's transaction commits, its session genuinely cannot see the row yet
+# -- that's SQL transaction isolation, not a bug in either session, and no
+# amount of re-querying the SAME session works around it (SQLite's
+# snapshot is fixed once its transaction starts reading). A fresh session
+# per attempt is what actually gets a fresh look. The race window is
+# whatever's left of the current tick after dispatch() returns -- at most
+# a handful of milliseconds even for a large estate post-V4 -- so this
+# retries fast and gives up quickly rather than masking a real problem.
+_FINISH_RETRY_ATTEMPTS = 5
+_FINISH_RETRY_DELAY_SECONDS = 0.05
+
+
+def _finish_run_with_retry(run_id: str, status, exit_code: Optional[int], pid: Optional[int]) -> None:
+    for attempt in range(_FINISH_RETRY_ATTEMPTS):
+        with sync_session() as session:
+            if run_repo.finish(session, run_id=run_id, status=status, exit_code=exit_code, pid=pid):
+                return
+        if attempt < _FINISH_RETRY_ATTEMPTS - 1:
+            time.sleep(_FINISH_RETRY_DELAY_SECONDS)
+    logger.warning(
+        "[agent] run %r for finish (status=%s) never became visible after %d attempts -- "
+        "the run record will remain stuck at RUNNING",
+        run_id[:8], status, _FINISH_RETRY_ATTEMPTS,
+    )
 
 
 def _exit_code_to_status(exit_code: int, max_exit_success: Optional[int]) -> str:
@@ -304,13 +334,7 @@ class AgentDispatch:
                     job_row = job_repo.get_row(session, job_name)
                     if job_row:
                         job_row.status = JobStatus.RESTART.value
-                    run_repo.finish(
-                        session,
-                        run_id    = run_id,
-                        status    = "FAILURE",
-                        exit_code = exit_code,
-                        pid       = runner.pid,
-                    )
+                _finish_run_with_retry(run_id, "FAILURE", exit_code, runner.pid)
 
                 # Re-create a fresh runner for the next attempt
                 import uuid
@@ -360,14 +384,7 @@ class AgentDispatch:
                         job_row.last_end = now
                     else:
                         status = "TERMINATED"
-
-                run_repo.finish(
-                    session,
-                    run_id    = run_id,
-                    status    = status,
-                    exit_code = exit_code,
-                    pid       = runner.pid,
-                )
+            _finish_run_with_retry(run_id, status, exit_code, runner.pid)
             break
 
         logger.info(

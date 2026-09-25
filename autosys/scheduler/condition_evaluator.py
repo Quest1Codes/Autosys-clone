@@ -176,5 +176,5 @@ def build_status_snapshot(session) -> dict[str, str]:
         Maps ``job_name → status`` for every row in the ``jobs`` table.
     """
     from autosys.db.repository import jobs as job_repo
-    rows = job_repo.list_all(session)
-    return {row.job_name: _norm_status(row.status) for row in rows}
+    rows = job_repo.list_status_only(session)
+    return {job_name: _norm_status(status) for job_name, status in rows}

@@ -308,6 +308,50 @@ class JobRepository:
             select(JobRow).order_by(JobRow.job_name)
         ))
 
+    def list_status_only(self, session: Session) -> list[tuple[str, int]]:
+        """
+        Return (job_name, status) for every job -- a two-column projection,
+        not full ORM rows.
+
+        Exists for build_status_snapshot(), which is called up to four
+        times per EPS tick and only ever reads these two columns. Measured
+        at 85,000 jobs: 0.167s vs 1.203s for the equivalent list_all() scan
+        (dev/task3.../02, section 3.1).
+        """
+        return list(session.execute(
+            select(JobRow.job_name, JobRow.status)
+        ).all())
+
+    def list_stuck_starting(self, session: Session) -> list[JobRow]:
+        """
+        Return non-BOX jobs currently in STARTING status.
+
+        Backs the EPS's stuck-STARTING recovery pass (a previous
+        run/restart left these mid-dispatch) -- was a full list_all() scan
+        with the filter applied in Python. Measured at 85,000 jobs: 0.009s
+        vs the full scan (dev/task3.../02, section 3.1).
+        """
+        return list(session.scalars(
+            select(JobRow)
+            .where(JobRow.job_type != "BOX")
+            .where(JobRow.status == JobStatus.STARTING.value)
+        ))
+
+    def list_schedulable(self, session: Session) -> list[JobRow]:
+        """
+        Return jobs that have a start_times attribute set.
+
+        Backs the EPS's time-trigger scan (time_trigger.get_triggered_jobs):
+        is_triggered() returns False immediately for any row with no
+        start_times, so scanning the other rows at all is wasted work --
+        was a full list_all() scan. Measured at 85,000 jobs: 0.034s for
+        the ~2,361 rows that actually have a schedule, vs the full scan
+        (dev/task3.../02, section 3.1).
+        """
+        return list(session.scalars(
+            select(JobRow).where(JobRow.start_times.isnot(None))
+        ))
+
     def search(self, session: Session, pattern: str) -> list[JobRow]:
         """Alias for list_by_pattern — used by the REST API."""
         return self.list_by_pattern(session, pattern)
@@ -578,12 +622,21 @@ class RunRepository:
         status: int,
         exit_code: Optional[int],
         pid: Optional[int] = None,
-    ) -> None:
+    ) -> bool:
         """
         Update a run record when the subprocess exits.
 
-        Called by AgentDispatch._run_job() from the background thread,
-        in its own session (separate from the dispatch session).
+        Called by AgentDispatch._run_job() from the background thread, in
+        its own session (separate from the dispatch session that created
+        the row via start()). That session may not have committed yet --
+        SQL transaction isolation means this call's own session/connection
+        genuinely cannot see the row until it does, no matter how the row
+        is queried. Returns False in that case rather than raising, so the
+        caller can retry with a fresh session (see AgentDispatch._run_job,
+        which does exactly that with a short bounded backoff) instead of
+        the update being silently lost -- confirmed happening for real:
+        test_phase5.py's real (non-stub) dispatch tests hit this often
+        enough to be a genuine, if narrow, race, not a theoretical one.
         """
         from datetime import datetime as _dt
         if isinstance(status, str):
@@ -593,12 +646,13 @@ class RunRepository:
                 pass
         row: Optional[JobRunRow] = session.get(JobRunRow, run_id)
         if row is None:
-            return
+            return False
         row.status    = status
         row.end_time  = _dt.now()
         row.exit_code = exit_code
         if pid is not None:
             row.pid = pid
+        return True
 
     def get_history(
         self,
@@ -851,7 +905,7 @@ class CalendarRepository:
     def upsert(self, session: Session, calendar: CalendarRow) -> None:
         session.merge(calendar)
         session.flush()
-        
+
     def delete(self, session: Session, name: str) -> bool:
         row = session.get(CalendarRow, name)
         if row:

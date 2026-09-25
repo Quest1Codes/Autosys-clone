@@ -289,29 +289,28 @@ class EventProcessor:
         # Calling dispatch_fn again lets unregistered-machine jobs resolve to
         # FAILURE (via AgentDispatch) and auto_complete stubs go to SUCCESS.
         from autosys.scheduler.state_machine import _norm_status as _ns
-        for row in job_repo.list_all(session):
-            if row.job_type != "BOX" and _ns(row.status) == "STARTING":
-                logger.info("stuck-STARTING recovery: re-dispatching %r", row.job_name)
-                try:
-                    self._dispatch_fn(session, row)
-                except Exception as exc:
-                    logger.warning("re-dispatch error for %r: %s", row.job_name, exc)
-                if self.auto_complete and _ns(row.status) == "RUNNING":
-                    if self._failure_injector and self._failure_injector.should_fail(row):
-                        row.status   = JobStatus.FAILURE.value
-                        row.last_end = now
-                        self._emit_status_change(row.job_name, "RUNNING", "FAILURE")
-                        self._record_run(session, row, now, failed=True)
-                    else:
-                        row.status   = JobStatus.SUCCESS.value
-                        row.last_end = now
-                        self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
-                        if self._failure_injector:
-                            self._record_run(session, row, now, failed=False)
+        for row in job_repo.list_stuck_starting(session):
+            logger.info("stuck-STARTING recovery: re-dispatching %r", row.job_name)
+            try:
+                self._dispatch_fn(session, row)
+            except Exception as exc:
+                logger.warning("re-dispatch error for %r: %s", row.job_name, exc)
+            if self.auto_complete and _ns(row.status) == "RUNNING":
+                if self._failure_injector and self._failure_injector.should_fail(row):
+                    row.status   = JobStatus.FAILURE.value
+                    row.last_end = now
+                    self._emit_status_change(row.job_name, "RUNNING", "FAILURE")
+                    self._record_run(session, row, now, failed=True)
+                else:
+                    row.status   = JobStatus.SUCCESS.value
+                    row.last_end = now
+                    self._emit_status_change(row.job_name, "RUNNING", "SUCCESS")
+                    if self._failure_injector:
+                        self._record_run(session, row, now, failed=False)
         snapshot = build_status_snapshot(session)
 
         # 3. Check time triggers (enqueue STARTJOB events for next tick)
-        rows = job_repo.list_all(session)
+        rows = job_repo.list_schedulable(session)
         cal_rows = calendar_repo.list_all(session)
         calendars = {}
         for r in cal_rows:
