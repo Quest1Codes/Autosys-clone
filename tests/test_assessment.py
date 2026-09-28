@@ -190,6 +190,115 @@ class TestComplexityModule:
         by_name = {r.job_name: r for r in results}
         assert by_name["d7"].size == "XL"
 
+    def test_retries_and_timeout_are_not_complexity(self, isolated_db):
+        """
+        n_retrys -> retries=N and term_run_time -> execution_timeout are
+        one-line keyword arguments in a DAG, so neither may lift a job out of
+        its structural tier. Scoring them as M put 163 of the reference
+        estate's 227 M-tier jobs there on those two attributes alone.
+        """
+        from autosys.db.connection import sync_session
+        from autosys.db.repository import jobs as job_repo
+        from autosys.models.job import parse_job
+        from autosys.analysis.complexity import build_report
+
+        with sync_session() as session:
+            job_repo.upsert(session, parse_job({
+                "job_name": "retry_only", "job_type": "CMD", "command": "echo hi",
+                "machine": "m1", "n_retrys": 2, "term_run_time": 35,
+            }))
+            job_repo.upsert(session, parse_job({
+                "job_name": "many_retries", "job_type": "CMD", "command": "echo hi",
+                "machine": "m1", "n_retrys": 9,
+            }))
+            session.commit()
+
+        with sync_session() as session:
+            results = build_report(job_repo.list_all(session))
+
+        by_name = {r.job_name: r for r in results}
+        assert by_name["retry_only"].size == "XS"
+        assert by_name["many_retries"].size == "XS"       # not L either
+        for r in results:
+            assert "n_retrys" not in r.drivers
+            assert "term_run_time" not in r.drivers
+
+    def test_calendar_still_scores_m_alongside_retries(self, isolated_db):
+        """The retry/timeout exclusion must not suppress a real M signal."""
+        from autosys.db.connection import sync_session
+        from autosys.db.repository import jobs as job_repo
+        from autosys.models.job import parse_job
+        from autosys.analysis.complexity import build_report
+
+        with sync_session() as session:
+            job_repo.upsert(session, parse_job({
+                "job_name": "cal_job", "job_type": "CMD", "command": "echo hi",
+                "machine": "m1", "n_retrys": 2, "term_run_time": 35,
+                "run_calendar": "month_end",
+            }))
+            session.commit()
+
+        with sync_session() as session:
+            results = build_report(job_repo.list_all(session))
+
+        assert results[0].size == "M"
+        assert "run_calendar=month_end" in results[0].drivers
+
+    def test_box_chain_is_charged_once_not_per_box(self, isolated_db):
+        """
+        Splitting an N-box chain into separate DAGs is one design decision.
+        Only the box the chain ends at carries the XL re-architecture driver;
+        every box upstream of it drops to L. Without this, one 8-box business
+        flow manufactures 2 XL "projects" here (and 22 on the real estate).
+        """
+        from autosys.db.connection import sync_session
+        from autosys.db.repository import jobs as job_repo
+        from autosys.models.job import parse_job
+        from autosys.analysis.complexity import build_report
+
+        with sync_session() as session:
+            prev = None
+            for i in range(1, 9):                        # b1 -> ... -> b8
+                kwargs = {"job_name": f"b{i}", "job_type": "BOX"}
+                if prev:
+                    kwargs["condition"] = f"success({prev})"
+                job_repo.upsert(session, parse_job(kwargs))
+                prev = f"b{i}"
+            session.commit()
+
+        with sync_session() as session:
+            results = build_report(job_repo.list_all(session))
+
+        by_name = {r.job_name: r for r in results}
+        assert by_name["b8"].size == "XL"                # depth 8, chain terminal
+        assert "chain terminal" in by_name["b8"].drivers
+        assert by_name["b7"].size == "L"                 # depth 7 but interior
+        assert "inside a longer chain" in by_name["b7"].drivers
+        assert [r.job_name for r in results if r.size == "XL"] == ["b8"]
+
+    def test_separate_chains_each_keep_their_terminal(self, isolated_db):
+        """Two independent chains are two design decisions, so two XLs."""
+        from autosys.db.connection import sync_session
+        from autosys.db.repository import jobs as job_repo
+        from autosys.models.job import parse_job
+        from autosys.analysis.complexity import build_report
+
+        with sync_session() as session:
+            for prefix in ("x", "y"):
+                prev = None
+                for i in range(1, 9):
+                    kwargs = {"job_name": f"{prefix}{i}", "job_type": "BOX"}
+                    if prev:
+                        kwargs["condition"] = f"success({prev})"
+                    job_repo.upsert(session, parse_job(kwargs))
+                    prev = f"{prefix}{i}"
+            session.commit()
+
+        with sync_session() as session:
+            results = build_report(job_repo.list_all(session))
+
+        assert sorted(r.job_name for r in results if r.size == "XL") == ["x8", "y8"]
+
     def test_blast_radius_counts_fan_in(self, isolated_db):
         """extract_sales-style hub: two children depend on the same upstream job."""
         from autosys.db.connection import sync_session
@@ -629,6 +738,33 @@ class TestAssessmentReportAPI:
 
         assert data["summary"]["risk_counts"]["HIGH"] == 2  # job "a" + seq_box (inherited)
         assert "gap_severity_counts" in data["summary"]
+
+    def test_report_includes_ai_token_budget_fields(self, ssa_client, isolated_db):
+        """Indicative Otto Token Budget -- additive contract, not a usage/cost
+        quote. See ai_token_estimate.py."""
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            session.commit()
+
+        r = ssa_client.get("/api/v1/assessment/report")
+        assert r.status_code == 200
+        data = r.json()
+
+        budget = data["ai_token_budget"]
+        assert budget is not None
+        assert budget["confidence"] == "LOW"
+        assert budget["calibration_status"] == "NOT_CALIBRATED"
+        assert budget["min_tokens"] <= budget["max_tokens"]
+
+        job_a = next(j for j in data["jobs"] if j["job_name"] == "a")
+        for field in (
+            "ai_route", "ai_pattern_key", "ai_estimate_role",
+            "estimated_otto_tokens_min", "estimated_otto_tokens_max",
+            "ai_estimate_confidence",
+        ):
+            assert field in job_a
+        assert job_a["estimated_otto_tokens_min"] <= job_a["estimated_otto_tokens_max"]
 
 
 class TestBoxTraceAPI:

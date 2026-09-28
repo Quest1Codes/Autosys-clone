@@ -2,9 +2,10 @@
 Assessment router — Phase 1 migration-assessment export for Shinro.
 
 GET  /api/v1/assessment/report               Full complexity report (JSON): T-shirt size, effort,
-                                             operational risk, gap tags, and the A1-A10 migration
-                                             signals. Risk for jobs with no run history is filled
-                                             in by a background dry-run simulation (see below).
+                                             operational risk, gap tags, the A1-A10 migration
+                                             signals, and an Indicative Otto Token Budget. Risk
+                                             for jobs with no run history is filled in by a
+                                             background dry-run simulation (see below).
 GET  /api/v1/assessment/migration-report     Same data plus a CSV export; always simulates and
                                              blocks until the simulation finishes.
 POST /api/v1/assessment/boxes/{box}/trace     Dry-run state-machine trace for one BOX.
@@ -34,6 +35,7 @@ from autosys.analysis.box_trace import (
     BoxNotFoundError, NotABoxError, run_box_trace,
 )
 from autosys.analysis import simulated_risk
+from autosys.analysis.ai_token_estimate import AITokenEstimate, compute_token_budget
 from autosys.analysis.complexity import (
     AssessmentSummary, JobAssessment, astronomer_mapping, box_effort_breakdown,
     build_report, compute_summary, export_csv, risk_mitigation,
@@ -42,6 +44,7 @@ from autosys.analysis.migration_signals import run_all_structural_analyses
 from autosys.analysis.operational_risk import fetch_run_stats
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas import (
+    AITokenBudgetResponse,
     AssessmentJobRecord, AssessmentReportResponse, AssessmentSimulation,
     AssessmentSummaryResponse,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
@@ -120,7 +123,9 @@ def _assess(
     return _Assessment(results, compute_summary(results), signals, sim, mode)
 
 
-def _job_record(a: JobAssessment) -> AssessmentJobRecord:
+def _job_record(
+    a: JobAssessment, ai_estimate: AITokenEstimate | None = None
+) -> AssessmentJobRecord:
     return AssessmentJobRecord(
         job_name=a.job_name, job_type=a.job_type, box_name=a.box_name,
         size=a.size, effort_h=a.effort_h, drivers=a.drivers,
@@ -131,6 +136,16 @@ def _job_record(a: JobAssessment) -> AssessmentJobRecord:
         schedule_burst_count=a.schedule_burst_count, has_notifications=a.has_notifications,
         has_hardcoded_logs=a.has_hardcoded_logs, timezone=a.timezone,
         astronomer_mapping=astronomer_mapping(a), risk_mitigation=risk_mitigation(a),
+        # Indicative Otto Token Budget (pre-pilot ROM, see ai_token_estimate.py)
+        # -- additive, LOW-confidence planning fields, not a usage or cost quote.
+        # Absent (ai_estimate=None) only if the caller didn't compute a budget
+        # for this result set; fields then keep their empty/zero defaults.
+        ai_route=ai_estimate.route if ai_estimate else "",
+        ai_pattern_key=ai_estimate.pattern_key if ai_estimate else "",
+        ai_estimate_role=ai_estimate.role if ai_estimate else "",
+        estimated_otto_tokens_min=ai_estimate.min_tokens if ai_estimate else 0,
+        estimated_otto_tokens_max=ai_estimate.max_tokens if ai_estimate else 0,
+        ai_estimate_confidence=ai_estimate.confidence if ai_estimate else "",
     )
 
 
@@ -154,6 +169,17 @@ def _summary_response(s: AssessmentSummary) -> AssessmentSummaryResponse:
     )
 
 
+def _ai_token_budget_response(ai_budget) -> AITokenBudgetResponse:
+    return AITokenBudgetResponse(
+        min_tokens=ai_budget.min_tokens, max_tokens=ai_budget.max_tokens,
+        confidence=ai_budget.confidence, calibration_status=ai_budget.calibration_status,
+        pattern_count=ai_budget.pattern_count,
+        architecture_pattern_count=ai_budget.architecture_pattern_count,
+        by_route=ai_budget.by_route, by_tier=ai_budget.by_tier,
+        disclaimer=ai_budget.disclaimer, pricing_note=ai_budget.pricing_note,
+    )
+
+
 @router.get("/report", response_model=AssessmentReportResponse)
 def get_report(
     request:  Request,
@@ -174,15 +200,18 @@ def get_report(
         session, request, box=box, cycles=simulated_risk.DEFAULT_CYCLES,
         simulate=simulate, wait_s=simulated_risk.default_wait_s(),
     )
+    ai_budget = compute_token_budget(a.results)
+
     return AssessmentReportResponse(
         generated_at   = datetime.now(),
         box_filter     = box,
         job_count      = len(a.results),
         execution_mode = a.mode,
         simulation     = a.simulation,
-        jobs           = [_job_record(r) for r in a.results],
+        jobs           = [_job_record(r, ai_budget.by_job.get(r.job_name)) for r in a.results],
         box_breakdown  = box_effort_breakdown(a.results),
         summary        = _summary_response(a.summary),
+        ai_token_budget = _ai_token_budget_response(ai_budget),
     )
 
 
@@ -254,12 +283,14 @@ def get_migration_report(
     a = _assess(
         session, request, box=None, cycles=cycles, simulate=True, wait_s=None, force=True,
     )
+    ai_budget = compute_token_budget(a.results)
     return {
         "generated_at": datetime.now().isoformat(),
         "job_count": len(a.results),
         "simulation": a.simulation.model_dump(),
-        "jobs": [_job_record(r).model_dump() for r in a.results],
+        "jobs": [_job_record(r, ai_budget.by_job.get(r.job_name)).model_dump() for r in a.results],
         "box_breakdown": box_effort_breakdown(a.results),
         "summary": _summary_response(a.summary).model_dump(),
+        "ai_token_budget": _ai_token_budget_response(ai_budget).model_dump(),
         "csv": export_csv(a.results),
     }

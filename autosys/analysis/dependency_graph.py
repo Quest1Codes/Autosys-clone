@@ -73,6 +73,35 @@ def dependency_wave(
     return memo[job_name]
 
 
+def upstream_closure(
+    seeds: set[str],
+    condition_by_name: dict[str, Optional[str]],
+    scope: set[str],
+) -> set[str]:
+    """
+    Every in-scope node reachable *upstream* from *seeds* by following
+    condition references (i.e. the union of the seeds' transitive
+    dependencies).
+
+    A seed is in the result only when it is itself a dependency of another
+    seed — so for one linear chain a->b->c seeded on {c}, the result is
+    {a, b} and c is excluded.
+
+    Used by complexity.score_job to avoid charging the same dependency chain
+    once per box: the chain's design cost lands on the node the chain ends
+    at, and everything upstream of it is already covered by that decision.
+    """
+    out: set[str] = set()
+    stack = [s for s in seeds if s in scope]
+    while stack:
+        node = stack.pop()
+        for dep in referenced_jobs(condition_by_name.get(node), scope) - {node}:
+            if dep not in out:
+                out.add(dep)
+                stack.append(dep)
+    return out
+
+
 def fan_in_counts(all_rows: dict[str, JobRow]) -> dict[str, int]:
     """
     Return {job_name: N} where N is the number of *other* jobs across the

@@ -92,6 +92,14 @@ def app_server(isolated_db, monkeypatch):
     env = os.environ.copy()
     env["AUTOSYS_DB_URL"] = isolated_db
     env["AUTOSYS_START_SCHEDULER"] = "true"  # Ensure lifespan task starts EPS
+    # `autosys scheduler serve` is the real network-facing entrypoint and
+    # refuses to start at all without these (see auth.startup_check_errors,
+    # called from cli/scheduler_cmd.py) -- this test spawns it as a real
+    # subprocess (not create_app() via TestClient), so it needs the same
+    # config a real deployment would supply.
+    env["AUTOSYS_AUTH_ENABLED"] = "true"
+    env["AUTOSYS_JWT_SECRET"] = "test-only-secret-not-for-real-use"
+    env["AUTOSYS_USERS"] = '{"admin": {"password": "admin", "role": "admin"}}'
 
     # Find the autosys CLI binary — could be next to sys.executable, in the
     # user scripts dir, or on PATH (depending on how it was installed).
@@ -143,7 +151,13 @@ def app_server(isolated_db, monkeypatch):
 def test_phase12_end_to_end(agent_1, agent_2, app_server):
     # 1. Register the two agent machines pointing to our test fixtures
     client = httpx.Client(base_url=app_server)
-    
+
+    # Auth is on for this subprocess (see app_server fixture) -- log in once
+    # and attach the token to every request this client makes from here on.
+    login = client.post("/api/v1/auth/token", json={"username": "admin", "password": "admin"})
+    assert login.status_code == 200, login.text
+    client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+
     r = client.post("/api/v1/machines", json={
         "machine_name": agent_1.name,
         "host": agent_1.host,
@@ -173,9 +187,18 @@ def test_phase12_end_to_end(agent_1, agent_2, app_server):
     r = client.post("/api/v1/jil/import", json={"content": jil_text})
     assert r.status_code in (200, 201), r.text
 
-    # 3. Fire STARTJOB demo_etl_box
-    r = client.post("/api/v1/jobs/demo_etl_box/sendevent", json={"event_type": "STARTJOB"})
-    assert r.status_code in (200, 201, 202), r.text
+    # 3. Fire STARTJOB demo_etl_box.
+    # V1 removed POST /api/v1/jobs/{name}/sendevent (no client-facing
+    # deployment should be able to force a job state change over the
+    # network), so enqueue directly at the repo layer instead -- the test
+    # subprocess and this process share the same SQLite file (isolated_db),
+    # and the subprocess's EPS (AUTOSYS_START_SCHEDULER=true) picks up
+    # anything queued here on its next tick, exactly as it used to pick up
+    # what the removed route enqueued.
+    from autosys.db.repository import events as event_repo
+    from autosys.models.event import Event
+    with sync_session() as s:
+        event_repo.enqueue(s, Event(event_type="STARTJOB", job_name="demo_etl_box", source="internal"))
 
     # 4. Poll until demo_etl_box reaches SUCCESS (wait up to 10 seconds)
     deadline = time.time() + 10

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchJobs, sendEvent } from '../api/jobs';
 import { useSSE } from '../hooks/useSSE';

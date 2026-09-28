@@ -288,15 +288,28 @@ def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool,
         AutoSys App Server starting on http://0.0.0.0:9000  [DRY-RUN]
         ^C  Stopped.
     """
+    import sys
     import uvicorn
+    from autosys.app_server.auth import startup_check_errors
     from autosys.app_server.main import create_app
+
+    # This is the actual network-facing entrypoint -- create_app() itself
+    # stays a plain factory (tests build one directly, with no real
+    # credentials, via TestClient), but a real `autosys scheduler serve`
+    # refuses to bind a port at all if auth would be a lie. See auth.py's
+    # module docstring for the history of why this defaults on now.
+    problems = startup_check_errors()
+    if problems:
+        _err.print("[bold red]Refusing to start:[/bold red]")
+        for p in problems:
+            _err.print(f"  - {p}")
+        sys.exit(1)
 
     dry_label = "  [bold yellow][DRY-RUN — stub dispatcher][/bold yellow]" if dry_run else ""
     ha_label = "  [bold cyan][HA MODE — tie-breaker][/bold cyan]" if ha and tie_breaker else ("  [bold green][HA MODE — primary][/bold green]" if ha else "")
     _console.print(
         f"\n[bold green]AutoSys App Server[/bold green] starting on "
         f"[cyan]http://{host}:{port}[/cyan]{dry_label}{ha_label}\n"
-        f"  API docs:  [bold]http://localhost:{port}/docs[/bold]\n"
         f"  Live feed: [bold]ws://localhost:{port}/api/v1/ws/events[/bold]\n"
         f"  EPS poll:  {poll_interval:.1f}s\n"
         f"[dim]Ctrl+C to stop[/dim]\n"

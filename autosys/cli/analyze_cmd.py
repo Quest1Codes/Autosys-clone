@@ -33,6 +33,10 @@ from rich.console import Console
 from rich.table import Table
 from rich import box as rich_box
 
+from autosys.analysis.ai_token_estimate import (
+    AITokenBudgetSummary,
+    compute_token_budget,
+)
 from autosys.analysis.complexity import (
     SIZES as _SIZES,
     SIZE_DESCRIPTIONS as _SIZE_DESCRIPTIONS,
@@ -77,9 +81,15 @@ _RISK_ABBREV = {
 # so the CLI and the REST API can never drift apart.
 # ---------------------------------------------------------------------------
 
-def _build_report(rows, box_pattern: Optional[str], run_stats=None) -> list[dict]:
-    return [
-        {
+def _build_report(
+    rows, box_pattern: Optional[str], run_stats=None
+) -> tuple[list[dict], AITokenBudgetSummary]:
+    assessments = build_report(rows, box_pattern, run_stats=run_stats)
+    ai_budget = compute_token_budget(assessments)
+    results = []
+    for r in assessments:
+        est = ai_budget.by_job[r.job_name]
+        results.append({
             "job_name": r.job_name,
             "job_type": r.job_type,
             "box_name": r.box_name,
@@ -90,9 +100,14 @@ def _build_report(rows, box_pattern: Optional[str], run_stats=None) -> list[dict
             "risk_drivers": r.risk_drivers,
             "blast_radius": r.blast_radius,
             "gap_tags":     r.gap_tags,
-        }
-        for r in build_report(rows, box_pattern, run_stats=run_stats)
-    ]
+            "ai_route":         est.route,
+            "ai_pattern_key":   est.pattern_key,
+            "ai_estimate_role": est.role,
+            "estimated_otto_tokens_min": est.min_tokens,
+            "estimated_otto_tokens_max": est.max_tokens,
+            "ai_estimate_confidence":    est.confidence,
+        })
+    return results, ai_budget
 
 
 def _print_detail_table(results: list[dict]) -> None:
@@ -216,11 +231,53 @@ def _print_summary(results: list[dict]) -> None:
     _console.print()
 
 
+def _print_ai_token_budget(budget: AITokenBudgetSummary) -> None:
+    """Indicative Otto Token Budget -- pre-pilot ROM, NOT a usage/cost quote.
+    See ai_token_estimate.py for the design rationale (pattern clustering,
+    Orbiter-vs-Otto routing, review-fraction on M jobs)."""
+    _console.print()
+    _console.print("[bold]AI-Assisted Migration Plan  (Otto + Orbiter)[/bold]")
+    _console.print()
+    _console.print("[bold]Indicative Otto Token Budget[/bold]  [dim]-- Pre-pilot ROM, Confidence: LOW[/dim]")
+    _console.print(
+        f"  Estimated volume   {budget.min_tokens / 1_000_000:.1f}M "
+        f"- {budget.max_tokens / 1_000_000:.1f}M model tokens"
+    )
+    _console.print(
+        f"  Distinct migration patterns   {budget.pattern_count}  "
+        f"(of which {budget.architecture_pattern_count} require architecture/re-engineering)"
+    )
+    _console.print(f"  Calibration status   {budget.calibration_status}")
+
+    route_table = Table(
+        box=rich_box.SIMPLE_HEAD, show_header=True, header_style="bold", padding=(0, 1),
+        title="Routing", title_justify="left",
+    )
+    route_table.add_column("Route", min_width=26, no_wrap=True)
+    route_table.add_column("Jobs", justify="right", min_width=5)
+    route_table.add_column("Tokens (K)", justify="right", min_width=16)
+    for route, stats in budget.by_route.items():
+        route_table.add_row(
+            route, str(stats["jobs"]),
+            f"{stats['min_tokens'] / 1_000:.0f}K - {stats['max_tokens'] / 1_000:.0f}K",
+        )
+    _console.print()
+    _console.print(route_table)
+
+    _console.print()
+    _console.print(f"[dim]{budget.disclaimer}[/dim]")
+    _console.print()
+    _console.print(f"[dim]{budget.pricing_note}[/dim]")
+    _console.print()
+
+
 def _export_csv(results: list[dict], path: str) -> None:
     """Write results to a CSV file."""
     fields = [
         "job_name", "job_type", "box_name", "size", "effort_h", "drivers",
         "risk", "risk_drivers", "blast_radius", "gap_tags",
+        "ai_route", "ai_pattern_key", "ai_estimate_role",
+        "estimated_otto_tokens_min", "estimated_otto_tokens_max", "ai_estimate_confidence",
     ]
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields)
@@ -283,7 +340,7 @@ def analyze(
         )
         sys.exit(0)
 
-    results = _build_report(rows, box_pattern, run_stats)
+    results, ai_budget = _build_report(rows, box_pattern, run_stats)
 
     _console.print(
         f"\n[bold]AutoSys → Astronomer  Migration Complexity Assessment[/bold]"
@@ -295,6 +352,7 @@ def analyze(
         _print_detail_table(results)
 
     _print_summary(results)
+    _print_ai_token_budget(ai_budget)
 
     if csv_path:
         _export_csv(results, csv_path)
