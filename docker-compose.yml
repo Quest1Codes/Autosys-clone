@@ -58,8 +58,13 @@ services:
       - autosys-data:/app/data
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
-      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
+      # The app refuses to start (cli/scheduler_cmd.py's _require_real_auth)
+      # if this is still the well-known default, or if AUTOSYS_USERS is unset --
+      # both are real requirements now, not just docs. Override via a .env file
+      # or exported env vars for anything beyond local dev.
+      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-autosys-clone-local-dev-secret-not-for-prod}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
+      AUTOSYS_USERS: ${AUTOSYS_USERS:-{"admin":{"password":"admin","role":"admin"},"operator":{"password":"operator","role":"operator"},"viewer":{"password":"viewer","role":"viewer"}}}
     depends_on:
       postgres:
         condition: service_healthy
