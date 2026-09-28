@@ -28,7 +28,7 @@ from autosys.db.connection import sync_session, reset_engines
 from autosys.db.migrations import create_all_sync
 from autosys.db.repository import (
     JobRepository, EventRepository, GlobalVarRepository,
-    jobs as job_repo, events as event_repo, globs as glob_repo,
+    jobs as job_repo, events as event_repo, globs as glob_repo, runs as run_repo,
 )
 from autosys.models.job import CmdJob, BoxJob
 from autosys.models.event import Event
@@ -509,8 +509,17 @@ class TestCLIJilValidate:
                            "command: /x\n"
                            # Missing required 'machine' for CMD job
                            )
-        result = self._run("jil", "validate", str(bad_jil))
+        # --strict for the old all-or-nothing contract: the tolerant default
+        # quarantines this instead of failing (see TestValidateTolerant below).
+        result = self._run("jil", "validate", "--strict", str(bad_jil))
         assert result.exit_code != 0
+
+    def test_validate_tolerant_default_quarantines_instead_of_failing(self, tmp_path):
+        bad_jil = tmp_path / "bad.jil"
+        bad_jil.write_text("insert_bogus: x\n")
+        result = self._run("jil", "validate", str(bad_jil))
+        assert result.exit_code == 0
+        assert "quarantined" in result.output and "JIL file is valid" not in result.output
 
 
 # ===========================================================================
@@ -524,12 +533,14 @@ class TestCLISendEvent:
         return runner.invoke(autosys, list(args), catch_exceptions=False)
 
     def test_startjob_exit_0(self):
+        self._run("jil", "import", str(_DEMO_JIL))
         result = self._run(
             "sendevent", "-E", "STARTJOB", "-J", "extract_sales"
         )
         assert result.exit_code == 0
 
     def test_startjob_shows_event_queued(self):
+        self._run("jil", "import", str(_DEMO_JIL))
         result = self._run(
             "sendevent", "-E", "STARTJOB", "-J", "extract_sales"
         )
@@ -537,6 +548,7 @@ class TestCLISendEvent:
         assert "STARTJOB" in result.output
 
     def test_startjob_shows_event_id(self):
+        self._run("jil", "import", str(_DEMO_JIL))
         result = self._run(
             "sendevent", "-E", "STARTJOB", "-J", "extract_sales"
         )
@@ -547,6 +559,7 @@ class TestCLISendEvent:
         assert result.exit_code != 0
 
     def test_startjob_enqueues_in_db(self):
+        self._run("jil", "import", str(_DEMO_JIL))
         self._run("sendevent", "-E", "STARTJOB", "-J", "extract_sales")
         with sync_session() as session:
             rows = event_repo.dequeue_pending(session)
@@ -564,18 +577,79 @@ class TestCLISendEvent:
         result = self._run("sendevent", "-E", "SET_GLOBAL", "-v", "val")
         assert result.exit_code != 0
 
-    def test_unknown_job_shows_warning_not_error(self):
+    def test_unknown_job_rejected(self):
         result = self._run(
             "sendevent", "-E", "STARTJOB", "-J", "no_such_job"
         )
-        # Should still exit 0 — event is queued even for unknown jobs
-        assert result.exit_code == 0
+        # Real AutoSys rejects events for jobs that don't exist
+        assert result.exit_code != 0
+        with sync_session() as session:
+            rows = event_repo.dequeue_pending(session)
+        assert not any(r.job_name == "no_such_job" for r in rows)
 
     def test_change_status_requires_s(self):
         result = self._run(
             "sendevent", "-E", "CHANGE_STATUS", "-J", "some_job"
         )
         assert result.exit_code != 0
+
+    def test_change_status_with_real_status_name(self):
+        # Regression test: Event.new_status is an IntEnum (JobStatus), so
+        # passing the status NAME string straight through used to raise
+        # a pydantic ValidationError inside sendevent — this is the CLI's
+        # own documented example ("-s INACTIVE") and it never actually
+        # worked end-to-end before this fix.
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run(
+            "sendevent", "-E", "CHANGE_STATUS", "-J", "nightly_cleanup", "-s", "INACTIVE",
+        )
+        assert result.exit_code == 0
+        result = self._run("scheduler", "run-once")
+        assert result.exit_code == 0
+
+    def test_change_status_unknown_name_rejected(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run(
+            "sendevent", "-E", "CHANGE_STATUS", "-J", "nightly_cleanup", "-s", "NOT_A_STATUS",
+        )
+        assert result.exit_code != 0
+
+    def test_job_on_noexec(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("sendevent", "-E", "JOB_ON_NOEXEC", "-J", "nightly_cleanup")
+        assert result.exit_code == 0
+        self._run("scheduler", "run-once")
+        result = self._run("autorep", "-J", "nightly_cleanup", "--tsv")
+        assert "NE" in result.output  # ON_NOEXEC's two-letter status code
+
+    def test_job_off_noexec_requires_job(self):
+        result = self._run("sendevent", "-E", "JOB_OFF_NOEXEC")
+        assert result.exit_code != 0
+
+    def test_mach_online_requires_machine(self):
+        result = self._run("sendevent", "-E", "MACH_ONLINE")
+        assert result.exit_code != 0
+
+    def test_mach_offline_unregistered_machine_rejected(self):
+        result = self._run("sendevent", "-E", "MACH_OFFLINE", "-N", "no_such_machine")
+        assert result.exit_code != 0
+
+    def test_mach_online_registered_machine(self):
+        self._run("machine", "register", "etl-cli-01", "--host", "127.0.0.1", "--port", "7520")
+        result = self._run("sendevent", "-E", "MACH_ONLINE", "-N", "etl-cli-01")
+        assert result.exit_code == 0
+
+    def test_deletejob_via_sendevent(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("sendevent", "-E", "DELETEJOB", "-J", "nightly_cleanup")
+        assert result.exit_code == 0
+        self._run("scheduler", "run-once")
+        with sync_session() as session:
+            assert job_repo.get_row(session, "nightly_cleanup") is None
+
+    def test_stop_demon_needs_no_target(self):
+        result = self._run("sendevent", "-E", "STOP_DEMON")
+        assert result.exit_code == 0
 
 
 # ===========================================================================
@@ -625,8 +699,103 @@ class TestCLIAutorep:
 
     def test_autorep_quiet_tsv(self):
         self._run("jil", "import", str(_DEMO_JIL))
-        result = self._run("autorep", "-J", "demo_etl_box", "-q")
+        result = self._run("autorep", "-J", "demo_etl_box", "--tsv")
         assert result.exit_code == 0
         # TSV output — tab-separated, no rich markup
         assert "\t" in result.output
         assert "demo_etl_box" in result.output
+
+    def test_autorep_q_dumps_jil(self):
+        # Real AutoSys semantics: -q prints the JIL definition, not TSV.
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "demo_etl_box", "-q")
+        assert result.exit_code == 0
+        assert "insert_job: demo_etl_box" in result.output
+        assert "job_type: BOX" in result.output
+        assert "\t" not in result.output
+
+    def test_autorep_q_default_short_form_condition(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "extract_sales", "-q")
+        assert "condition: s(check_source_ready)" in result.output
+
+    def test_autorep_q_w_long_form_condition(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "extract_sales", "-q", "-w")
+        assert "condition: success(check_source_ready)" in result.output
+
+    def test_autorep_no_selector_errors(self):
+        result = self._run("autorep")
+        assert result.exit_code != 0
+
+    def test_autorep_mutually_exclusive_selectors(self):
+        result = self._run("autorep", "-J", "%", "-M", "ALL")
+        assert result.exit_code != 0
+
+    def test_autorep_machine_report(self):
+        self._run("machine", "register", "etl-server-01", "--host", "127.0.0.1", "--port", "7520")
+        result = self._run("autorep", "-M", "ALL")
+        assert result.exit_code == 0
+        assert "etl-server-01" in result.output
+
+    def test_autorep_machine_report_not_found(self):
+        result = self._run("autorep", "-M", "no_such_machine")
+        assert result.exit_code == 0
+
+    def test_autorep_global_report(self):
+        self._run("sendevent", "-E", "SET_GLOBAL", "-G", "RUN_DATE", "-v", "20260625")
+        self._run("scheduler", "run-once")
+        result = self._run("autorep", "-G", "ALL")
+        assert result.exit_code == 0
+        assert "RUN_DATE" in result.output
+        assert "20260625" in result.output
+
+    def test_autorep_global_report_not_found(self):
+        result = self._run("autorep", "-G", "no_such_global")
+        assert result.exit_code == 0
+
+    def test_autorep_level_0_hides_children(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "demo_etl_box", "-L", "0")
+        assert "demo_etl_box" in result.output
+        assert "check_source_ready" not in result.output
+
+    def test_autorep_no_children_equivalent_to_level_0(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "demo_etl_box", "--no-children")
+        assert "check_source_ready" not in result.output
+
+    def test_autorep_default_level_shows_children(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "demo_etl_box")
+        assert "check_source_ready" in result.output
+
+    def test_autorep_detail_report_no_history(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("autorep", "-J", "check_source_ready", "-d")
+        assert result.exit_code == 0
+        assert "No run history" in result.output
+
+    def test_autorep_detail_report_with_history(self):
+        from datetime import datetime
+        self._run("jil", "import", str(_DEMO_JIL))
+        # Open the run window FIRST, then fire the event, then close the
+        # window — matching real chronology (a run's [start_time, end_time]
+        # must bracket events that happen during its execution) — so -d's
+        # detail query (which filters events to that window) picks it up.
+        with sync_session() as session:
+            now = datetime.now()
+            run_repo.start(
+                session, "detail_run_1", "check_source_ready",
+                command="echo hi", machine="localhost",
+                run_date=now.strftime("%Y-%m-%d"),
+            )
+            session.commit()
+        self._run("sendevent", "-E", "STARTJOB", "-J", "check_source_ready")
+        with sync_session() as session:
+            run_repo.finish(session, "detail_run_1", status=4, exit_code=0)
+            session.commit()
+        result = self._run("autorep", "-J", "check_source_ready", "-d")
+        assert result.exit_code == 0
+        assert "check_source_ready" in result.output
+        assert "STARTJOB" in result.output

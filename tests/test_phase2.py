@@ -30,7 +30,7 @@ from autosys.parser.jil_parser import (
 )
 from autosys.parser.condition_parser import (
     parse_condition, evaluate, condition_to_str, list_job_dependencies,
-    JobCondNode, ValueCondNode, AndNode, OrNode, ConditionSyntaxError,
+    JobCondNode, ValueCondNode, ExitCodeCondNode, AndNode, OrNode, ConditionSyntaxError,
 )
 from autosys.parser.variable_sub import (
     substitute, build_builtins, substitute_job_attrs,
@@ -383,6 +383,74 @@ class TestConditionAST:
             parse_condition("success()")  # empty job name is an IDENT issue → parse error
 
 
+class TestConditionGrammarExtensions:
+    """v()/e() shorthands, AND/OR keywords, and s(job, N) lookback."""
+
+    # -- v(...) shorthand for value(...) ----------------------------------
+
+    def test_v_shorthand_parses_as_value_cond(self):
+        node = parse_condition('v(BATCH_DATE) = "20260625"')
+        assert isinstance(node, ValueCondNode)
+        assert node.global_name == "BATCH_DATE"
+        assert node.expected    == "20260625"
+
+    def test_v_shorthand_equivalent_to_value(self):
+        short = parse_condition('v(ENV) != "PROD"')
+        long_ = parse_condition('value(ENV) != "PROD"')
+        assert short == long_
+
+    # -- e(...) shorthand for exitcode(...) --------------------------------
+
+    def test_e_shorthand_parses_as_exitcode_cond(self):
+        node = parse_condition("e(extract_sales) = 0")
+        assert isinstance(node, ExitCodeCondNode)
+        assert node.job_name == "extract_sales"
+        assert node.expected == 0
+
+    def test_e_shorthand_equivalent_to_exitcode(self):
+        short = parse_condition("e(a) != 1")
+        long_ = parse_condition("exitcode(a) != 1")
+        assert short == long_
+
+    # -- AND / OR keyword operators -----------------------------------------
+
+    def test_and_keyword_parses_like_ampersand(self):
+        kw  = parse_condition("success(a) AND success(b)")
+        sym = parse_condition("success(a) & success(b)")
+        assert isinstance(kw, AndNode)
+        assert kw == sym
+
+    def test_or_keyword_parses_like_pipe(self):
+        kw  = parse_condition("success(a) OR failure(b)")
+        sym = parse_condition("success(a) | failure(b)")
+        assert isinstance(kw, OrNode)
+        assert kw == sym
+
+    def test_and_or_keywords_are_case_insensitive(self):
+        node = parse_condition("success(a) and success(b) or failure(c)")
+        assert isinstance(node, OrNode)
+
+    def test_and_keyword_precedence_matches_ampersand(self):
+        node = parse_condition("success(a) OR success(b) AND success(c)")
+        assert isinstance(node, OrNode)
+        assert isinstance(node.right, AndNode)
+
+    # -- s(job, N) lookback ---------------------------------------------------
+
+    def test_lookback_number_parses(self):
+        node = parse_condition("success(a, 12.00)")
+        assert isinstance(node, JobCondNode)
+        assert node.look_back == 12.00
+
+    def test_lookback_zero_parses(self):
+        node = parse_condition("s(a, 0)")
+        assert node.look_back == 0
+
+    def test_lookback_integer_parses(self):
+        node = parse_condition("success(a, 6)")
+        assert node.look_back == 6.0
+
+
 class TestConditionEvaluate:
 
     def test_success_true_when_job_succeeded(self):
@@ -461,6 +529,94 @@ class TestConditionEvaluate:
         statuses = {"generate_report": 4, "load_to_warehouse": 1}
         assert evaluate(node, statuses) is False
 
+    # -- exitcode(...) / e(...) ---------------------------------------------
+
+    def test_exitcode_equals_true(self):
+        node = parse_condition("exitcode(a) = 0")
+        assert evaluate(node, {}, job_exitcodes={"a": 0}) is True
+
+    def test_exitcode_equals_false(self):
+        node = parse_condition("exitcode(a) = 0")
+        assert evaluate(node, {}, job_exitcodes={"a": 1}) is False
+
+    def test_exitcode_not_equals(self):
+        node = parse_condition("exitcode(a) != 0")
+        assert evaluate(node, {}, job_exitcodes={"a": 1}) is True
+
+    def test_exitcode_missing_job_is_false(self):
+        node = parse_condition("exitcode(a) = 0")
+        assert evaluate(node, {}, job_exitcodes={}) is False
+
+    def test_exitcode_no_job_exitcodes_dict_is_false(self):
+        node = parse_condition("exitcode(a) = 0")
+        assert evaluate(node, {}) is False
+
+    def test_e_shorthand_evaluates_same_as_exitcode(self):
+        node = parse_condition("e(a) = 0")
+        assert evaluate(node, {}, job_exitcodes={"a": 0}) is True
+
+    # -- v(...) shorthand evaluation -----------------------------------------
+
+    def test_v_shorthand_evaluates_same_as_value(self):
+        node = parse_condition('v(MY_VAR) = "hello"')
+        assert evaluate(node, {}, {"MY_VAR": "hello"}) is True
+
+    # -- AND / OR keyword evaluation ------------------------------------------
+
+    def test_and_keyword_evaluates_like_ampersand(self):
+        node = parse_condition("success(a) AND success(b)")
+        assert evaluate(node, {"a": 4, "b": 4}) is True
+        assert evaluate(node, {"a": 4, "b": 5}) is False
+
+    def test_or_keyword_evaluates_like_pipe(self):
+        node = parse_condition("success(a) OR success(b)")
+        assert evaluate(node, {"a": 4, "b": 5}) is True
+
+    # -- s(job, N) lookback ----------------------------------------------------
+
+    def test_lookback_within_window_is_true(self):
+        node = parse_condition("success(a, 12.00)")
+        now = datetime(2026, 1, 1, 12, 0)
+        assert evaluate(
+            node, {"a": 4},
+            job_last_times={"a": datetime(2026, 1, 1, 6, 0)}, now=now,
+        ) is True
+
+    def test_lookback_outside_window_is_false(self):
+        node = parse_condition("success(a, 12.00)")
+        now = datetime(2026, 1, 1, 12, 0)
+        assert evaluate(
+            node, {"a": 4},
+            job_last_times={"a": datetime(2025, 12, 31, 23, 0)}, now=now,
+        ) is False
+
+    def test_lookback_zero_means_unbounded(self):
+        node = parse_condition("success(a, 0)")
+        now = datetime(2026, 1, 1, 12, 0)
+        assert evaluate(
+            node, {"a": 4},
+            job_last_times={"a": datetime(2020, 1, 1)}, now=now,
+        ) is True
+
+    def test_lookback_without_now_is_false(self):
+        node = parse_condition("success(a, 12.00)")
+        assert evaluate(node, {"a": 4}) is False
+
+    def test_lookback_job_never_ran_is_false(self):
+        node = parse_condition("success(a, 12.00)")
+        now = datetime(2026, 1, 1, 12, 0)
+        assert evaluate(node, {"a": 4}, job_last_times={}, now=now) is False
+
+    def test_lookback_does_not_override_status_check(self):
+        # Even inside the lookback window, the job must still satisfy the
+        # base predicate (success) — a recent FAILURE shouldn't count.
+        node = parse_condition("success(a, 12.00)")
+        now = datetime(2026, 1, 1, 12, 0)
+        assert evaluate(
+            node, {"a": 5},  # FAILURE
+            job_last_times={"a": now}, now=now,
+        ) is False
+
 
 class TestConditionHelpers:
 
@@ -479,6 +635,24 @@ class TestConditionHelpers:
     def test_condition_to_str_value(self):
         node = parse_condition('value(MY_VAR) = "x"')
         assert condition_to_str(node) == 'value(MY_VAR) = "x"'
+
+    def test_condition_to_str_exitcode(self):
+        node = parse_condition("exitcode(a) = 0")
+        assert condition_to_str(node) == "exitcode(a) = 0"
+
+    def test_condition_to_str_lookback_round_trips(self):
+        node = parse_condition("success(a, 12.00)")
+        assert condition_to_str(node) == "success(a, 12)"
+
+    def test_condition_to_str_instance_round_trips(self):
+        node = parse_condition("success(a^PRD)")
+        assert condition_to_str(node) == "success(a^PRD)"
+
+    def test_condition_to_str_v_and_e_render_as_long_form(self):
+        # v()/e() are input shorthands; the canonical rendering is the
+        # long form, matching how the parser already normalises them.
+        assert condition_to_str(parse_condition('v(X) = "y"')) == 'value(X) = "y"'
+        assert condition_to_str(parse_condition("e(a) = 0")) == "exitcode(a) = 0"
 
     def test_list_job_dependencies_simple(self):
         node = parse_condition("success(extract_sales)")
@@ -642,6 +816,10 @@ class TestDemoEtlJIL:
 
     def test_box_max_run_alarm(self, jobs_by_name):
         assert jobs_by_name["demo_etl_box"].max_run_alarm == 120
+
+    def test_box_date_conditions(self, jobs_by_name):
+        # Required for start_times/days_of_week to actually self-trigger.
+        assert jobs_by_name["demo_etl_box"].date_conditions is True
 
     # --- check_source_ready ---
 

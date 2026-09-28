@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Generator
 
 import pytest
@@ -89,7 +90,7 @@ def _seed_alarm(job_name: str, alarm_type: str = "FAILURE", message: str = "test
     with sync_session() as s:
         s.add(AlarmRow(
             alarm_id=alarm_id, job_name=job_name, alarm_type=alarm_type,
-            message=message, raised_at=datetime.utcnow(),
+            message=message, raised_at=utcnow(),
         ))
     return alarm_id
 
@@ -280,7 +281,7 @@ class TestWCCJsonAPI:
         from autosys.db.schema import AlarmRow
         with sync_session() as s:
             row = s.get(AlarmRow, a1)
-            row.cleared_at = datetime.utcnow()
+            row.cleared_at = utcnow()
             row.cleared_by = "admin"
 
         r = wcc_client.get("/api/wcc/alarms", params={"active": "true"})

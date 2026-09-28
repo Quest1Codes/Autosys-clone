@@ -13,6 +13,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timedelta
+from autosys.timeutil import utcnow
 from typing import Generator
 
 import pytest
@@ -328,7 +329,7 @@ class TestLogTextMonitor:
 class TestReportGeneration:
 
     def test_job_report_empty(self, fresh_db):
-        now = datetime.utcnow()
+        now = utcnow()
         with sync_session() as s:
             report = generate_job_report(s, now - timedelta(days=1), now)
         assert report["report_type"] == "JOB_REPORT"
@@ -336,7 +337,7 @@ class TestReportGeneration:
         assert report["by_status"] == {}
 
     def test_job_report_with_runs(self, fresh_db):
-        now = datetime.utcnow()
+        now = utcnow()
         with sync_session() as s:
             _make_job(s, "rpt_job")
             s.add(JobRunRow(
@@ -356,14 +357,14 @@ class TestReportGeneration:
         assert report["by_status"].get("FAILURE") == 1
 
     def test_alarm_report_empty(self, fresh_db):
-        now = datetime.utcnow()
+        now = utcnow()
         with sync_session() as s:
             report = generate_alarm_report(s, now - timedelta(days=1), now)
         assert report["report_type"] == "ALARM_REPORT"
         assert report["total_alarms"] == 0
 
     def test_alarm_report_with_alarms(self, fresh_db):
-        now = datetime.utcnow()
+        now = utcnow()
         with sync_session() as s:
             _make_job(s, "a_job")
             _make_job(s, "b_job")
@@ -383,3 +384,119 @@ class TestReportGeneration:
         assert report["total_alarms"] == 2
         assert report["cleared"] == 1
         assert report["by_type"].get("FAILURE") == 2
+
+
+# ===========================================================================
+# CLI — autosys monbro
+# ===========================================================================
+# Real AutoSys has a monbro CLI command that runs a pre-defined monitor or
+# report (browser) by name; the engine above existed with no CLI wrapping
+# it at all until this.
+
+class TestMonbroCLI:
+
+    def _run(self, *args):
+        from click.testing import CliRunner
+        from autosys.cli.main import autosys
+        return CliRunner().invoke(autosys, list(args), catch_exceptions=False)
+
+    def test_monbro_runs_file_monitor_no_match(self, fresh_db):
+        with sync_session() as s:
+            _make_job(s, "watched")
+            mon_repo.upsert(s, "fm1", "FILE_MONITOR", job_name="watched",
+                             attributes_json=json.dumps({"path": "/nonexistent/xyz123"}))
+            s.commit()
+        result = self._run("monbro", "-N", "fm1")
+        assert result.exit_code == 0
+        assert "fm1" in result.output
+        assert "No condition met" in result.output
+
+    def test_monbro_runs_file_monitor_match_raises_alarm(self, fresh_db, tmp_path):
+        watched_file = tmp_path / "trigger.txt"
+        watched_file.write_text("x")
+        with sync_session() as s:
+            _make_job(s, "watched")
+            mon_repo.upsert(s, "fm2", "FILE_MONITOR", job_name="watched",
+                             attributes_json=json.dumps({"path": str(watched_file)}))
+            s.commit()
+        result = self._run("monbro", "-N", "fm2")
+        assert result.exit_code == 0
+        assert "EVENT" in result.output
+        with sync_session() as s:
+            events = list(s.query(EventQueueRow).filter_by(job_name="watched"))
+        assert any(e.event_type == "STARTJOB" for e in events)
+
+    def test_monbro_query_prints_jil(self, fresh_db):
+        with sync_session() as s:
+            mon_repo.upsert(s, "fm3", "FILE_MONITOR", attributes_json=json.dumps({"path": "/x"}))
+            s.commit()
+        result = self._run("monbro", "-N", "fm3", "-q")
+        assert result.exit_code == 0
+        assert "insert_monbro: fm3" in result.output
+        assert "monbro_type: FILE_MONITOR" in result.output
+        assert "path: /x" in result.output
+
+    def test_monbro_all_runs_every_definition(self, fresh_db):
+        with sync_session() as s:
+            mon_repo.upsert(s, "a1", "FILE_MONITOR", attributes_json=json.dumps({"path": "/x"}))
+            mon_repo.upsert(s, "a2", "JOB_REPORT", attributes_json=json.dumps({"hours": 24}))
+            s.commit()
+        result = self._run("monbro", "-N", "ALL")
+        assert result.exit_code == 0
+        assert "a1" in result.output
+        assert "a2" in result.output
+        assert "JOB_REPORT" in result.output
+
+    def test_monbro_wildcard_pattern(self, fresh_db):
+        with sync_session() as s:
+            mon_repo.upsert(s, "web_check_1", "FILE_MONITOR", attributes_json=json.dumps({"path": "/x"}))
+            mon_repo.upsert(s, "db_check_1", "FILE_MONITOR", attributes_json=json.dumps({"path": "/y"}))
+            s.commit()
+        result = self._run("monbro", "-N", "web%")
+        assert "web_check_1" in result.output
+        assert "db_check_1" not in result.output
+
+    def test_monbro_no_match_exits_0(self, fresh_db):
+        result = self._run("monbro", "-N", "no_such_monitor")
+        assert result.exit_code == 0
+
+    def test_monbro_job_report(self, fresh_db):
+        now = utcnow()
+        with sync_session() as s:
+            _make_job(s, "j1")
+            s.add(JobRunRow(
+                run_id=str(uuid.uuid4()), job_name="j1", status=JobStatus.SUCCESS.value,
+                start_time=now - timedelta(minutes=5), end_time=now,
+            ))
+            mon_repo.upsert(s, "jr1", "JOB_REPORT", attributes_json=json.dumps({"hours": 24}))
+            s.commit()
+        result = self._run("monbro", "-N", "jr1")
+        assert result.exit_code == 0
+        assert "total_runs: 1" in result.output
+
+    def test_monbro_alarm_report(self, fresh_db):
+        now = utcnow()
+        with sync_session() as s:
+            _make_job(s, "j2")
+            s.add(AlarmRow(
+                alarm_id=str(uuid.uuid4()), job_name="j2", alarm_type="FAILURE",
+                message="test", raised_at=now,
+            ))
+            mon_repo.upsert(s, "ar1", "ALARM_REPORT", attributes_json=json.dumps({"hours": 24}))
+            s.commit()
+        result = self._run("monbro", "-N", "ar1")
+        assert result.exit_code == 0
+        assert "total_alarms: 1" in result.output
+
+    def test_monbro_report_explicit_date_range(self, fresh_db):
+        now = utcnow()
+        with sync_session() as s:
+            _make_job(s, "j3")
+            mon_repo.upsert(s, "jr2", "JOB_REPORT", attributes_json=json.dumps({
+                "date_from": (now - timedelta(days=2)).isoformat(),
+                "date_to":   now.isoformat(),
+            }))
+            s.commit()
+        result = self._run("monbro", "-N", "jr2")
+        assert result.exit_code == 0
+        assert "report_type: JOB_REPORT" in result.output

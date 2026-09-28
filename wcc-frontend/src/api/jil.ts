@@ -13,6 +13,10 @@ export interface JILImportResponse {
   n_updated: number;
   n_deleted: number;
   n_machines: number;
+  // Stanzas that were NOT lost, but need a look. success=true says nothing
+  // about these -- a "successful" import can still have quarantined stanzas.
+  n_quarantined: number;
+  n_warnings: number;
   error?: string;
 }
 

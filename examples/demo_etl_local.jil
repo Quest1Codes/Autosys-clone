@@ -8,6 +8,7 @@ insert_job: demo_etl_box   job_type: BOX
 owner: svc_demo
 start_times: "06:00"
 days_of_week: mo,tu,we,th,fr
+date_conditions: 1
 max_run_alarm: 120
 alarm_if_fail: 1
 
@@ -73,3 +74,4 @@ command: "/Users/micheal/quest1works/AutosysToAstronomer/Autosys-clone/scripts/c
 machine: localhost
 start_times: "23:00"
 days_of_week: all
+date_conditions: 1

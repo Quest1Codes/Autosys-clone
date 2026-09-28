@@ -338,10 +338,23 @@ autosys agent jobs              # see running jobs
 autosys agent tail check_source_ready   # tail output
 ```
 
-### PostgreSQL Setup (Optional)
+### PostgreSQL Setup
 
-The clone defaults to SQLite for zero-config development. For production or
-multi-process deployments, use PostgreSQL:
+Running the bare CLI on your own laptop still defaults to SQLite, for
+zero-config local development. Every actual deployment path uses PostgreSQL
+instead — SQLite's single-writer model can't take the concurrent writes a
+real migration (hundreds of thousands of jobs, many files imported at once)
+needs:
+
+- **`docker-compose*.yml`** run a `postgres` service and point `api`/`wcc` at
+  it (`AUTOSYS_DB_URL`) — nothing to configure.
+- **The client-facing bundle image** (`docker run <image>`, no compose file)
+  starts and initializes a real PostgreSQL server inside the same container
+  at boot (`docker-entrypoint.sh`), with its data under the same `/app/data`
+  volume everything else already persists to — still a one-line `docker run`.
+
+To point the bare CLI at PostgreSQL too (e.g. to reproduce something you saw
+in a deployment):
 
 ```bash
 pip install -e ".[dev,pg]"

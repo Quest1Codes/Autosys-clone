@@ -105,6 +105,13 @@ def _get_db_url(async_: bool = True) -> str:
                 return raw.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
             elif raw.startswith("postgresql://") and "asyncpg" not in raw:
                 return raw.replace("postgresql://", "postgresql+asyncpg://", 1)
+        elif raw.startswith("postgresql://") and "+psycopg" not in raw:
+            # SQLAlchemy >= 2.1 changed the *default* DBAPI for a bare
+            # "postgresql://" URL from psycopg2 to psycopg (v3) -- pin it
+            # explicitly so this doesn't silently start failing ("No module
+            # named 'psycopg'") the moment SQLAlchemy resolves to 2.1+, since
+            # pyproject.toml only pins psycopg2-binary, not psycopg[binary].
+            return raw.replace("postgresql://", "postgresql+psycopg2://", 1)
         return raw
 
     _DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)

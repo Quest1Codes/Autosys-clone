@@ -514,6 +514,9 @@ def create_runner(
             run_id=run_id,
             max_run_secs=max_run_secs,
             output_callback=output_callback,
+            envvars=getattr(row, "envvars", None),
+            std_in_file=getattr(row, "std_in_file", None),
+            ulimit=getattr(row, "ulimit", None),
         )
 
     if jt == "FILEWATCH":

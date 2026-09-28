@@ -54,14 +54,23 @@ WORKDIR /app
 # switch this to installing a built wheel.
 COPY pyproject.toml README.md ./
 COPY autosys ./autosys
-RUN pip install --no-cache-dir -e .
+# [pg] pulls in psycopg2-binary/asyncpg — the compose files point
+# AUTOSYS_DB_URL at a PostgreSQL container, not the SQLite default.
+RUN pip install --no-cache-dir -e .[pg]
 
 # nginx is the single origin the browser talks to: WCC's own SPA fallback
 # 404s anything under /api/v1/ (login, JIL import), which lives in the API
 # app instead, so serving the frontend from WCC's own process would break
 # login the moment a browser (not curl hitting a port directly) loads it.
+#
+# postgresql (server + client binaries) backs the client-facing bundle mode
+# (docker-entrypoint.sh starts and initializes it under /app/data/pgdata) --
+# there is no separate DB container to pair with a one-line `docker run`,
+# and SQLite's single-writer model cannot take 300k+ files' worth of
+# concurrent writes. Only that mode uses it; the multi-container compose
+# files run their own separate `postgres` service instead.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends nginx \
+    && apt-get install -y --no-install-recommends nginx postgresql \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=frontend-build /app/wcc-frontend/dist ./wcc-frontend/dist
@@ -73,7 +82,11 @@ RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
 RUN mkdir -p /app/data
 
-ENV AUTOSYS_DB_URL=sqlite:///data/autosys.db
+# Overridden by docker-entrypoint.sh once the bundled PostgreSQL is up (client-
+# facing bundle mode); the multi-container compose files override this
+# themselves to point at their own `postgres` service. This default only
+# matters if something reads it before the entrypoint runs.
+ENV AUTOSYS_DB_URL=postgresql+psycopg2://autosys:autosys@localhost:5432/autosys
 VOLUME ["/app/data"]
 
 EXPOSE 9000 8080

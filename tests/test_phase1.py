@@ -22,6 +22,7 @@ import json
 import os
 import tempfile
 from datetime import datetime, date, timedelta, timezone
+from autosys.timeutil import utcnow
 from pathlib import Path
 
 import pytest
@@ -73,21 +74,23 @@ def fresh_db():
 class TestEnums:
 
     def test_job_type_members(self):
-        assert set(JobType) == {
+        # The original members must all still exist (the enum was extended
+        # with every job type code from the vendor job_type doc).
+        assert {
             JobType.BOX, JobType.CMD, JobType.FTP,
             JobType.FILEWATCH, JobType.CONNECT,
             JobType.SAP, JobType.PEOPLESOFT, JobType.INFORMATICA,
             JobType.MICROFOCUS, JobType.WEBSERVICE, JobType.REMOTECMD,
             JobType.WOL, JobType.USERDEFINED,
-        }
+        } <= set(JobType)
 
     def test_job_status_has_17_states(self):
         # Real AutoSys uses integer status codes for DB compatibility
         expected = {1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 99}
         assert {s.value for s in JobStatus} == expected
 
-    def test_event_type_has_15_members(self):
-        assert len(EventType) == 15
+    def test_event_type_has_22_members(self):
+        assert len(EventType) == 22
 
     def test_alarm_type_members(self):
         assert AlarmType.MAX_RUN_ALARM.value == "MAX_RUN_ALARM"
@@ -224,9 +227,13 @@ class TestJobModels:
         )
         assert j.days_of_week == ["mo", "tu", "we", "th", "fr"]
 
-    def test_job_name_pattern_rejects_spaces(self):
+    def test_job_name_outside_pdf_charset_is_accepted(self):
+        # real estates contain such names; they are reported, not rejected
+        assert CmdJob(job_name="odd name", job_type="CMD", command="x", machine="m").job_name == "odd name"
+
+    def test_empty_job_name_rejected(self):
         with pytest.raises(Exception):
-            CmdJob(job_name="bad name", job_type="CMD", command="x", machine="m")
+            CmdJob(job_name="", job_type="CMD", command="x", machine="m")
 
     def test_default_status_is_inactive(self):
         j = parse_job({"job_name": "x", "job_type": "BOX"})
@@ -240,7 +247,7 @@ class TestJobModels:
 class TestJobRunModel:
 
     def test_duration_seconds_none_when_not_finished(self):
-        r = JobRun(job_name="my_job", start_time=datetime.utcnow())
+        r = JobRun(job_name="my_job", start_time=utcnow())
         assert r.duration_seconds is None
 
     def test_duration_seconds_computed(self):
@@ -341,7 +348,7 @@ class TestAlarmModel:
             job_name="failing_job",
             alarm_type="ALARM_IF_FAIL",
             message="Job failed after 3 retries",
-            raised_at=datetime.utcnow(),
+            raised_at=utcnow(),
         )
         assert a.is_active is True
 
@@ -350,8 +357,8 @@ class TestAlarmModel:
             job_name="failing_job",
             alarm_type="MAX_RUN_ALARM",
             message="Job exceeded 120 min",
-            raised_at=datetime.utcnow(),
-            cleared_at=datetime.utcnow(),
+            raised_at=utcnow(),
+            cleared_at=utcnow(),
             cleared_by="ops_team",
         )
         assert a.is_active is False
@@ -361,7 +368,7 @@ class TestAlarmModel:
             job_name="j",
             alarm_type="ALARM_IF_FAIL",
             message="x",
-            raised_at=datetime.utcnow(),
+            raised_at=utcnow(),
         )
         assert len(a.alarm_id) == 36
 

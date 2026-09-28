@@ -1,4 +1,51 @@
+# Local-source compose file — builds all three images from this checkout.
+# Three separate containers (api / wcc / web-nginx) talking over the Docker
+# network; this is what `nginx.conf` (not `nginx.bundled.conf`) is for.
+#
+#   docker compose up -d --build
+#
+# Then open http://localhost:8080
+#
+# Other ways to run this project with Docker:
+#   docker-compose.dist.yml     — same 3-container layout, pulls prebuilt
+#                                  images from GHCR instead of building.
+#   docker-compose.offline.yml  — same layout again, from `docker load`-ed
+#                                  local images (no registry/source needed).
+#   `docker run <image>` (no command, no compose file at all) — the single
+#                                  all-in-one container built from the
+#                                  `runtime` Dockerfile stage; see
+#                                  docker-entrypoint.sh and nginx.bundled.conf.
+#                                  That path still defaults to SQLite (no
+#                                  separate DB container to run alongside a
+#                                  one-line `docker run`); this compose file's
+#                                  api/wcc point at the postgres service below.
+#
+# Joined to Shinro's `shinro` Docker network (see Shinro's own
+# docker-compose.yml, bottom of the api service / networks section) so the
+# two stacks can reach each other by container-network hostname. Start
+# Shinro's stack first -- it owns and creates the `shinro` network -- then
+# bring this one up. The api service (port 9000) is additionally reachable
+# as `autosys-sim` on that shared network (kept distinct from Shinro's own
+# `api` service name to avoid a DNS alias collision); point Shinro's
+# SIMULATOR_URL at http://autosys-sim:9000.
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${AUTOSYS_DB_USER:-autosys}
+      POSTGRES_PASSWORD: ${AUTOSYS_DB_PASSWORD:-autosys}
+      POSTGRES_DB: ${AUTOSYS_DB_NAME:-autosys}
+    volumes:
+      - autosys-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTOSYS_DB_USER:-autosys}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - shinro
+
   api:
     build:
       context: .
@@ -10,10 +57,17 @@ services:
     volumes:
       - autosys-data:/app/data
     environment:
-      AUTOSYS_DB_URL: sqlite:///data/autosys.db
+      AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
       AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+    networks:
+      shinro:
+        aliases:
+          - autosys-sim
 
   wcc:
     build:
@@ -24,10 +78,15 @@ services:
     volumes:
       - autosys-data:/app/data
     environment:
-      AUTOSYS_DB_URL: sqlite:///data/autosys.db
+      AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
     depends_on:
-      - api
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
+    networks:
+      - shinro
 
   web:
     build:
@@ -40,6 +99,17 @@ services:
       - api
       - wcc
     restart: unless-stopped
+    networks:
+      - shinro
 
 volumes:
   autosys-data:
+  autosys-pgdata:
+
+networks:
+  # Owned by Shinro's own docker-compose.yml (`name: shinro`, driver: bridge).
+  # Start that stack (or `docker network create shinro`) before this one --
+  # `external: true` means compose will not create it, only attach to it.
+  shinro:
+    external: true
+    name: shinro

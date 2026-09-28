@@ -14,6 +14,10 @@ const ACTION_COLOR: Record<string, string> = {
   DELETED:  '#CC0000',
   OK:       '#0055A5',
   MACHINE:  '#6A0DAD',
+  // "SKIPPED" covers both a quarantined (unreadable) stanza and a few other
+  // parsed-but-not-applicable cases (an override delete with nothing stored
+  // to cancel, etc) -- n_quarantined/n_warnings above say which, in bulk.
+  SKIPPED:  '#B8860B',
 };
 
 // webkitdirectory/directory aren't in React's HTMLInputElement typings, but
@@ -23,9 +27,16 @@ const FOLDER_INPUT_PROPS = {
   directory: 'true',
 } as unknown as React.InputHTMLAttributes<HTMLInputElement>;
 
+// This loop is one sequential HTTP round-trip per file from the browser tab
+// -- fine for a handful of files, but it does not scale to a real migration
+// (no resumability, no batching) and it stops the moment the tab closes.
+// Past this many files, steer people at the CLI's `jil import-dir` instead,
+// which is the tested bulk path (proven at 600k jobs / ~160k files).
+const BULK_CLI_THRESHOLD = 200;
+
 interface FolderFileResult {
   name: string;
-  status: 'pending' | 'ok' | 'error';
+  status: 'pending' | 'ok' | 'warn' | 'error';
   detail: string;
 }
 
@@ -121,7 +132,7 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
     const results: FolderFileResult[] = folderFiles.map(f => ({ name: f.name, status: 'pending', detail: '' }));
     setFolderResults([...results]);
 
-    let ok = 0, failed = 0;
+    let ok = 0, failed = 0, quarantinedTotal = 0, warningsTotal = 0;
     let anyRealSuccess = false;
     for (let i = 0; i < folderFiles.length; i++) {
       try {
@@ -130,10 +141,15 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
         if (res.success) {
           ok++;
           if (!dryRun) anyRealSuccess = true;
+          quarantinedTotal += res.n_quarantined;
+          warningsTotal += res.n_warnings;
           results[i] = {
             name: folderFiles[i].name,
-            status: 'ok',
-            detail: `+${res.n_inserted} ~${res.n_updated} -${res.n_deleted}${res.n_machines ? ` 🖥${res.n_machines}` : ''}`,
+            status: (res.n_quarantined > 0 || res.n_warnings > 0) ? 'warn' : 'ok',
+            detail: `+${res.n_inserted} ~${res.n_updated} -${res.n_deleted}`
+              + `${res.n_machines ? ` 🖥${res.n_machines}` : ''}`
+              + `${res.n_quarantined ? ` ⛔${res.n_quarantined} quarantined` : ''}`
+              + `${res.n_warnings ? ` ⚠${res.n_warnings} warning${res.n_warnings !== 1 ? 's' : ''}` : ''}`,
           };
         } else {
           failed++;
@@ -149,9 +165,16 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
     }
 
     setFolderRunning(false);
+    // ok/failed alone hides quarantined stanzas -- a file with a bad stanza
+    // still reports "ok" (the request succeeded, most of the file didn't).
+    const flags = [
+      quarantinedTotal ? `⛔ ${quarantinedTotal} stanza${quarantinedTotal !== 1 ? 's' : ''} quarantined` : '',
+      warningsTotal ? `⚠ ${warningsTotal} loaded with a warning` : '',
+    ].filter(Boolean).join(', ');
     showToast(
-      `${dryRun ? 'Dry-run' : 'Import'} complete: ${ok} ok, ${failed} failed`,
-      failed ? 'error' : 'success'
+      `${dryRun ? 'Dry-run' : 'Import'} complete: ${ok} ok, ${failed} failed`
+        + (flags ? ` — ${flags} (see the per-file rows for which)` : ''),
+      failed || quarantinedTotal ? 'error' : warningsTotal ? 'info' : 'success'
     );
     if (anyRealSuccess) onImported();
   };
@@ -228,6 +251,19 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
               </label>
             </div>
 
+            {folderFiles.length > BULK_CLI_THRESHOLD && (
+              <div style={{
+                marginTop: 8, padding: '6px 10px', borderRadius: 3,
+                background: '#FFF6E5', border: '1px solid #F0C36D', fontSize: 11, color: '#7A5B00',
+              }}>
+                ⚠ {folderFiles.length} files is a lot to import one HTTP request at a time from this
+                tab — it will be slow and won't resume if the tab closes. For a real migration, run{' '}
+                <code>autosys jil import-dir &lt;folder&gt;</code> from the CLI instead: it batches
+                commits and archives every file/stanza the same way, and is what this simulator has
+                actually been tested at scale with (600k jobs / ~160k files).
+              </div>
+            )}
+
             {folderFiles.length > 0 && (
               <>
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
@@ -251,6 +287,7 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
                           <td>
                             {r.status === 'pending' && <span style={{ color: '#AAA' }}>…</span>}
                             {r.status === 'ok' && <span style={{ color: '#00A650' }}>✓ {r.detail}</span>}
+                            {r.status === 'warn' && <span style={{ color: '#B8860B' }}>⚠ {r.detail}</span>}
                             {r.status === 'error' && <span style={{ color: '#CC0000' }}>✗ {r.detail}</span>}
                           </td>
                         </tr>
@@ -314,7 +351,28 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
                       </>
                     )}
                     {result.n_machines > 0 && <span style={{ color: ACTION_COLOR.MACHINE }}>🖥 {result.n_machines} machines</span>}
+                    {result.n_warnings > 0 && <span style={{ color: '#B8860B' }}>⚠ {result.n_warnings} loaded with a warning</span>}
+                    {result.n_quarantined > 0 && <span style={{ color: '#CC0000' }}>⛔ {result.n_quarantined} quarantined</span>}
                   </div>
+                  {/* success=true only means the request didn't fail outright -- a
+                      stanza can still be quarantined or loaded with a warning within
+                      it, so that needs its own, separate, harder-to-miss notice. */}
+                  {(result.n_quarantined > 0 || result.n_warnings > 0) && (
+                    <div style={{
+                      marginBottom: 6, padding: '6px 10px', borderRadius: 3,
+                      background: '#FFF6E5', border: '1px solid #F0C36D', fontSize: 11, color: '#7A5B00',
+                    }}>
+                      {result.n_quarantined > 0 && (
+                        <div>⛔ {result.n_quarantined} stanza{result.n_quarantined !== 1 ? 's' : ''} could not
+                          be read as JIL and {result.n_quarantined !== 1 ? 'were' : 'was'} quarantined (archived
+                          verbatim, not imported) — see the row(s) below.</div>
+                      )}
+                      {result.n_warnings > 0 && (
+                        <div>⚠ {result.n_warnings} stanza{result.n_warnings !== 1 ? 's' : ''} loaded with
+                          something imperfect worth checking — see the row(s) below.</div>
+                      )}
+                    </div>
+                  )}
                   <table className="wcc-table" style={{ fontSize: 11 }}>
                     <thead>
                       <tr><th>Job Name</th><th>Type</th><th>Action</th></tr>

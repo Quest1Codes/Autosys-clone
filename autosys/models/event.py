@@ -57,6 +57,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -89,6 +90,12 @@ class Event(BaseModel):
     * ``sendevent -E JOB_OFF_HOLD -J <job>``        →  EventType.JOB_OFF_HOLD
     * ``sendevent -E JOB_ON_ICE -J <job>``          →  EventType.JOB_ON_ICE
     * ``sendevent -E JOB_OFF_ICE -J <job>``         →  EventType.JOB_OFF_ICE
+    * ``sendevent -E JOB_ON_NOEXEC -J <job>``       →  EventType.JOB_ON_NOEXEC
+    * ``sendevent -E JOB_OFF_NOEXEC -J <job>``      →  EventType.JOB_OFF_NOEXEC
+    * ``sendevent -E MACH_ONLINE -N <machine>``     →  EventType.MACH_ONLINE
+    * ``sendevent -E MACH_OFFLINE -N <machine>``    →  EventType.MACH_OFFLINE
+    * ``sendevent -E DELETEJOB -J <job>``           →  EventType.DELETEJOB
+    * ``sendevent -E STOP_DEMON``                   →  EventType.STOP_DEMON
 
     Validation summary (enforced by ``@model_validator``)
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -279,7 +286,7 @@ class Event(BaseModel):
     # ------------------------------------------------------------------
 
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp at which this event was inserted into the queue. "
             "The EPS processes events in strict ascending ``created_at`` order, "
@@ -364,7 +371,7 @@ class Event(BaseModel):
             An empty ``global_value`` is legal (it clears the variable), but
             it must be explicitly set to ``""`` rather than left as ``None``.
 
-        STARTJOB, FORCE_STARTJOB, KILLJOB, HOLD_JOB, JOB_OFF_HOLD,
+        STARTJOB, FORCE_STARTJOB, KILLJOB, JOB_ON_HOLD, HOLD_JOB, JOB_OFF_HOLD,
         JOB_ON_ICE, JOB_OFF_ICE
             ``job_name`` must be provided because these events target a
             specific job.  The EPS will 404 anyway if the job doesn't exist,
@@ -413,14 +420,29 @@ class Event(BaseModel):
             EventType.FORCE_STARTJOB.value,
             EventType.KILLJOB.value,
             EventType.HOLD_JOB.value,
+            EventType.JOB_ON_HOLD.value,
             EventType.JOB_OFF_HOLD.value,
             EventType.JOB_ON_ICE.value,
             EventType.JOB_OFF_ICE.value,
+            EventType.JOB_ON_NOEXEC.value,
+            EventType.JOB_OFF_NOEXEC.value,
+            EventType.DELETEJOB.value,
         }:
             if not self.job_name:
                 raise ValueError(
                     f"{event_type_val} event requires 'job_name' to be set. "
                     "Example: job_name='ETL_LOAD_SALES'"
+                )
+
+        elif event_type_val in {
+            EventType.MACH_ONLINE.value,
+            EventType.MACH_OFFLINE.value,
+        }:
+            if not self.job_name:
+                raise ValueError(
+                    f"{event_type_val} event requires the target machine name "
+                    "(passed as 'job_name' — MACH_* events have no separate "
+                    "machine column). Example: job_name='etl-server-01'"
                 )
 
         elif self.event_type == EventType.COMMENT:

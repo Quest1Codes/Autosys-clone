@@ -1,0 +1,3014 @@
+[
+{
+"line": 8619,
+"txt": "insert_machine: localhost definition. By default, the localhost value"
+},
+{
+"line": 10762,
+"txt": " insert_job: testjob1\n command: echo hello\n machine: localhost\n owner\n :user1"
+},
+{
+"line": 11746,
+"txt": " insert_job: test_unbalanced_qte\n job_type: cmd\n command: \"echo hello wall\n machine: local_machine\n owner: autosys\n permission:\n std_out_file: /tmp/$AUTO_JOB_NAME.out\n std_err_file: /tmp/$AUTO_JOB_NAME.err"
+},
+{
+"line": 12846,
+"txt": " insert_job: dep_job\n condition: s(job1) and s(job1@RMT)"
+},
+{
+"line": 13485,
+"txt": " override_job: over\n command: echo 'test'"
+},
+{
+"line": 13953,
+"txt": " insert_job: test_forecast\n job_type: CMD\n command: echo \"Wrong forecast\"\n machine: localhost\n date_conditions: 1\n exclude_calendar: test_exc_cal"
+},
+{
+"line": 19814,
+"txt": "  insert_xinst: WAE\n  xtype: e\n  xmanager: WAEEMGR\n  xmachine: WAEEHOST\n  xport: 12345\n  xcrypt_type: NONE\n  xcomm_alias: ACE_SCH_ALIAS"
+},
+{
+"line": 19827,
+"txt": "  insert_xinst: WAE\n  xtype: e\n  xmanager: WAEEMGR\n  xmachine: WAEEHOST\n  xcomm_alias: ACE_SCH_ALIAS\n  xport: 12345\n  xkey_to_manager: 0x012345678901234567890ABCDEFABCDEF\n  xcrypt_type: AES"
+},
+{
+"line": 19975,
+"txt": "  insert_machine: ZOS\n  type: a\n  opsys: zos\n  port: 9680\n  node_name: PRODTSO\n  agent_name: PRODTSO\n  encryption_type: NONE\n  character_code: EBCIDIC"
+},
+{
+"line": 19989,
+"txt": "  insert_job: ABC_job\n  job_type: ZOSM\n  machine: zosagent\n  zos_jobname: ABC\n  owner: zosuser\n  auth_string: zosuser"
+},
+{
+"line": 20000,
+"txt": "  insert_job: zos_job\n  job_type: ZOS\n  owner: zosuser\n  machine: zosagent\n  jcl_library: CYBDL01.JCLLIB\n  jcl_member: CYBDL01A"
+},
+{
+"line": 20122,
+"txt": " insert_machine: remote_host\n type: u"
+},
+{
+"line": 20130,
+"txt": " insert_machine: remote_host\n type: c"
+},
+{
+"line": 20149,
+"txt": "  insert_xinst: ACE\n  xtype: a\n xmachine: remote\\:9000"
+},
+{
+"line": 20157,
+"txt": "  insert_xinst: EE1\n  xtype: e\n  xmachine: ZOS1"
+},
+{
+"line": 20170,
+"txt": "  insert_xinst: CA7\n  xtype: u\n  xmachine: remote3"
+},
+{
+"line": 20186,
+"txt": "  insert_job: ca7_job1\n  owner: MIKEW@CA72XXX\n  command: CA7JOBNM\n machine: remote_host *\n date_conditions: 1\n days_of_week: all\n start_mins: 25"
+},
+{
+"line": 20200,
+"txt": "  insert_job: ca7_job1\n  command: auto_cnct -a remote_host -j CA7JOBNM -s CA7 -c RUN -d\n machine: remote_host *\n date_conditions: 1\n days_of_week: all\n start_mins: 25"
+},
+{
+"line": 20221,
+"txt": "  insert_job: test_dep1\n  command: sleep 100\n condition: success(JB5MINS^RMT)\n machine: local_host\n insert_job: test_dep2\n command: sleep 100\n condition: success(JB5HRS^RMT)\n machine: local_host"
+},
+{
+"line": 20239,
+"txt": "  insert_job: CA7job4\n  command: auto_cnct -a remote_host -j ASYS7002 -s CA7 -c RUN -d\n machine: remote_host\n condition: success(JB5HRS^RMT)"
+},
+{
+"line": 20297,
+"txt": "     insert_job: JOBB\n     owner: master\n    machine: MAINF\n    type: c\n    condition: success(JOBA)\n    command: auto_cnct -a MAINF -c RUN -j JOBC -s CA7 -d"
+},
+{
+"line": 20387,
+"txt": "  insert_job: JOBD\n  owner: master\n machine: autosys\n type: c\n condition: success(JOBC^ACE)\n command: sleep 10"
+},
+{
+"line": 21818,
+"txt": "  insert_job: service_desk_on_failure_1\n  machine: localhost\n command: false\n owner: user@localhost\n service_desk: y\n svcdesk_pri: 1\n svcdesk_desc: “service_desk_on_failure_1 has failed.”\n EXIT"
+},
+{
+"line": 21836,
+"txt": "  insert_job: service_desk_on_failure_2\n  machine: localhost\n command: false\n owner: user@localhost\n service_desk: y\n svcdesk_imp: 3\n svcdesk_sev: 4\n svcdesk_desc: “service_desk_on_failure_2 has failed.”\n  EXIT"
+},
+{
+"line": 25287,
+"txt": "  insert_job: test_install\n  machine: localhost\n  command: /bin/echo “AUTOSYS install test”\n  std_out_file: /tmp/test_install.out\n  std_err_file: /tmp/test_install.err"
+},
+{
+"line": 25632,
+"txt": "    insert_machine: sales"
+},
+{
+"line": 25950,
+"txt": " insert_machine: sysagt"
+},
+{
+"line": 25955,
+"txt": " insert_machine: eagle\n type: a\n agent_name: WA_AGENT\n node_name: myagenthostname\n port: 49154\n max_load: 100\n factor: 1.0"
+},
+{
+"line": 26043,
+"txt": " insert_job: i5job_runcmd\n job_type: I5\n machine: i5agent\n i5_name: CALC"
+},
+{
+"line": 26050,
+"txt": " insert_job: UNIXjob_runcmd\n job_type: CMD\n machine: unixagent\n command: \"/usr/bin/sleep\" 1\n owner: autosys@unixagent"
+},
+{
+"line": 26059,
+"txt": " insert_job: WINjob_runcmd\n job_type: CMD\n machine: winagent\n command: \"C:\\sleep.exe\" 1\n owner: autosys@winagent"
+},
+{
+"line": 31254,
+"txt": "     insert_machine: scheduler_machine_name\n     node_name: address\n      type: type"
+},
+{
+"line": 31289,
+"txt": "  insert_job: h1\n  job_type: C\n  command: ls\n  machine: localhost\n  owner: root@localhost"
+},
+{
+"line": 31304,
+"txt": "  insert_machine: prod\n  type: a"
+},
+{
+"line": 33745,
+"txt": " insert_job: aswinjob\n job_type: CMD\n owner: sched@winagenthost\n machine: winagenthost\n command: my_command"
+},
+{
+"line": 46495,
+"txt": "  update_machine: machine3\n  agent_name: WA_MACH3\n  node_name: machine3\n  encryption_type: AES\n  key_to_agent: 0x000102030405060708090A0B0C0D0E0Fl"
+},
+{
+"line": 46675,
+"txt": "  update_machine: machine1\n  agent_name: WA_MACH2"
+},
+{
+"line": 47876,
+"txt": " insert_machine: zagent113\n type: a\n opsys: zos\n port: 7520\n encryption_type: NONE\n character_code: EBCDIC"
+},
+{
+"line": 48817,
+"txt": "    insert_job: service_desk_on_failure_1\n    machine: localhost\n    command: false\n    owner: user@localhost\n    service_desk: y\n    svcdesk_pri: 1\n    svcdesk_desc: “service_desk_on_failure_1 has failed.”"
+},
+{
+"line": 48828,
+"txt": "    insert_job: service_desk_on_failure_2\n    machine: localhost\n    command: false\n    owner: user@localhost\n    service_desk: y\n    svcdesk_imp: 3\n    svcdesk_sev: 4\n    svcdesk_desc: “service_desk_on_failure_2 has failed.”"
+},
+{
+"line": 49745,
+"txt": " insert_xinst: AC2\n xtype: a\n xmachine: machine2\n xcrypt_type: AES\n xkey_to_manager: 0x0102030405060708090A0B0C0D0E0F10\n xport: 9002\n insert_xinst: AC3\n xtype: a\n xmachine: machine3\n xcrypt_type: NONE\n xport: 9003"
+},
+{
+"line": 49759,
+"txt": " insert_xinst: AC1\n xtype: a\n xmachine: machine1\n xcrypt_type: NONE\n xport: 9001"
+},
+{
+"line": 49766,
+"txt": " insert_xinst: AC1\n xtype: a\n xmachine: machine1\\:9001"
+},
+{
+"line": 49785,
+"txt": " insert_xinst: ACE\n xtype: a\n xmachine: machineA,machineB\n xcrypt_type: AES\n xkey_to_manager: 0102030405060708090A0B0C0D0E0F10\n xport: 9000"
+},
+{
+"line": 50191,
+"txt": "     insert_xinst: external_instance_name\n     xtype: e\n     xmachine: host_name\n     xcrypt_type : NONE\n     xmanager: manager_name\n     xport: port_number"
+},
+{
+"line": 50208,
+"txt": "     insert_xinst: external_instance_name\n     xtype: e\n     xmachine: host_name\n     xcrypt_type: AES\n     xmanager: manager_name\n     xport: port_number\n     xkey_to_manager: key /* For AES encryption only */"
+},
+{
+"line": 51058,
+"txt": "     insert_machine: remote3\n     type: c"
+},
+{
+"line": 51078,
+"txt": "      insert_xinst: SE7\n      xtype: c\n      xmachine: remote3"
+},
+{
+"line": 51087,
+"txt": "     insert_job: SE_job1\n     job_type: CMD\n     command: SE7JOBNM\n     machine: remote3 *\n     date_conditions: 1\n     days_of_week: all\n     start_mins: 25"
+},
+{
+"line": 51102,
+"txt": "     insert_job: SE_job2\n     job_type: CMD\n     command: auto_cnct -a remote3 -j SE7JOBNM -s CA7 -c RUN -d\n     machine: remote3 *\n     date_conditions: 1\n     days_of_week: all\n     start_mins: 25"
+},
+{
+"line": 51123,
+"txt": "      insert_job: test_dep1\n      job_type: CMD\n      command: sleep 100\n      condition: success(JB5MINS^RMT)\n      machine: remote3\n      insert_job: test_dep2\n      job_type: CMD\n      command: sleep 100\n      condition: success(JB5HRS^RMT)\n      machine: remote3"
+},
+{
+"line": 51144,
+"txt": "      insert_job: SEjob4\n      job_type: CMD\n      command: auto_cnct -a remote3 -j ASYS7002 -s CA7 -c RUN -d\n      machine: remote3\n      condition: success(JB5HRS^RMT)"
+},
+{
+"line": 51402,
+"txt": "     insert_machine: host_name\n     type: machine_type"
+},
+{
+"line": 51452,
+"txt": "  insert_job: as400ji\n  owner: bob@ZASYS400\n  machine: ZASYS400\n  command: DLYJOB DLY(16)"
+},
+{
+"line": 52082,
+"txt": "     insert_machine: cluster_machine_name\n     node_name: cluster_host_name\n     agent_name: common_agent_name\n     port: common_agent_port"
+},
+{
+"line": 53618,
+"txt": "    insert_job: email_job_1\n    machine: localhost\n    job_type: c\n    command: as_test -t 2\n    send_notification:1\n    notification_emailaddress:admin@example.com\n    notification_msg:\"email_job_1 has completed\""
+},
+{
+"line": 53628,
+"txt": "    insert_job: email_job_fails\n    machine: localhost\n    job_type: c\n    command: as_test -t 2 -e 2\n    send_notification:F\n    notification_emailaddress:admin@example.com\n    notification_msg:\"email_job_fails has failed\""
+},
+{
+"line": 53639,
+"txt": "    insert_job: email_job_2\n    machine: localhost\n    job_type: c\n    command: as_test -t 2\n    send_notification: y\n    notification_template: emailtemplate\n    notification_emailaddress: terminate@example.com\n    notifcation_emailaddress_on_terminate: admin@example.com"
+},
+{
+"line": 59101,
+"txt": "    insert_view: view_name attributes"
+},
+{
+"line": 59177,
+"txt": "  insert_view: East-Accounting\n  insert_filter: AE1\n  view: East-Accounting\n  filter: job_name like EAcct%"
+},
+{
+"line": 59253,
+"txt": "     delete_view: view_name"
+},
+{
+"line": 59260,
+"txt": "    delete_view: SampleView"
+},
+{
+"line": 59371,
+"txt": "    delete_filter: server_name"
+},
+{
+"line": 59389,
+"txt": " delete_filter: autosys-nc3\n view: SampleView"
+},
+{
+"line": 59407,
+"txt": "  insert_alert_policy: policy_name attributes"
+},
+{
+"line": 59530,
+"txt": "  insert_alert_policy: FailedJobs\n  job_status: Failure\n  alarm_type: JOBFAILURE, STARTJOBFAIL\n  job_name: *\n  severity: High\n  server: AS1, AS2\n  status: OPEN, ACKNOWLEDGED\n  active: true"
+},
+{
+"line": 59667,
+"txt": "     delete_alert_policy:policy_name"
+},
+{
+"line": 59674,
+"txt": "    delete_alert_policy: JobFailure"
+},
+{
+"line": 61016,
+"txt": " insert_alert_policy: “\n alarm_type: “\n job_name: “\n severity: HIGH\n status: OPEN,ACKNOWLEDGED\n system_log: false\n active: false"
+},
+{
+"line": 61025,
+"txt": " insert_alert_policy: ‘View1-Default Alert Filter=ABC’\n job_status: TERMINATED\n job_name: A?\n severity: CRITICAL\n status: OPEN,ACKNOWLEDGED, CLOSED\n system_log: false\n url_link: “http:ABC”\n url_name: ABC\n text: ABC\n active: false"
+},
+{
+"line": 61037,
+"txt": " insert_view: View1\n render_flow: true\n render_collections: true\n render_jobs: true\n job_columns: job_name,status,box_name,server,start_time,end_time\n alert_columns: alert,alert_type,severity,status,server,job,create_time,status_time"
+},
+{
+"line": 64293,
+"txt": " insert_machine: lowgate\n type: a\n # Example of Jobs\n insert_job: Nightly_Download\n job_type: box\n date_conditions: yes\n days_of_week: all\n start_times: \"02:00\"\n insert_job: Watch_4_file\n job_type: ft\n box_name: Nightly_Download\n watch_file: /DOWNLOAD/MAINFRAME/SALES.RAW\n watch_file_type: generate\n watch_no_change: 1\n machine: lowgate\n    insert_job: filter_data\n    job_type: cmd\n    box_name: Nightly_Download\n    condition: success(Watch_4_file)\n    command: filter_mainframe_info\n    machine: lowgate\n    std_in_file: /DOWNLOAD/MAINFRAME/SALES.RAW\n    insert_job: parse_data\n    job_type: cmd\n    box_name: Nightly_Download\n    condition: success(filter_data)\n    machine: lowgate\n    command: isql -U mutt -P jeff\n    std_in_file: /DOWNLOAD/MAINFRAME/SALES.SQL\n    std_out_file: /LOG/parse_data.out\n    std_err_file: /LOG/LOG/parse_data.err"
+},
+{
+"line": 64373,
+"txt": "insert_machine: localhost definition."
+},
+{
+"line": 64490,
+"txt": " insert_machine: jaguar\n type: n\n max_load: 100\n factor: 1.0"
+},
+{
+"line": 64497,
+"txt": " insert_machine: jaguar\n type: r\n max_load: 100\n factor: 1.0"
+},
+{
+"line": 64508,
+"txt": " insert_machine: cheetah\n type: a\n opsys: windows\n insert_machine: lily\n type: a\n opsys: windows\n insert_machine: giraffe\n type: v\n machine: cheetah\n max_load: 400\n factor: 5.0\n machine: lily\n max_load: 15\n factor: 2"
+},
+{
+"line": 64540,
+"txt": " insert_machine: lion\n type: n\n max_load: 100\n factor: 1\n insert_machine: lotus\n type: n\n max_load: 80\n factor: .8\n insert_machine: gorilla\n type: v\n machine: lion\n max_load: 10\n machine: lotus\n max_load: 9"
+},
+{
+"line": 64559,
+"txt": " insert_machine: warthog\n opsys: linux\n insert_machine: camel\n insert_machine: sheep\n type: v\n machine: warthog\n machine: camel"
+},
+{
+"line": 64579,
+"txt": "    insert_machine: lion\n    type: r\n    max_load: 100\n    factor: 1\n    insert_machine: lotus\n    type: r\n    max_load: 80\n    factor: .9\n    insert_machine: zebra\n    type: v\n    machine: lion\n    machine: lotus"
+},
+{
+"line": 64601,
+"txt": "    delete_machine: name_of_real_machine"
+},
+{
+"line": 64622,
+"txt": "    delete_machine: jaguar"
+},
+{
+"line": 64636,
+"txt": " delete_machine: carnivores\n machine: hyena\n delete_machine: hyena"
+},
+{
+"line": 64648,
+"txt": " delete_machine: panther\n remove_references: y"
+},
+{
+"line": 64663,
+"txt": " delete_machine: gorilla"
+},
+{
+"line": 64691,
+"txt": " delete_machine: virtual_machine_name\n machine: real_machine_name_referenced"
+},
+{
+"line": 64703,
+"txt": " delete_machine: sheep\n machine: camel"
+},
+{
+"line": 65138,
+"txt": "  insert_machine: marmot\n  machine: cheetah\n  factor: 1\n  machine: hippogriff\n  factor: .8\n  machine: camel\n  factor: .3"
+},
+{
+"line": 65208,
+"txt": "      insert_machine: sloth\n    insert_machine: tiger\n    insert_machine: leopard\n    insert_machine: domain\n    type: v\n    machine: sloth\n    machine: tiger\n    machine: leopard"
+},
+{
+"line": 65220,
+"txt": "      insert_resource: job_weight\n     res_type: r\n     machine: sloth\n     amount: 2\n     insert_resource: job_weight\n     res_type: r\n     machine: tiger\n    amount: 10\n    insert_resource: job_weight\n    res_type: r\n    machine: leopard\n    amount: 30"
+},
+{
+"line": 65243,
+"txt": "     insert_job: quick_job\n    machine: domain\n    command: efficient_report\n    resources: (job_weight,quantity=1,free=y)\n    insert_job: heavy_job\n    machine: domain\n    command: analytical_report\n    resources: (job_weight,quantity=5,free=y)\n    insert_job: beastly_job\n    machine: domain\n    command: quarterly_update\n    resources: (job_weight,quantity=10,free=y)"
+},
+{
+"line": 65278,
+"txt": "     insert_resource: ren_glb1\n     res_type: R\n     amount: 10"
+},
+{
+"line": 65289,
+"txt": "     insert_job: job_load\n     job_type: CMD\n     command: sleep 1\n     machine: DCAPOOL\n     owner: autosys\n     date_condition: 0\n     alarm_if_fail: 1\n     resources: (ren_glb1, quantity=2, free=y) and (MEM_INUSE_PCT, VALUE=30, VALUEOP=LTE)"
+},
+{
+"line": 65601,
+"txt": " insert_job: jobA\n machine: lion\n job_load: 80\n priority: 1\n insert_job: jobB\n machine: lion\n job_load: 90\n priority: 1"
+},
+{
+"line": 65623,
+"txt": " insert_machine: cheetah\n max_load: 80\n insert_job: JobA\n machine: cheetah\n job_load: 50\n priority: 70\n insert_job: JobB\n machine: cheetah\n job_load: 50\n priority: 50\n insert_job: JobC\n machine: cheetah\n job_load: 30\n priority: 60\n insert_job: JobD\n machine: cheetah\n job_load: 30\n priority: 80"
+},
+{
+"line": 65672,
+"txt": " insert_machine: cheetah_printQ\n machine: cheetah max_load: 15"
+},
+{
+"line": 65680,
+"txt": " insert_job: Print1\n machine: cheetah_printQ\n job_load: 15\n priority: 1\n insert_job: Print2\n machine: cheetah_printQ\n job_load: 15\n priority: 1\n insert_job: Print3\n machine: cheetah_printQ\n job_load: 15\n priority: 2"
+},
+{
+"line": 65734,
+"txt": " insert_machine: printQ\n type: v\n machine: cheetah\n max_load: 15\n machine: camel\n max_load: 15"
+},
+{
+"line": 65777,
+"txt": " insert_job: run_free\n machine: '/usr/local/bin/pick_free_mach'\n command: $HOME/DEL_STUFF"
+},
+{
+"line": 66150,
+"txt": " insert_job: test_run\n job_type: CMD /* This attribute is optional for Command jobs. CMD is the default. */\n machine: unixagent\n command: /bin/touch /tmp/test_run.out"
+},
+{
+"line": 66277,
+"txt": " delete_job: test_run"
+},
+{
+"line": 66337,
+"txt": " insert_job: jobA\n job_type: CMD\n machine: unixagent\n command: /bin/touch /tmp/test_run.out\n owner: prod@unixagent"
+},
+{
+"line": 66352,
+"txt": " update_job: jobA\n owner: newprod@unixagent"
+},
+{
+"line": 66496,
+"txt": " insert_job: cpu_monitoring_used\n job_type: OMCPU\n machine: unixagent\n lower_boundary: 70\n cpu_usage: USED\n inside_range: TRUE\n monitor_mode: CONTINUOUS"
+},
+{
+"line": 66516,
+"txt": " insert_job: cpu_monitoring_used_wait\n job_type: OMCPU\n machine: unixagent\n lower_boundary: 70\n cpu_usage: USED\n inside_range: TRUE\n monitor_mode: WAIT"
+},
+{
+"line": 67144,
+"txt": "    update_job: test_run\n    date_conditions: y\n    days_of_week: mo, we, fr\n    start_times: \"10:00, 14:00\""
+},
+{
+"line": 67232,
+"txt": " insert_job: EOD_post\n job_type: cmd\n machine: prod\n condition: success(EOD_watch)\n command: $HOME/POST"
+},
+{
+"line": 67273,
+"txt": "    insert_job: test_sample_04\n    machine: localhost\n    command: sleep 10\n    condition: success(test_sample_01,12.00) AND failure(test_sample_02,24.00) AND success(test_samp"
+},
+{
+"line": 67364,
+"txt": " override_job: RunData\n condition: NULL\n std_out_file: \"tmp\\SpecialRun.out\""
+},
+{
+"line": 67374,
+"txt": " override_job: RunData\n condition: NULL\n std_out_file: \"C:\\tmp\\SpecialRun.out\""
+},
+{
+"line": 67386,
+"txt": " override_job: RunData delete"
+},
+{
+"line": 67723,
+"txt": "    insert_job: test_must_start_complete\n    command: /opt/StartTransactions.sh\n    machine: localhost\n    date_conditions: y\n    days_of_week: all\n    start_times: \"10:00, 11:00, 12:00\"\n    must_start_times: \"10:02, 11:02, 12:02\"\n    must_complete_times: \"10:08, 11:08, 12:08\""
+},
+{
+"line": 67761,
+"txt": " insert_job: job3\n command: echo \"hello\"\n machine: localhost\n date_conditions: y\n days_of_week: all\n start_times: \"12:00\"\n must_start_times: \"34:10\"\n must_complete_times: \"34:12\""
+},
+{
+"line": 67819,
+"txt": " insert_job: test_must_start_complete\n job_type: CMD\n machine: localhost\n command: /opt/StartTransactions.sh\n date_conditions: y\n days_of_week: all\n start_times: \"10:00, 11:00, 12:00\"\n must_start_times: +3\n must_complete_times: +8"
+},
+{
+"line": 67849,
+"txt": " insert_job: test_must_start_complete\n job_type: CMD\n machine: localhost\n command: /opt/StartTransactions.sh\n date_conditions: y\n days_of_week: all\n start_mins: 10, 20, 30, 40, 50, 00\n must_start_times: +2\n must_complete_times: +7"
+},
+{
+"line": 68826,
+"txt": "    insert_connectionprofile: conn_name\n    connectionprofile_type: conn_type\n    description: texthadoop_edgenode: edgenodename\n    hadoop_edgenode_port: SSH_port\n    hadoop_binpath: path_to_CLI\n    hadoop_hdfs_namenode: nodename\n    hadoop_oozie_server_url: location\n    hadoop_hive_jdbcurl: hive_jdbc_url\n    hadoop_hive_driverclass: hive_driverclass\n    hadoop_sqoop_jdbcurl: sqoop_jdbc_url\n    hadoop_sqoop_driverclass: sqoop_driverclass\n    exit\n     conn_name"
+},
+{
+"line": 68903,
+"txt": " insert_connectionprofile: conn1\n connectionprofile_type: HADOOP\n hadoop_edgenode: HADOOP_EDGE_NODE\n hadoop_edgenode_port: 22\n hadoop_binpath: /usr/bin\n hadoop_hdfs_namenode: \"hdfs://HADOOP_EDGE_NODE:8020\"\n hadoop_oozie_server_url: \"http://HADOOP_EDGE_NODE:11000/oozie\"\n hadoop_hive_jdbcurl: \"jdbc:hive2://HADOOP_EDGE_NODE:10000\"\n hadoop_hive_driverclass: org.apache.hive.jdbc.HiveDriver\n hadoop_sqoop_jdbcurl: \"jdbc:sqlserver://\n DATABASE_SERVER_MACHINE:1433\\;databaseName=SAMPLE\"\n hadoop_sqoop_driverclass: com.microsoft.sqlserver.jdbc.SQLServerDriver"
+},
+{
+"line": 68925,
+"txt": " insert_connectionprofile: conn2\n connectionprofile_type: HADOOP\n hadoop_edgenode: HADOOP_EDGE_NODE"
+},
+{
+"line": 68931,
+"txt": " update_connectionprofile: conn1\n hadoop_binpath: /user/root/bin"
+},
+{
+"line": 68937,
+"txt": " update_connectionprofile: conn2\n hadoop_oozie_server_url: \"http://HADOOP_EDGE_NODE:11000/oozie\""
+},
+{
+"line": 68942,
+"txt": " delete_connectionprofile: conn1"
+},
+{
+"line": 68945,
+"txt": " delete_connectionprofile: conn2\n force: Y"
+},
+{
+"line": 69142,
+"txt": "     insert_job : Job1\n     command : wrappers/mssql_call.bat --operation=RunJob --UserName=sa --\n     Password=0C6C30073DF47232 --JobName=SqlJob --StepName=Step1 --TargetDB=master --\n     ServerName=mssqlserver --Domain=mydomain\n     machine : sqlagent\n    insert_job : Job2\n    command : wrappers/mssql_call.bat --operation=RunJob --JobID=308C3291-2917-4A92-9A4D-\n    F6B6D89E5AD8 --Track=Y\n    machine : sqlagent\n    description : Autosys Job with SQL Job ID"
+},
+{
+"line": 69449,
+"txt": " insert_job: create\n job_type: ENTYBEAN\n machine: appagent\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n provider_url: \"t3://localhost:7001\"\n bean_name: customer\n create_name: createcustomer\n operation_type: CREATE\n create_parameter: String=\"customerid\", String=\"800-555-0100\""
+},
+{
+"line": 69470,
+"txt": " insert_job: update\n job_type: ENTYBEAN\n machine: appagent\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n provider_url: \"t3://localhost:7001\"\n bean_name: customer\n operation_type: UPDATE\n method_name: changephone\n finder_name: findByPrimaryKey\n finder_parameter: String=\"customerid\"\n modify_parameter: String=\"800-555-0199\""
+},
+{
+"line": 69485,
+"txt": " insert_job: remove\n job_type: ENTYBEAN\n machine: appagent\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n provider_url: \"t3://localhost:7001\"\n bean_name: customer\n operation_type: REMOVE\n finder_name: findByPrimaryKey\n finder_parameter: String=\"customerid\""
+},
+{
+"line": 69960,
+"txt": " insert_job: sample4\n job_type: HTTP\n invocation_type: GET\n machine: localhost\n provider_url: \"http://wabld-linux-itc1.ibn.broadcom.net:8082/vmc/bookstore\"\n compatibility: 12\n success_criteria_regex: \"\\\"author\\\": \\\"Nigel Rees\\\"\""
+},
+{
+"line": 70140,
+"txt": "    insert_job: HTTP.CON_USER\n     job_type: HTTP\n     machine: appagent\n     invocation_type: GET\n     provider_url: \"http://host.example.com/protected\"\n     j2ee_conn_origin: host.example.com\n     j2ee_conn_domain: windows_domain\n     j2ee_conn_user: myuser@windows_domain\n     j2ee_no_global_proxy_defaults: Y\n     j2ee_authentication_order: BASIC,DIGEST,NTLM\n     j2ee_proxy_domain: \"http://host.domain.proxy\"\n     j2ee_proxy_host: proxy.example.com\n     j2ee_proxy_origin_host: \"http://host.origin.proxy\"\n     j2ee_proxy_port: 90\n     j2ee_proxy_user: user01"
+},
+{
+"line": 70306,
+"txt": " insert_job: publish\n job_type: JMSPUB\n machine: appagent\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n provider_url: \"iiop://172.24.0.0:2809\"\n connection_factory: ConnectionFactory\n destination_name: Queue1\n use_topic: FALSE\n message_class: String\n j2ee_parameter: java.lang.String=\"this is my message\"\n j2ee_user: cyberuser@host"
+},
+{
+"line": 70605,
+"txt": " insert_job: query\n job_type: JMXMAG\n machine: appagent\n URL: \"service:jmx:rmi:///jndi/rmi://localhost:9999/server\"\n mbean_name: \"DefaultDomain:index=1,type=Config\"\n mbean_attr: cachesize"
+},
+{
+"line": 70670,
+"txt": " insert_job: change\n job_type: JMXMAS\n machine: appagent"
+},
+{
+"line": 70749,
+"txt": " insert_job: create\n job_type: JMXMC\n machine: appagent"
+},
+{
+"line": 70821,
+"txt": " insert_job: reset\n job_type: JMXMOP\n machine: agent\n URL: \"service:jmx:rmi:///jndi/rmi://localhost:9999/server\"\n mbean_name: \"DefaultDomain:index=1,type=Config\"\n mbean_operation: resetmem\n jmx_parameter: Integer=50"
+},
+{
+"line": 70849,
+"txt": " insert_job: test_JMXMOP2a\n machine: localhost\n job_type: JMXMOP\n url: \"service:jmx:rmi:///jndi/rmi://localhost:9999/server\"\n mbean_name: \"DefaultDomain:type=SimpleStandard,index=1\"\n mbean_operation: reset\n jmx_parameter: String=\"Hello\"\n insert_job: test_JMXMOP2b\n machine: localhost\n job_type: JMXMOP\n url: \"service:jmx:rmi:///jndi/rmi://localhost:9999/server\"\n mbean_name: \"DefaultDomain:type=SimpleStandard,index=1\"\n mbean_operation: reset\n jmx_parameter: String=\"Hello\", payload_job=test_JMXMOP2a\n condition: S(test_JMXMOP2a)"
+},
+{
+"line": 70915,
+"txt": " insert_job: remove\n job_type: JMXMREM\n machine: appagent\n URL: \"service:jmx:rmi:///jndi/rmi://agenttest:5099/jmxserver\"\n mbean_name: \"DefaultDomain:index=CreateIns1,type=cdc.jmx.SimpleDynamic\""
+},
+{
+"line": 70979,
+"txt": " insert_job: change\n job_type: JMXSUB\n machine: agent\n URL: \"service:jmx:rmi:///jndi/rmi://localhost:9999/server\"\n mbean_name: \"DefaultDomain:index=1,type=Config\"\n filter_type: Attributes\n filter: cachesize"
+},
+{
+"line": 70993,
+"txt": " insert_job: change\n job_type: JMXSUB\n machine: appagent\n URL: \"service:jmx:rmi:///jndi/rmi://localhost:9999/server\"\n mbean_name: \"DefaultDomain:index=1,type=Config\"\n    continuous: Y\n    filter_type: Types\n    filter: jmx.attribute.change"
+},
+{
+"line": 71123,
+"txt": " insert_job: ignore\n job_type: POJO\n machine: appagent\n class_name: java.lang.Integer\n method_name: parseInt\n j2ee_parameter: java.lang.String=5"
+},
+{
+"line": 71211,
+"txt": " insert_job: start\n job_type: JAVARMI\n machine: appagent\n remote_name: \"rmi://remotehost/Test\"\n method_name: startserver\n j2ee_parameter: String=\"now\""
+},
+{
+"line": 71327,
+"txt": " insert_job: reverse\n job_type: SESSBEAN\n machine: appagent\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n provider_url: \"corbaloc:iiop://172.24.0.0:2809\"\n bean_name: CybEJBTestBean\n method_name: reverse\n destination_file: \"C:\\Makapt15\"\n j2ee_user: cyberuser\n j2ee_parameter: java.lang.String=\"a23\""
+},
+{
+"line": 71677,
+"txt": "    insert_job: box_a\n    job_type: b\n    box_success: success(job_a)\n    insert_job: job_a\n    box_name: box_a\n    command: sleep 15\n    machine: machine1\n    insert_job: job_b\n    box_name: box_a\n command: sleep 60\n machine: machine1"
+},
+{
+"line": 71718,
+"txt": " insert_job: box_a\n job_type: b\n box_failure: failure(job_c^ACE)\n insert_job: job_a\n box_name: box_a\n command: sleep 60\n machine: machine1\n insert_job: job_b\n box_name: box_a\n command: sleep 300\n machine: machine1"
+},
+{
+"line": 71765,
+"txt": " insert_job: box_a\n job_type: b\n box_success: failure(job_d)\n insert_job: job_a\n box_name: box_a\n command: sleep 60\n machine: machine1\n insert_job: job_b\n box_name: box_a\n command: sleep 300\n machine: machine1\n insert_job: job_d\n command: sleep 5\n machine: machine2"
+},
+{
+"line": 71813,
+"txt": " insert_job: box_a\n job_type: b\n box_failure: v(TEST) = ABC\n insert_job: job_a\n box_name: box_a\n command: sleep 300\n machine: machine\n insert_job: job_b\n box_name: box_a\n command: sleep 600\n machine: machine"
+},
+{
+"line": 72305,
+"txt": "    insert_job: EOD_box\n    job_type: box\n    condition: success(EOD_watch)"
+},
+{
+"line": 72349,
+"txt": " insert_job: HR_payroll\n job_type: cmd"
+},
+{
+"line": 72359,
+"txt": " insert_job: ACCT_salaryreport\n job_type: cmd"
+},
+{
+"line": 72412,
+"txt": " update_job: EOD_post\n box_name: EOD_box"
+},
+{
+"line": 72426,
+"txt": " delete_box: EOD_box"
+},
+{
+"line": 72434,
+"txt": " delete_job: EOD_box"
+},
+{
+"line": 72688,
+"txt": "    insert_job: test_run\n    job_type: CMD /* This attribute is optional for Command jobs. CMD is the default. */\n    machine: winagent\n    command: \"c:\\bin\\test.bat\""
+},
+{
+"line": 72741,
+"txt": "    insert_job: unix_job1\n    job_type: CMD\n    machine: unixagent\n    command: /mfg/test1.csh\n    shell: /bin/csh"
+},
+{
+"line": 72772,
+"txt": "  insert_job: unix_job2\n  job_type: CMD\n  machine: unixagent\n  command: /mfg/test1.csh\n  owner: guest"
+},
+{
+"line": 72782,
+"txt": "  insert_job: edit_file\n  job_type: CMD\n  machine: winagent\n  description: \"Edit/review a configuration file\"\n  command: notepad.exe \"c:\\run_info\\config.txt\"\n  interactive: y"
+},
+{
+"line": 72825,
+"txt": " insert_job: unix_chk\n job_type: CMD\n machine: unixagent\n command: /u1/procrun.sh\n chk_files: /roots 100 /auxfs1 120"
+},
+{
+"line": 72841,
+"txt": " insert_job: win_chk\n job_type: CMD\n machine: winagent\n command: \"C:\\Programs\\Payroll\\pay.exe\"\n chk_files: \"C: 100 D: 120\""
+},
+{
+"line": 72884,
+"txt": " insert_job: cmd_job1\n job_type: CMD\n machine: unixprod\n command: addinfo.sh \"user 1\" 905-555-1212 749"
+},
+{
+"line": 72892,
+"txt": " insert_job: cmd_job2\n job_type: CMD\n machine: winprod\n command: \"c:\\Programs\\Payroll\\pay.exe\" \"C:\\Pay Data\\salary.dat\" \"C:\\Pay Data\n \\benefits.dat\""
+},
+{
+"line": 72916,
+"txt": " insert_job: unix_job\n job_type: CMD\n machine: unixprod\n    command: /home/scripts/pay\n    envvars: NAME=\"user 1\"\n    envvars: JOB=PAYROLL\n    envvars: PWD=/usr/scripts/dailyrun"
+},
+{
+"line": 72944,
+"txt": "    insert_job: cmd_job1\n    job_type: CMD\n    machine: winprod\n    command: \"c:\\cmds\\processrun.exe\"\n    envvars: PATH=\"c:\\windows\\system32\"\n    envvars: TEMP=\"c:\\temp\""
+},
+{
+"line": 73011,
+"txt": "    insert_job: unix_stdin\n    job_type: CMD\n    machine: unixagent\n    command: /usr/common/backup\n    std_in_file: /tmp/test.in\n    std_out_file: /tmp/test.out"
+},
+{
+"line": 73072,
+"txt": " insert_job: test_blob\n job_type: CMD\n machine: unixagent\n command: cat\n blob_file: /blob_input_file.txt\n std_in_file: $$blobt\n owner: produser@unixagent"
+},
+{
+"line": 73089,
+"txt": " insert_job: report_job1\n job_type: CMD\n machine: localhost\n command: myapplication\n std_err_file: $$blobt"
+},
+{
+"line": 73097,
+"txt": " insert_job: report_job1\n job_type: CMD\n machine: localhost\n command: myapplication\n std_out_file: $$blobt"
+},
+{
+"line": 73124,
+"txt": " insert_job: CMDJOB\n job_type: CMD\n machine: winagt\n command: \"c:\\temp\\procjob.exe\"\n fail_codes: 40-50"
+},
+{
+"line": 73163,
+"txt": " insert_job: test_blob\n job_type: CMD\n machine: unixagent\n command: /home/esp/payroll.sh\n success_codes: 100"
+},
+{
+"line": 73217,
+"txt": " insert_job: unix_job\n job_type: CMD\n machine: unixagent\n command: procscript.sh\n owner: jsmith"
+},
+{
+"line": 73226,
+"txt": " insert_job: win_job\n job_type: CMD\n machine: winagent\n command: procscript.bat"
+},
+{
+"line": 73266,
+"txt": " insert_job: unix_job\n job_type: CMD\n machine: unixagent\n command: $MY_PATH/myscript.sh\n owner: jsmith"
+},
+{
+"line": 73309,
+"txt": " insert_job: unix_job\n job_type: CMD\n machine: unixagent\n command: /home/guest/bin/cmd1.ksh\n owner: guest"
+},
+{
+"line": 73364,
+"txt": "    insert_job: cmd_job\n    job_type: CMD\n    machine: unixagent\n    command: /u1/procrun.sh\n    ulimit: c=”100,200”, s=”250,300”, t=”4000,unlimited”, m=”3332,unlimited”"
+},
+{
+"line": 73425,
+"txt": " insert_job: cmd_job\n job_type: CMD\n machine: unixagent\n command: /home/bin/cmd1.sh\n shell: /bin/ksh\n owner: guest\n envvars: ENV=/esp/myenv"
+},
+{
+"line": 73468,
+"txt": " insert_job: cmd_job\n job_type: CMD\n machine: unixagent\n command: /home/guest/bin/cmd1.csh\n envvars: HOME=/home/bin/"
+},
+{
+"line": 73528,
+"txt": "       insert_job: perl_job\n       job_type: CMD\n       machine: unixagent\n       command: /bin/cmd1.pl Hello world\n       shell: /usr/local/bin/perl\n       owner: guest"
+},
+{
+"line": 73584,
+"txt": " insert_job: cmd_job\n job_type: CMD\n machine: winprod\n command: dir \"c:\\temp\\\""
+},
+{
+"line": 73593,
+"txt": " insert_job: cmd_job\n job_type: CMD\n machine: winprod\n command: \"C:\\Windows\\system32\\cmd.exe /C copy C:\\env.txt C:\\test\\env.txt\""
+},
+{
+"line": 73669,
+"txt": " insert_job: exe_job1\n job_type: CMD\n machine: NT20\n command: \\\\CYBNT\\MyDesktop\\notify.cmd\n owner: CYBDOM\\JDOE"
+},
+{
+"line": 73678,
+"txt": " insert_job: exe_job2\n job_type: CMD\n machine: NT30\n command: \\\\CYBNT\\public\\calc.exe\n owner: CYBDOM\\CYBUSER"
+},
+{
+"line": 73689,
+"txt": " insert_job: exe_job3\n job_type: CMD\n machine: NT30\n command: \\\\CYBNT\\C$\\working\\test\n owner: CYBDOM\\admin1"
+},
+{
+"line": 73852,
+"txt": " insert_job: dbmon_add\n job_type: DBMON\n machine: dbagent\n owner: dbuser@MSSQL\n tablename: staff\n monitor_type: INCREASE\n connect_string: \"jdbc:sqlserver://myhost:1433;DatabaseName=ORDERS\""
+},
+{
+"line": 73869,
+"txt": " insert_job: dbmon_job\n job_type: DBMON\n machine: dbagent\n owner: entadm@myhost\n monitor_type: VARIANCE\n tablename: staff\n monitor_cond: NAME='Jonson'"
+},
+{
+"line": 73988,
+"txt": " insert_job: dbtrig_job\n job_type: DBTRIG\n machine: DB_agent\n owner: dbuser@ORA\n dbtype: Oracle\n tablename: emp"
+},
+{
+"line": 73999,
+"txt": " insert_job: dbtrig1\n job_type: DBTRIG\n machine: DB_agent\n trigger_type: DELETE,INSERT\n tablename: stores\n dbtype: MSSQL\n owner: sa@myhost\n connect_string:\"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\""
+},
+{
+"line": 74025,
+"txt": " insert_job: dbtrig2\n job_type: DBTRIG\n machine: DB_agent\n dbtype: Oracle\n trigger_type: DELETE\n tablename: emp\n owner: scott@orcl\n connect_string: \"jdbc:oracle:thin:@myhost:1521:orcl\""
+},
+{
+"line": 74038,
+"txt": " insert_job: dbtrig_ora\n job_type: DBTRIG\n machine: dbagent\n dbtype: Oracle\n trigger_type: DELETE,INSERT\n tablename: emp\n owner: scott@orcl\n connect_string:\"jdbc:oracle:thin:@myhost:1521:orcl\""
+},
+{
+"line": 74051,
+"txt": "     insert_job: dbtrig_delete\n     job_type: DBTRIG\n     machine: dbagent\n     dbtype: Oracle\n     trigger_type: DELETE\n     trigger_cond: old.deptno=75\n     tablename: emp\n     owner: scott@orcl"
+},
+{
+"line": 74062,
+"txt": "     insert_job: dbtrig_insert\n     job_type: DBTRIG\n     machine: dbagent\n     dbtype: Oracle\n     trigger_type: INSERT\n     trigger_cond: new.ename like 'g%%'\n    tablename: emp\n    owner: scott@orcl\n    connect_string:\"jdbc:oracle:thin:@myhost:1521:orcl\""
+},
+{
+"line": 74117,
+"txt": " insert_job: dbtrig_sqlsvr\n job_type: DBTRIG\n machine: dbagent\n dbtype: MSSQL\n owner: sa@myhost\n connect_string: \"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\"\n tablename: sales\n trigger_type: UPDATE\n trigger_cond: UPDATE(ord_date) and UPDATE(qty)"
+},
+{
+"line": 74151,
+"txt": " insert_job: dbtrig4\n job_type: DBTRIG\n machine: DB_agent\n dbtype: MSSQL\n trigger_type: DELETE\n tablename: sales\n owner: sa@myhost\n connect_string:\"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\""
+},
+{
+"line": 74191,
+"txt": " insert_job: dbtrig_db2\n job_type: DBTRIG\n machine: dbagent\n dbtype: DB2\n owner: entadm@myhost\n connect_string:\"jdbc:db2://172.31.255.255:50000/SAMPLE\"\n tablename: STAFF\n dbtype: DB2\n trigger_type: UPDATE"
+},
+{
+"line": 74211,
+"txt": " insert_job: db_sqltrig_upd\n job_type: DBTRIG\n machine: localhost\n dbtype: Sybase\n connect_string: \"jdbc:sybase:Tds:myhost:5001/APDB\"\n trigger_type: UPDATE\n tablename: ap_invoices\n owner: admin@myhost"
+},
+{
+"line": 74303,
+"txt": " insert_job: sp_default\n job_type: DBPROC\n machine: DB_agent\n owner: dbuser@dbhost\n sp_name: calcproc"
+},
+{
+"line": 74312,
+"txt": " insert_job: sp1_job\n job_type: DBPROC\n machine: DB_agent\n owner: sa\n sp_name: byroyalty\n sp_arg: name=percentage, argtype=IN, datatype=INTEGER, value=40\n connect_string:\"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\""
+},
+{
+"line": 74346,
+"txt": " insert_job: sp2_job\n job_type: DBPROC\n machine: DB_agent\n sp_name: EMPLOY\n sp_arg: name=f_name, argtype=IN, datatype=VARCHAR, value=John\n sp_arg: name=l_name, argtype=IN, datatype=VARCHAR, value=Doe\n sp_arg: name=pubid, argtype=OUT, datatype=CHAR\n owner: sa\n connect_string:\"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\""
+},
+{
+"line": 74391,
+"txt": " insert_job: deptmed\n job_type: DBPROC\n machine: DB_agent\n sp_name: ENTADM.DEPT_MEDIAN\n sp_arg: name=deptNumber, argtype=IN, datatype=SMALLINT, value=20\n sp_arg: name=medianSalary, argtype=OUT, datatype=DOUBLE\n owner: entadm\n connect_string:\"jdbc:db2://172.31.255.255:50000/SAMPLE\""
+},
+{
+"line": 74477,
+"txt": " insert_job: deletejob\n job_type: SQL\n machine: DB_agent\n sql_command: DELETE FROM stores WHERE stor_id='6523'\n owner: scott@orcl"
+},
+{
+"line": 74491,
+"txt": " insert_job: deletejob\n job_type: SQL\n machine: DB_agent\n sql_command: DELETE FROM EMP WHERE ENAME='robert'\n owner: scott@orcl\n connect_string:\"jdbc:oracle:thin:@myhost:1521:orcl\""
+},
+{
+"line": 74517,
+"txt": " insert_job: updatejob\n job_type: SQL\n machine: DB_agent\n sql_command: UPDATE EMP SET SAL=75000 where ENAME='robert'\n owner: scott@orcl\n connect_string:\"jdbc:oracle:thin:@myhost:1521:orcl\""
+},
+{
+"line": 74577,
+"txt": " insert_job: deletejob\n job_type: SQL\n machine: DB_agent\n sql_command: DELETE FROM stores WHERE stor_id='6523'\n owner: sa@myhost\n connect_string:\"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\""
+},
+{
+"line": 74593,
+"txt": " insert_job: updatejob\n job_type: SQL\n machine: DB_agent\n sql_command: UPDATE sales SET ord_date='6/15/2006', qty=10 WHERE ord_num='6871'\n owner: sa@myhost\n connect_string:\"jdbc:sqlserver://myhost:1433;DatabaseName=pubs\""
+},
+{
+"line": 74647,
+"txt": " insert_job: insertjob\n job_type: SQL\n machine: DB_agent\n sql_command: INSERT INTO stores(stor_id, stor_name, stor_address, city, state, zip) VALUES('6523\n owner: sa@myhost\n connect_string:\"jdbc:sybase:Tds:myhost:5001/APDB\""
+},
+{
+"line": 74664,
+"txt": " insert_job: deletejob\n job_type: SQL\n machine: DB_agent\n sql_command: DELETE FROM stores WHERE stor_id='6523'\n owner: sa@myhost\n connect_string:\"jdbc:sybase:Tds:myhost:5001/APDB\""
+},
+{
+"line": 74682,
+"txt": " insert_job: updatejob\n job_type: SQL\n machine: DB_agent\n sql_command: UPDATE sales SET ord_date='6/15/2006', qty=10 WHERE ord_num='6871'\n owner: sa@myhost\n connect_string:\"jdbc:sybase:Tds:myhost:5001/APDB\""
+},
+{
+"line": 74720,
+"txt": " insert_job: updatejob\n job_type: SQL\n machine: DB_agent\n sql_command: UPDATE ENTADM.STAFF SET YEARS=3 where NAME=\"Jonson\"\n owner: entadm@myhost\n connect_string:\"jdbc:db2://172.31.255.255:50000/SAMPLE\""
+},
+{
+"line": 74729,
+"txt": " insert_job: deletejob\n job_type: SQL\n machine: DB_agent\n sql_command: DELETE FROM ENTADM.STAFF where NAME=\"Jonson\"\n owner: entadm@myhost\n connect_string:\"jdbc:db2://172.31.255.255:50000/SAMPLE\""
+},
+{
+"line": 74803,
+"txt": " insert_job: QRY1\n job_type: SQL\n machine: dbagent\n owner: dbuser1@myhost\n user_role: as sysdba\n sql_command: SELECT * from NEWORDS\n connect_string: \"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\""
+},
+{
+"line": 74897,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: unixagt\n watch_file: /tmp/batch.input\n watch_file_type: EXIST"
+},
+{
+"line": 74911,
+"txt": " insert_job: ft_unix_size\n job_type: FT\n machine: unixagt\n watch_file: /data/test\n watch_file_type: EXPAND\n watch_file_change_type: SIZE\n watch_file_change_value: 100"
+},
+{
+"line": 74998,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: ftagt\n watch_file: \"c:\\data\\monthly.log\"\n watch_file_type: CREATE"
+},
+{
+"line": 75007,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: ftagt\n watch_file: \"c:\\data\\monthly.log\"\n watch_file_type: GENERATE\n watch_no_change: 2"
+},
+{
+"line": 75023,
+"txt": " insert_job: ftjob\n job_type: FT\n machine: ftagt\n watch_file: /usr/data/pay*\n watch_file_type: DELETE\n continuous: Y"
+},
+{
+"line": 75033,
+"txt": " insert_job: ft_unix_delta\n job_type: FT\n machine: unixagt\n watch_file: /credit/record\n watch_file_type: EXPAND\n watch_file_change_type: DELTA\n watch_file_change_value: 200000\n watch_no_change: 30"
+},
+{
+"line": 75045,
+"txt": " insert_job: ft_unix_notexist\n job_type: FT\n machine: unixagt\n watch_file: /start/term/vacation\n watch_file_type: NOTEXIST"
+},
+{
+"line": 75054,
+"txt": " insert_job: ft_unix_shrink\n job_type: FT\n machine: unixagt\n watch_file: /cash/items/distribute\n watch_file_type: SHRINK\n watch_file_change_type: SIZE\n watch_file_change_value: 1000"
+},
+{
+"line": 75074,
+"txt": "    insert_job: ft_unix_update\n    job_type: FT\n    machine: unixagt\n    watch_file: \"/usr/data/*\"\n    watch_file_type: UPDATE\n    watch_file_recursive: Y\n    watch_no_change: 30"
+},
+{
+"line": 75110,
+"txt": "    insert_job: ft_unix_nochange\n    job_type: FT\n    machine: unixagt\n    watch_file: /research/analysis\n    watch_file_type: EXPAND\n    watch_file_change_type: SIZE\n watch_file_change_value: 1\n watch_no_change: 120"
+},
+{
+"line": 75233,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: ftagt\n watch_file: /usr/data/payroll\n watch_file_type: CREATE\n watch_file_owner: JDOE\n watch_no_change: 30"
+},
+{
+"line": 75254,
+"txt": " insert_job: ft_unixgroup\n job_type: FT\n machine: unixagent\n watch_file: /data/payroll.dat\n watch_file_type: EXIST\n watch_file_groupname: ACCTS"
+},
+{
+"line": 75323,
+"txt": "    insert_job: ft_job\n    job_type: FT\n    machine: unixagt\n watch_file: $MY_PATH/reports/august2011.out\n watch_file_type: EXIST"
+},
+{
+"line": 75363,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: unixagt\n watch_file: $MY_PATH/reports/august2011.out\n watch_file_type: EXIST\n owner: jsmith"
+},
+{
+"line": 75422,
+"txt": " insert_job: ft_remotefile\n job_type: FT\n machine: winagent\n watch_file: \\\\CYBNT\\AccountingFiles\\payroll.dat\n watch_file_type: UPDATE\n watch_file_win_user: CYBDOM\\JSMITH@CYBDOM"
+},
+{
+"line": 75512,
+"txt": " insert_job: fw_job\n job_type: FW\n machine: winagent\n watch_file: “c:\\tmp\\watch_file.log”\n watch_file_min_size: 10000\n watch_interval: 90"
+},
+{
+"line": 75676,
+"txt": " insert_job: FTPT1A\n job_type: FTP\n machine: ftpagent\n ftp_server_name: 172.16.0.0\n ftp_server_port: 21\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: A\n ftp_remote_name: /u1/ftpdata/textfile\n ftp_local_name: \"c:\\ftpfiles\"\n owner: ftpuser@172.16.0.0"
+},
+{
+"line": 75689,
+"txt": " insert_job: FTPBINARY\n job_type: FTP\n machine: unixagent\n ftp_server_name: hpunix\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: B\n ftp_remote_name: /u1/qatest/ftpdata/binaryfile\n ftp_local_name: /export/home/qatest/ftpdata/transf.bin\n owner: test@hpunix"
+},
+{
+"line": 75710,
+"txt": "    insert_job: EBCDIC_FILE\n    job_type: FTP\n    machine: I5AGENT\n    ftp_server_name: i5agent\n    ftp_server_port: 5222\n    ftp_transfer_direction: DOWNLOAD\n    ftp_transfer_type: E\n    ftp_remote_name: /QSYS.LIB/DATALIB.LIB/DATAFILE.FILE/DATA.MBR\n    ftp_local_name: /QSYS.LIB/ESPLIB.LIB/DOWNLOAD.FILE/DATA.MBR\n    owner: test@i5agent"
+},
+{
+"line": 75725,
+"txt": "    insert_job: FTP_REMOTE\n    job_type: FTP\n    machine: unixagent\n    ftp_server_name: 172.16.0.0\n    ftp_server_port: 123\n    ftp_transfer_direction: UPLOAD\n    ftp_transfer_type: A\n    ftp_remote_name: \"/C:/Temp/textfile\"\n    ftp_local_name: /export/home/ftpfiles/ftpdata/textfile\n    owner: test@172.16.0.0"
+},
+{
+"line": 75789,
+"txt": "    insert_job: DOWNLOAD_SINGLE\n    job_type: FTP\n    machine: RAGENT\n    ftp_server_name: hprsupp\n    ftp_server_port: 5222\n    ftp_transfer_direction: DOWNLOAD\n    ftp_transfer_type: A\n    ftp_remote_name: /u1/files/ftpdata/textfile\n    ftp_local_name: /export/home/ftpfiles/ftpdata/textfile_dn/textfile\n    owner: testuser@hprsupp"
+},
+{
+"line": 75841,
+"txt": " insert_job:FTP_UPLOAD\n job_type: FTP\n machine: winagent\n owner: user1@winserver\n ftp_server_name: winserver\n ftp_server_port: 21\n ftp_transfer_direction: UPLOAD"
+},
+{
+"line": 75870,
+"txt": " insert_job: FTP_DOWNLOAD\n job_type: FTP\n machine: winagent\n owner: user1@hpunix\n ftp_server_name: hpunix\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_use_SSL: FALSE\n ftp_remote_name: /files_to_download/filename.txt\n ftp_local_name: \"d:\\downloaded_files\\filename.txt\""
+},
+{
+"line": 75913,
+"txt": " insert_job: FTPJOB\n job_type: FTP\n machine: ftpagent\n ftp_server_name: aixunix\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_compression: 3\n ftp_remote_name: /files_to_download/largefile.txt\n ftp_local_name: \"c:\\downloaded_files\\largefile.txt\"\n owner: ftpuser@aixunix"
+},
+{
+"line": 75961,
+"txt": " insert_job: CYBJK.FTP\n job_type: FTP\n machine: ftpagent\n ftp_server_name: ftp.ca.com\n ftp_server_port: 21\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: B\n ftp_compression: 8\n ftp_remote_name: /pub/cazip.exe\n ftp_local_name: /tmp/bla\n ftp_command: locsite blksize=FB\n ftp_command: locsite automount\n owner: user1@ftp.ca.com"
+},
+{
+"line": 76157,
+"txt": " insert_job: HDFS_TOUCH_JOB\n job_type: HDFS\n machine: HADOOPAI\n hadoop_hdfs_type: TOUCH\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_path: /tmp/file1\n connectionprofile: conn1"
+},
+{
+"line": 76169,
+"txt": " insert_job: HDFS_MKDIR_JOB\n job_type: HDFS\n machine: HADOOPAI\n hadoop_hdfs_type: MKDIR\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_path: /HDFS_PRT_DIR/HDFS_DIR\n hadoop_hdfs_create_parentdir: true\n connectionprofile: conn1"
+},
+{
+"line": 76182,
+"txt": " insert_job: HDFS_REMOVE_JOB\n job_type: HDFS\n machine: HADOOPAI\n hadoop_hdfs_type: REMOVE\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_skiptrash: true\n hadoop_hdfs_recursive: true\n hadoop_hdfs_path: /tmp/path1\n hadoop_hdfs_path: tmp/path2, ../../path3\n hadoop_hdfs_path: \"/tmp/path 4\", /tmp/path5\n connectionprofile: conn1"
+},
+{
+"line": 76198,
+"txt": " insert_job: HDFS_COPY_JOB\n job_type: HDFS\n machine: HADOOPAI\n hadoop_hdfs_type: COPY\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_source: /tmp/path4, /test/path2\n hadoop_hdfs_destination: /tmp/path5\n hadoop_hdfs_overwrite: true\n connectionprofile: conn1"
+},
+{
+"line": 76219,
+"txt": " insert_job: HDFS_COPYFROMLOCAL_JOB\n job_type: HDFS\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_type: COPYFROMLOCAL\n hadoop_hdfs_source: /tmp/file/path2\n hadoop_hdfs_destination: /tmp/dir/path5\n hadoop_hdfs_overwrite: 1\n hadoop_hdfs_preserve_status: true\n connectionprofile: conn1"
+},
+{
+"line": 76234,
+"txt": " insert_job: HDFS_COPYTOLOCAL_JOB\n job_type: HDFS\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_type: COPYTOLOCAL\n hadoop_hdfs_source: /tmp/file/path3\n hadoop_hdfs_destination: /tmp/dir/path6\n hadoop_hdfs_preserve_status:\n  true\n connectionprofile: conn1"
+},
+{
+"line": 76249,
+"txt": " insert_job: HDFS_MOVEFROMLOCAL_JOB\n job_type: HDFS\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hdfs_type: MOVEFROMLOCAL\n hadoop_hdfs_source: /tmp/file/path2\n hadoop_hdfs_destination: /tmp/dir/path7\n connectionprofile: conn1"
+},
+{
+"line": 76351,
+"txt": " insert_job: OOZIE_JOB\n job_type: OOZIE\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_oozie_cfgfile: /tmp/oozie/workflow.job.properties\n hadoop_pollinterval: 20\n connectionprofile: conn1"
+},
+{
+"line": 76442,
+"txt": " insert_job: HIVE_JOB\n job_type: HIVE\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_hive_initfile: /tmp/initfile\n hadoop_hive_configparams: mapred.job.queue.name=default\n hadoop_hive_scriptfile: /tmp/apps/hive/script.q\n hadoop_hive_variables: VAR1=/tmp/examples/input-data/table, VAR2=/tmp/examples/output-\n data/hive\n hadoop_hive_additional_params: --color=true\n hadoop_hive_user: user1@token\n hadoop_pollinterval: 20\n connectionprofile: conn1"
+},
+{
+"line": 76594,
+"txt": " insert_job: SQOOP_EXPORT_JOB\n job_type: SQOOP\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_sqoop_type: EXPORT\n hadoop_sqoop_jdbcuser: jdbcuser@token\n hadoop_sqoop_source: /tmp/sqoop/input/output_data\n hadoop_sqoop_additional_params: --outdir /tmp/sqoop/output\n hadoop_sqoop_jdbctable: TABLE_NAME\n hadoop_sqoop_columns: COLUMN1, COLUMN2\n hadoop_sqoop_nullstring: UNDEF\n hadoop_sqoop_nullnonstring: UNDEF\n hadoop_sqoop_clearstagingtable: 1\n hadoop_sqoop_stagingtable: tmp_results_updated\n hadoop_pollinterval: 20\n connectionprofile: conn1"
+},
+{
+"line": 76696,
+"txt": " insert_job: PIG_JOB\n job_type: PIG\n machine: HADOOPAI\n owner: user1@HADOOP_EDGE_NODE\n hadoop_pig_parameterfile: /tmp/pig/pig_paramfile.txt\n hadoop_pig_propertyfile: /tmp/pig/pig_job.properties\n hadoop_pig_scriptfile: /tmp/pig/run_pig.pig\n hadoop_pig_additional_params: --color=true\n connectionprofile: conn1"
+},
+{
+"line": 76846,
+"txt": "    insert_job: i5job_runcmd\n    job_type: I5\n    machine: i5agent\n    i5_name: DSPJOBLOG"
+},
+{
+"line": 76854,
+"txt": "    insert_job: i5job_lib\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n    i5_name: MFGDATA\n    i5_lib: PRODJOBS"
+},
+{
+"line": 76899,
+"txt": "    insert_job: i5job_lib\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n    i5_name: PAYLOAD\n    i5_job_queue: /QYS.LIB/QBASE.LIB/JQUEUE.JOBQ"
+},
+{
+"line": 76924,
+"txt": "    insert_job: i5job_lib\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n i5_name: PAYJOB\n i5_params: ABC 1 P \"VALUE C\" X r"
+},
+{
+"line": 76996,
+"txt": " insert_job: i5job_lib\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: PAYJOB\n i5_others: PRTDEV=*JOBD,OUTQ=*JOBD"
+},
+{
+"line": 77070,
+"txt": " insert_job: i5job_returnOPM\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: PAYROLL\n i5_cc_exit: *PROGRAM"
+},
+{
+"line": 77080,
+"txt": " insert_job: i5job_returnC\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: SALARY\n i5_cc_exit: *USER\n success_codes: 1,10"
+},
+{
+"line": 77121,
+"txt": " insert_job: i5job_succ\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: PAYPROG\n i5_cc_exit: *PROGRAM\n success_codes: 1,100"
+},
+{
+"line": 77132,
+"txt": " insert_job: i5job_fail\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: RECPROG\n i5_cc_exit: *PROGRAM\n fail_codes: 40\n success_codes: 50-255"
+},
+{
+"line": 77168,
+"txt": " insert_job: i5job_lda\n job_type: I5\n machine: i5agent\n i5_action: COMMAND\n i5_name: IVP\n i5_lda: x'abcd'"
+},
+{
+"line": 77250,
+"txt": " insert_job: informatica\n job_type: INFORMATICA\n machine: 160_infor\n owner: root@informatica\n informatica_folder_name: FSTL\n informatica_workflow_name: WF_1\n informatica_pass_on_success: 1\n informatica_task_name: copy"
+},
+{
+"line": 77342,
+"txt": " insert_job: mf_job_by_content\n job_type: MICROFOCUS\n    machine: mfagent\n    mf_server_address_type: ADDRESS\n    mf_server: \"tcp:172.31.255.255:2222\"\n    mf_jcl_type: CONTENT\n    mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\""
+},
+{
+"line": 77369,
+"txt": "    insert_job: mf_job_by_reference\n    job_type: MICROFOCUS\n    machine: mfagent\n    mf_server_address_type: NAME\n    mf_server: mfprod\n    mf_jcl_type: REFERENCE\n    mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\"\n    mf_user: MFUSER01@mfprod"
+},
+{
+"line": 77430,
+"txt": "    insert_job: mf_job_with_version_jes3\n    job_type: MICROFOCUS\n    machine: mfagent\n    mf_server_address_type: NAME\n    mf_server: mfprod\n    mf_jcl_type: REFERENCE\n    mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\"\n    mf_version: JES3"
+},
+{
+"line": 77480,
+"txt": " insert_job: mf_job_with_envars\n job_type: MICROFOCUS\n machine: mfagent\n mf_server_address_type: NAME\n mf_server: mfprod\n mf_jcl_type: CONTENT\n mf_jcl_name: \"C:\\Program Files\\microfocus\\es-jcldemo\\mfprog.jcl\"\n mf_user: MFUSER01@mfprod\n envvars: VAR1=SORT\n envvars: VAR2=MAX"
+},
+{
+"line": 77589,
+"txt": " insert_job: omcpu_job\n job_type: OMCPU\n machine: unixagent\n monitor_mode: NOW"
+},
+{
+"line": 77599,
+"txt": " insert_job: omcpu_job\n job_type: OMCPU\n machine: unixagent\n lower_boundary: 50"
+},
+{
+"line": 77615,
+"txt": "    insert_job: omcpu_job\n    job_type: OMCPU\n    machine: unixagent\n    cpu_usage: FREE\n    inside_range: TRUE\n    poll_interval: 60\n    monitor_mode: CONTINUOUS\n    lower_boundary: 75\n    upper_boundary: 95"
+},
+{
+"line": 77676,
+"txt": "    insert_job: omcpu_job\n    job_type: OMCPU\n    machine: winagent\n    cpu_usage: USED\n    inside_range: TRUE\n    monitor_mode: WAIT\n    lower_boundary: 80\n    upper_boundary: 95"
+},
+{
+"line": 77694,
+"txt": "    insert_job: omcpu_job\n    job_type: OMCPU\n    machine: unixagent\n    lower_boundary: 20\n    upper_boundary: 80\n    inside_range: FALSE\n    cpu_usage: USED"
+},
+{
+"line": 77831,
+"txt": "    insert_job: unix_freemb\n    job_type: OMD\n    machine: unixagent\n    disk_drive: /export/home\n    disk_format: MB\n    monitor_mode: NOW"
+},
+{
+"line": 77843,
+"txt": "    insert_job: omd_job\n    job_type: OMD\n    machine: unixagent\n    disk_drive: /export/home\n    lower_boundary: 50"
+},
+{
+"line": 77853,
+"txt": "    insert_job: unix_used\n    job_type: OMD\n    machine: unixagent\n    disk_drive: /export/home\n    disk_space: USED\n    disk_format: PERCENT\n    monitor_mode: CONTINUOUS\n    lower_boundary: 90"
+},
+{
+"line": 77897,
+"txt": "    insert_job: omd_win\n    job_type: OMD\n    machine: winagent\n    disk_drive: C\n    disk_format: PERCENT\n    lower_boundary: 16\n    upper_boundary: 95\n    inside_range: FALSE\n    disk_space: USED"
+},
+{
+"line": 77966,
+"txt": " insert_job: win_used\n job_type: OMD\n machine: winagent\n disk_drive: C\n disk_format: PERCENT\n disk_space: USED\n monitor_mode: WAIT\n lower_boundary: 16\n upper_boundary: 95\n inside_range: FALSE"
+},
+{
+"line": 77998,
+"txt": " insert_job: i5_used\n job_type: OMD\n machine: i5agent\n disk_drive: /\n disk_space: USED\n disk_format: PERCENT\n monitor_mode: CONTINUOUS\n lower_boundary: 90\n upper_boundary: 100"
+},
+{
+"line": 78025,
+"txt": " insert_job: omd_job\n job_type: OMD\n machine: winagent\n disk_drive: C\n disk_space: FREE\n disk_format: KB\n lower_boundary: 35000000\n upper_boundary: 36000000\n inside_range: TRUE\n no_change: 100\n monitor_mode: CONTINUOUS"
+},
+{
+"line": 78125,
+"txt": " insert_job: omip_job\n job_type: OMIP\n machine: monagt\n ip_host: myhost\n ip_status: STOPPED\n monitor_mode: WAIT"
+},
+{
+"line": 78134,
+"txt": " insert_job: omip_stop\n job_type: OMIP\n machine: SYSAG\n ip_host: APPARCL\n monitor_mode: WAIT"
+},
+{
+"line": 78179,
+"txt": "    insert_job: omip_job\n    job_type: OMIP\n    machine: monagt\n    ip_host: 172.31.255.255\n    ip_port: 7510\n    monitor_mode: NOW\n    ip_status: RUNNING"
+},
+{
+"line": 78221,
+"txt": " insert_job: omip_job\n job_type: OMIP\n machine: SYSAG\n ip_host: 172.24.2.20\n ip_port: 9401\n ip_status: RUNNING\n monitor_mode: NOW"
+},
+{
+"line": 78281,
+"txt": "    insert_job: omp_unix\n    job_type: OMP\n    machine: unixagt\n    process_name: nlnotes\n    monitor_mode: WAIT"
+},
+{
+"line": 78290,
+"txt": "    insert_job: omp_unix\n    job_type: OMP\n    machine: unixagt\n    process_name: 2568\n    process_status: RUNNING\n    monitor_mode: WAIT"
+},
+{
+"line": 78326,
+"txt": " insert_job: omp_win\n job_type: OMP\n machine: winagt\n process_name: \"c:\\Program files\\Web_Server\\server.exe\"\n process_status: RUNNING\n monitor_mode: WAIT"
+},
+{
+"line": 78350,
+"txt": " insert_job: mon_sql_server_instance1\n job_type: OMP\n machine: mssqlserver\n process_name: \"C:\\Program Files\\Microsoft SQL Server\\MSSQL.1\\MSSQL\\Binn\\sqlservr.exe\"\n process_status: stopped\n monitor_mode: wait\n insert_job: mon_sql_server_instance2\n job_type: OMP\n machine: mssqlserver\n process_name: \"C:\\Program Files\\Microsoft SQL Server\\MSSQL.2\\MSSQL\\Binn\\sqlservr.exe\"\n process_status: stopped\n monitor_mode: wait"
+},
+{
+"line": 78387,
+"txt": " insert_job: omp_i5_onejob\n job_type: OMP\n machine: i5agt\n process_name: 123456/PROD/APPLPGM\n process_status: RUNNING\n monitor_mode: NOW"
+},
+{
+"line": 78405,
+"txt": " insert_job: omp_i5\n job_type: OMP\n machine: i5agt\n process_name: *ALL/JDOE/CALC*\n process_status: STOPPED\n monitor_mode: WAIT"
+},
+{
+"line": 78468,
+"txt": " insert_job: textfile_job\n job_type: OMTF\n machine: monagt\n text_file_name: /export/home/logs/transactions.log\n text_file_filter: ERROR MESSAGE"
+},
+{
+"line": 78484,
+"txt": "    insert_job: textfile_job1\n    job_type: OMTF\n    machine: monagt\n    text_file_name: \"c:\\program files\\agent\\log\"\n    text_file_filter: ERROR MESSAGE\n    text_file_mode: LINE\n    lower_boundary: 1234\n    upper_boundary: 1876\n    monitor_mode: NOW"
+},
+{
+"line": 78523,
+"txt": "    insert_job: omtf_unix_line\n    job_type: OMTF\n machine: monagt\n text_file_name: /export/home/systemagent/agentparm.txt\n text_file_filter: \\.0/MAIN$\n text_file_mode: REGEX\n lower_boundary: \\Aagent\n upper_boundary: level=2\\Z\n monitor_mode: NOW"
+},
+{
+"line": 78555,
+"txt": " insert_job: textfile_job\n job_type: OMTF\n machine: monagt\n text_file_name: /export/home/logs/transactions.log\n text_file_filter: ERROR MESSAGE\n text_file_mode: LINE\n lower_boundary: 1\n upper_boundary: 50\n encoding: ISO-8859-1\n monitor_mode: NOW"
+},
+{
+"line": 78630,
+"txt": "    insert_job: omtf_line\n    job_type: OMTF\n    machine: monagt\n    text_file_name: \"c:\\ca\\log\"\n    text_file_filter: ERROR MESSAGE\n text_file_mode: LINE\n lower_boundary: 143\n monitor_mode: NOW"
+},
+{
+"line": 78661,
+"txt": " insert_job: omtf_regex\n job_type: OMTF\n machine: monagt\n text_file_name: \"c:\\ca\\log\"\n text_file_filter: ARCHIVE\n text_file_mode: REGEX\n upper_boundary: service\n monitor_mode: NOW"
+},
+{
+"line": 78684,
+"txt": " insert_job: omtf_timedate\n job_type: OMTF\n machine: monagt\n text_file_name: /export/home/logs/transmitter.log\n text_file_filter: transmitted\n text_file_mode: DATETIME\n lower_boundary: \"Thu May 20 00:00:00.000 EDT 2010\"\n upper_boundary: \"Thu May 27 23:59:59.999 EDT 2010\"\n time_format: \"EEE MMM dd HH:mm:ss.SSS zzz yyyy\"\n time_position: 12\n monitor_mode: NOW"
+},
+{
+"line": 78717,
+"txt": " insert_job: textfile_job\n job_type: OMTF\n machine: monagt\n text_file_name: /export/home/log/transmitter.log\n text_file_filter: Warning\n text_file_mode: LINE\n lower_boundary: 25\n text_file_filter_exists: TRUE\n monitor_mode: CONTINUOUS"
+},
+{
+"line": 78790,
+"txt": " insert_job: textfile_job3\n job_type: OMTF\n machine: monagt\n text_file_name: /QSYS.LIB/LIBRARY.LIB/RESULTS.FILE/DATA.MBR\n text_file_filter: Create file failed\n text_file_mode: LINE\n lower_boundary: 1\n upper_boundary: 20\n monitor_mode: NOW"
+},
+{
+"line": 78822,
+"txt": " insert_job: textfile_job\n job_type: OMTF\n machine: monagt\n text_file_name: /export/home/log/transmitter.log\n text_file_filter: Warning\n text_file_mode: LINE\n lower_boundary: 1\n upper_boundary: 200\n text_file_filter_exists: FALSE\n monitor_mode: NOW"
+},
+{
+"line": 78902,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Application"
+},
+{
+"line": 78916,
+"txt": " insert_job: win_eventlog\n job_type: OMEL\n    machine: winagent\n    win_log_name: Application\n    win_event_type: info\n    win_event_category: None\n    win_event_source: LLDSAPNT223\n    win_event_datetime: \"20100112 06:30:00\""
+},
+{
+"line": 78981,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Application\n win_event_source: LLDSAPNT223\n win_event_category: None\n win_event_type: INFO\n win_event_op: LE\n win_event_id: 4000\n win_event_description: started\n monitor_mode: CONTINUOUS"
+},
+{
+"line": 79024,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Application\n win_event_op: LT\n win_event_id: 1"
+},
+{
+"line": 79044,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: System\n win_event_type: WARN\n win_event_source: MrxSmb\n win_event_category: None"
+},
+{
+"line": 79058,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Security\n win_event_type: AUDITS\n win_event_category: System Event\n win_event_source: Service Control Manager\n win_event_description: \"-succeeded +Audit log\""
+},
+{
+"line": 79073,
+"txt": " insert_job: eventlog_job1\n job_type: OMEL\n machine: monagt\n win_log_name: System\n win_event_type: ERROR\n win_event_description: \"+conflict +state -deny -master -browser\""
+},
+{
+"line": 79093,
+"txt": " insert_job: eventlog_job2\n job_type: OMEL\n machine: monagt\n win_log_name: Application\n win_event_type: INFO\n win_event_description: \"Normal shutdown\""
+},
+{
+"line": 79147,
+"txt": "    insert_job: oms_job2\n    job_type: OMS\n    machine: winagt\n    win_service_name: App Server\n    monitor_mode: WAIT"
+},
+{
+"line": 79156,
+"txt": "    insert_job: oms_job3\n    job_type: OMS\n    machine: winagt\n    win_service_name: schedmanager\n    win_service_status: RUNNING\n    monitor_mode: NOW"
+},
+{
+"line": 79184,
+"txt": "    insert_job: oms_job1\n    job_type: OMS\n    machine: winagt\n    win_service_name: Proc Server\n    win_service_status: PAUSED\n    monitor_mode: NOW"
+},
+{
+"line": 79205,
+"txt": " insert_job: oms_job1\n job_type: OMS\n machine: winagt\n win_service_name: Proc Server\n win_service_status: EXISTS"
+},
+{
+"line": 79217,
+"txt": " insert_job: oms_job2\n job_type: OMS\n machine: winagt\n win_service_name: \"C:\\Program Files\\Log App\\apptask.exe\"\n win_service_status: CONTINUE_PENDING\n monitor_mode: WAIT"
+},
+{
+"line": 79332,
+"txt": "    insert_job: oacopy_single\n    job_type: oacopy\n    machine: oaagent\n    request_id: 2255470\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator"
+},
+{
+"line": 79431,
+"txt": " insert_job: oaset_resp\n job_type: oaset\n machine: oaagent\n oracle_appl_name_type: SHORT\n oracle_appl_name: BIS\n oracle_req_set_type: SHORT\n oracle_req_set: FNDRSSUB1310\n oracle_user: SYSADMIN\n oracle_resp: \"Business Intelligence Super User, Progress S&L\"\n oracle_save_output: Y"
+},
+{
+"line": 79488,
+"txt": "    insert_job: oaset_prog\n    job_type: oaset\n    machine: oaagent\n    oracle_appl_name_type: DISPLAY\n    oracle_appl_name: Application Object Library\n    oracle_req_set: EXTRACTS\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_printer: \"\\\\printer path\\Q8\"\n oracle_print_style: LANDSCAPE\n oracle_print_copies: 1\n oracle_programdata: index=1, args=\"T23,,R1\", printer=\"\n \\\\printer\\Q1\", print_style=PORTRAIT, print_copies=2, saveop=Y\n oracle_programdata: index=5, args=\"R,R1,\", printer=\"\n \\\\printer\\Q2\", print_style=PORTRAIT, print_copies=3, saveop=N"
+},
+{
+"line": 79523,
+"txt": " delete_job: test_OASET\n insert_job: oaset_fmt\n job_type: OASET\n machine: localhost\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_appl_name_type: SHORT\n oracle_appl_name: BIS\n oracle_req_name_type: DISPLAY\n oracle_req_set: FNDRSSUB1310\n oracle_use_arg_def: Y\n oracle_programdata: index=1, output_format=PDF, template_language=en, template_ter\n ritory=US, notify_users=\"'SYSADMIN','ASGUEST','QATEST1'\"\n oracle_programdata: index=2, output_format=EXCEL, template_language=en, template_t\n erritory=US, notify_users=\"'SYSADMIN','ASGUEST','QATEST1'\"\n group: OA"
+},
+{
+"line": 79575,
+"txt": "    insert_job: oaset_prog\n    job_type: oaset\n    machine: oaagent\n    oracle_appl_name_type: DISPLAY\n    oracle_appl_name: Application Object Library\n    oracle_req_set: EXTRACTS\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_use_arg_def: Y\n    oracle_programdata: index=2, args=\"T23,,R1\", printer=\"\\\\printer\n    \\Q1\", print_style=PORTRAIT, print_copies=2, saveop=Y"
+},
+{
+"line": 79701,
+"txt": " insert_job: oasg_short\n job_type: oasg\n machine: oaagent\n oracle_appl_name_type: SHORT\n oracle_appl_name: ACCOUNTS\n oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator"
+},
+{
+"line": 79721,
+"txt": " insert_job: oasg_disp\n job_type: oasg\n machine: oaagent\n oracle_appl_name_type: DISPLAY\n oracle_appl_name: Application Object Library\n oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_desc: CONFIRMED REQ 2010808 by TYB212"
+},
+{
+"line": 79767,
+"txt": "    insert_job: oasg_args\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name_type: DISPLAY\n    oracle_appl_name: Application Object Library\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_program: FNDSCARU\n    oracle_use_arg_def: Y\n    oracle_args: T,,X23,,"
+},
+{
+"line": 79862,
+"txt": "    insert_job: oaset_resp\n    job_type: oaset\n machine: oaagent\n oracle_appl_name_type: SHORT\n oracle_appl_name: BIS\n oracle_req_set: FNDRSSUB1310\n oracle_user: SYSADMIN\n oracle_resp: System Administrator"
+},
+{
+"line": 80015,
+"txt": " insert_job: ps_txtfile\n job_type: ps\n machine: psagt\n ps_process_name: DDDAUDIT\n ps_process_type: Application Engine"
+},
+{
+"line": 80027,
+"txt": " insert_job: ps_file\n job_type: ps\n machine: psagent\n ps_process_name: XRFWIN\n ps_process_type: SQR Report\n ps_dest_type: FILE\n    ps_dest_format: PDF\n    ps_output_dest: /export/home/PSoutput/report1.pdf\n    ps_run_cntrl_id: test\n    owner: VP1@ps1"
+},
+{
+"line": 80106,
+"txt": "    insert_job: ps_cst\n    job_type: ps\n    machine: psagt\n    ps_process_name: PAYROLL\n    ps_server_name: PSPR\n    ps_process_type: Application Engine\n    ps_run_cntrl_id: PS_ALL\n    ps_operator_id: vp1@ps1"
+},
+{
+"line": 80187,
+"txt": " insert_job: ps_users\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: EMAIL\n ps_dest_format: PDF\n ps_dlist_users: VP1,VP2,VP3\n ps_operator_id: VP3@ps1\n ps_run_cntrl_id: test"
+},
+{
+"line": 80220,
+"txt": " insert_job: ps_email\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: EMAIL\n ps_dest_format: PDF\n ps_operator_id: VP2@ps1\n ps_email_address: user1@example.com;user2@example.com\n ps_email_subject: PeopleSoft Report Status\n ps_email_text: This report is available for distribution."
+},
+{
+"line": 80284,
+"txt": " insert_job: ps_htmfile\n job_type: ps\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: SQR Report\n ps_server_name: PSPR\n ps_dest_type: WEB\n ps_dest_format: HTM\n ps_run_cntrl_id: PS_ALL"
+},
+{
+"line": 80306,
+"txt": " insert_job: ps_web\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: WEB\n ps_dest_format: PDF\n ps_operator_id: VP2@ps1\n ps_email_web_report: YES\n ps_email_address: user1@example.com;user2@example.com\n ps_email_subject: PeopleSoft Report Status\n ps_email_text: This report is available for distribution."
+},
+{
+"line": 80359,
+"txt": " insert_job: ps_printer\n job_type: ps\n machine: psagent\n ps_process_name: XRFWIN\n ps_process_type: SQR Report\n ps_dest_type: PRINTER\n ps_dest_format: PS\n ps_output_dest: \\\\printers\\PRINTER1\n ps_run_cntrl_id: test\n ps_operator_id: VP1@ps1"
+},
+{
+"line": 80443,
+"txt": " insert_job: execproc\n job_type: PAPROC\n machine: localhost\n endpoint_URL: \"http://capamach:8080/itpam/soap\"\n pa_name: \"/CAWAAE/Test Process\"\n owner: pamadmin@capamach\n pa_monitor_progress: Y\n pa_parameter: param_name=\"strTestName\", param_value=\"PA Test\""
+},
+{
+"line": 80515,
+"txt": "    insert_job: runsrf\n    job_type: PAREQ\n    machine: localhost\n    endpoint_URL: \"http://capamach:8080/itpam/soap\"\n    pa_name: \"Process A\"\n    pa_path: /CAWAAE/\n    owner: pamadmin@capamach\n    pa_monitor_progress: Y\n    pa_parameter: param_name=\"strTestName\", param_value=\"PA Test\""
+},
+{
+"line": 80529,
+"txt": "    insert_job: srf1\n    job_type: PAREQ\n    endpoint_URL: \"http://paserver:8080/itpam/soap\"\n    machine: paagent\n    owner: pamadmin@paserver\n    pa_path: \"/ITPAM Tutorials/S05 External Interactions/L06 Start Req Form for Input/\"\n    pa_name: \"Start Request Form\"\n    pa_parameter: Name=\"AlarmProcessingProduct\", Value=\"Test Alarm Product\"\n    pa_parameter: Name=\"Server\", Value=\"paserver\"\n    pa_parameter: Name=\"Port\", Value=80\n    pa_monitor_progress: Y\n    pa_trace: N"
+},
+{
+"line": 80571,
+"txt": " insert_job: pam1\n job_type: PAPROC\n endpoint_url: \"http://canor01-vm2k3c:8080/itpam/soap\"\n machine: paagent\n owner: pamadmin@capamach\n pa_name: \"/ITPAM Tutorials/S01 Getting started/L01 Creating a Simple Process/\n L01-2 Running the Process/Running the Process\"\n pa_monitor_progress: Y\n pa_trace: N"
+},
+{
+"line": 80670,
+"txt": "    insert_job: proxy_job\n    job_type: PROXY\n    machine:agentmachine\n    owner: root@remoteagent\n    remote_target: remoteagent\n    spool_file: /opt/spool/commandout.out\n    remote_command: ls /opt"
+},
+{
+"line": 80878,
+"txt": " insert_job: bdcjob\n job_type: SAPBDC\n machine: sapagent\n owner: WAAESAP@sapagent\n sap_job_name: ZBDCTEST\n sap_release_option: A\n sap_step_parms: abap_name=\"ZBDCTEST\""
+},
+{
+"line": 80890,
+"txt": " insert_job: SAPBDC_job\n job_type: SAPBDC\n machine: localhost\n owner: WAAESAP@sapserver\n sap_job_name: ZBDCTEST\n sap_release_option: I\n sap_step_parms: abap_name=\"ZBDCTEST\",banner_page=no,release=no,print_imm=no,\n new_spool=no,footer=no"
+},
+{
+"line": 80948,
+"txt": " insert_job: InfoBW2\n job_type: SAPBWIP\n machine: sapagent\n owner: WAAESAP@sapagent\n sap_job_name: InfoBW2\n sap_rfc_dest: SM1\n sap_info_pack: 0PAK_D2XZMZ1HD5WFVFL3EN1NVIT4V"
+},
+{
+"line": 80958,
+"txt": " insert_job: bwip_job\n job_type: SAPBWIP\n machine: localhost\n owner: user@sapserver\n sap_job_name: BI_BTCHSAP_TEST\n sap_rfc_dest: mts\n sap_info_pack: ZPAK_DIBX41NKYK0S7FB1FOV0FQ7BV\n sap_lang: EN\n sap_client: 001\n job_class: a"
+},
+{
+"line": 81019,
+"txt": " insert_job: SAPBWPC3\n job_type: SAPBWPC\n machine: sapagent\n owner: WAAESAP@sapagent\n sap_chain_id: DEMO_CHAIN1\n sap_lang: EN\n sap_rfc_dest: SM1"
+},
+{
+"line": 81087,
+"txt": " insert_job: SAPDA_job\n job_type: SAPDA\n machine: sapagent\n owner: WAAESAP@sapagent\n arc_obj_name: BC_ARCHIVE\n arc_obj_variant: BC_ARCVARIANT\n sap_print_parms: dest=LP01,prt_arc_mode=PRINT"
+},
+{
+"line": 81147,
+"txt": " insert_job: SAPEVT_job\n job_type: SAPEVT\n machine: sapagent\n owner: WAAESAP@sapagent\n sap_event_id: SAP_TEST\n sap_rfc_dest: BI1\n sap_is_trigger: Y"
+},
+{
+"line": 81158,
+"txt": " insert_job: trigger_evt\n job_type: SAPEVT\n machine: localhost\n owner: WAAESAP@sapserver\n sap_rfc_dest: BI1\n sap_event_id: SAP_TEST\n sap_is_trigger: N\n sap_event_parm: L L\n sap_client: 001\n sap_lang: EN\n continuous: y"
+},
+{
+"line": 81225,
+"txt": " insert_job: test_SAPPM\n job_type: SAPPM\n machine: sapagent\n sap_abap_name: ZMYABAP\n sap_process_status: RUNNING\n sap_rfc_dest: BI1\n owner: WAAESAP@sapagent"
+},
+{
+"line": 81293,
+"txt": " insert_job: SAPJC_job\n job_type: SAPJC\n owner: WAAESAP@sapagent\n machine: sapagent\n sap_job_name: AM\n sap_job_count: 113315AM"
+},
+{
+"line": 81365,
+"txt": " insert_job: test_SAP\n job_type: SAP\n machine: sapagent\n sap_job_name: BI_WRITE_PROT_TO_APPLLOG\n sap_rfc_dest: BI1\n sap_step_parms: abap_lang=EN,abap_name=RSBATCH_WRITE_PROT_TO_APPLLOG\n owner: WAAESAP@sapagent"
+},
+{
+"line": 81376,
+"txt": " insert_job: TEST_1\n job_type: SAP\n machine: localhost\n job_class: c\n sap_job_name: \"SAP 3 STEPS_@#$\"\n sap_release_option: I\n sap_step_parms:abap_name=BTCTEST,variant=test,arc_printer=LP01,copies=2,\n prt_arc_mode=BOTH,arc_obj_type=ARCHIVE,arc_doc_type=ARCHIVE,arc_info=inf,num_lines=65,\n num_columns=80\n sap_step_parms:abap_name=BTCTEST,variant=test2,arc_printer=LP01,copies=3,\n prt_arc_mode=BOTH,print_imm=N,release=N,sap_banner=Y,banner_page=Y,\n recipient_name=cyber,num_lines=65,num_columns=80,arc_obj_type=ARCHIVE,\n arc_doc_type=ARCHIVE,arc_info=inf\n sap_step_parms:abap_name=BTCTEST,variant=test,arc_printer=LP01,copies=1,"
+},
+{
+"line": 81489,
+"txt": " insert_job: test_SAP_1\n job_type: SAP\n machine: sapagent\n owner: WAAESAP@sapserver\n sap_job_name: BI_WRITE_PROT_TO_APPLLOG\n sap_rfc_dest: BI1\n sap_step_parms:abap_name=RSBATCH_WRITE_PROT_TO_APPLLOG,sap_maillist=\"user1@example.com\",variant="
+},
+{
+"line": 81694,
+"txt": " insert_job: sftp_upload\n job_type: SCP\n machine: WINAGENT\n scp_transfer_direction: UPLOAD\n scp_server_name: hpsupport\n scp_remote_dir: /u/tmp\n    scp_remote_name: logs.tar\n    scp_local_name: \"D:\\temp\\logs.tar\"\n    scp_protocol: SFTP\n    owner: causer@WINAGENT"
+},
+{
+"line": 81728,
+"txt": "    insert_job: sftp_up_mult\n    job_type: SCP\n    machine: WINAGENT\n    scp_transfer_direction: UPLOAD\n    scp_server_name: aixunix\n    scp_remote_dir: /u1/build/uploaded\n    scp_remote_name: \"*\"\n    scp_local_name: \"c:\\temp\\upload\\*\"\n    scp_protocol: SFTP\n    owner: causer@WINAGENT"
+},
+{
+"line": 81925,
+"txt": " insert_job: getvarv2\n job_type: SNMPGET\n machine: snmpagent\n snmp_mib: cybermation.mib\n snmp_host: host.example.com\n snmp_oid: agentVersion\n port: 161\n snmp_version: 2\n snmp_comm_string: public"
+},
+{
+"line": 81942,
+"txt": " insert_job: getvarv3\n job_type: SNMPGET\n machine: localhost\n owner: Administrator@localhost\n snmp_oid: .1.3.1.1.3.1.0.0\n snmp_host: snmp\n snmp_version: 3\n snmp_auth_protocol: SHA\n snmp_privacy: AES\n snmp_privacy_user: user1"
+},
+{
+"line": 82041,
+"txt": " insert_job: setvarint\n job_type: SNMPSET\n machine: snmpagent\n snmp_mib: cybermation.mib\n snmp_host: host.example.com\n snmp_oid: agentLogLevel\n port: 161\n snmp_version: 2\n snmp_comm_string: public\n snmp_value: int=8"
+},
+{
+"line": 82056,
+"txt": " insert_job: setvarip\n job_type: SNMPSET\n machine: localhost\n owner: Administrator@localhost\n snmp_oid: .1.3.1.1.2.1.9.3\n snmp_host: snmp\n snmp_value: addr=172.24.2.20\n snmp_version: 3\n snmp_auth_protocol: MD5\n snmp_privacy: DES\n snmp_privacy_user: user1"
+},
+{
+"line": 82114,
+"txt": "    insert_job: setvarv3\n    job_type: SNMPSET\n    machine: snmpagent\n    snmp_mib: cybermation.mib\n    snmp_host: host.example.com\n    snmp_oid: out456789\n    snmp_version: 3\n    snmp_privacy: AES\n    snmp_privacy_user: user1\n    snmp_auth_protocol: MD5\n    snmp_value: int=8"
+},
+{
+"line": 82140,
+"txt": " insert_job: getvarv1\n job_type: SNMPGET\n machine:localhost\n owner: Administrator@localhost\n snmp_oid: .1.3.6.1.2.1.1.6.0\n snmp_host: snmp"
+},
+{
+"line": 82211,
+"txt": " insert_job: sqlagent_job\n job_type: SQLAGENT\n machine: SQL_AGENT\n sqlagent_jobname: mssql_job\n sqlagent_user_name: mydomainuser\n sqlagent_domain_name: mydomain\n sqlagent_target_db: mytargetDB\n sqlagent_server_name: myserver"
+},
+{
+"line": 82295,
+"txt": " insert_job: wol_default_job\n job_type: WOL\n machine: agentnme\n broadcast_address: 172.16.255.255\n mac_address: 00-11-43-73-38-DC\n ping_host: 172.16.1.101"
+},
+{
+"line": 82307,
+"txt": " insert_job: wol_job\n job_type: WOL\n machine: agentnme\n broadcast_address: 172.16.255.255\n mac_address: 00-1E-4F-C1-0F-FE\n ping_host: 172.16.1.101\n ping_ports: 7"
+},
+{
+"line": 82320,
+"txt": " insert_job: wol_pwd_job\n job_type: WOL\n machine: agentnme\n broadcast_address: 172.16.255.255\n mac_address: 11-22-33-44-55-66\n wake_password: AA-BB-CC-DD-EE-FF"
+},
+{
+"line": 82355,
+"txt": "    insert_job: wol_job\n    job_type: WOL\n    machine: agentnme\n    broadcast_address: 172.16.255.255\n    mac_address: 00-1E-4F-C1-0F-FE\n    ping_host: 172.16.1.101\n    ping_ports: 7\n    ping_timeout: 300"
+},
+{
+"line": 82699,
+"txt": " insert_job: execws\n job_type: WSDOC\n machine: wsagent\n endpoint_URL: \"https://s3.amazonaws.com/soap\"\n wsdl_url: \"http://s3.amazonaws.com/doc/2006-03-01/AmazonS3.wsdl\"\n service_name: AmazonS3\n port_name: AmazonS3\n wsdl_operation: ListAllMyBuckets\n ws_proxy_host: 172.31.255.255\n ws_proxy_port: 80\n ws_proxy_user: user@domain\n ws_proxy_domain: domain\n ws_parameter: Name=\"/ListAllMyBuckets\", Value=\"\"\n ws_parameter: Name=\"/ListAllMyBuckets/AWSAccessKeyId\", Value=\"0x0102030405060708\"\n ws_parameter: Name=\"/ListAllMyBuckets/Timestamp\", Value=\"2011-08-25T02:24:21\"\n ws_parameter: Name=\"/ListAllMyBuckets/Signature\", Value=\"0x0102030405060708\""
+},
+{
+"line": 82821,
+"txt": "    insert_job: quote\n    job_type: WBSVC\n    machine: localhost\n    owner: ejmcommander\n    max_run_alarm: 0\n    alarm_if_fail: y\n    send_notification: n\n    wsdl_url: \"http://host:8080/axis/services/StockQuote?wsdl\"\n    target_namespace: \"http://ws.ca.com\"\n    service_name: StockQuoteService\n    port_name: StockQuote\n    wsdl_operation: GetQuote\n    endpoint_url: \"http://host:8080/axis/services/StockQuote\"\n    web_parameter: \"xsd:string=CA\"\n    one_way: false"
+},
+{
+"line": 82979,
+"txt": "    insert_job: PROD.NIGHTLY\n    job_type: ZOSDST\n    machine: ZOS1\n    zos_dataset: PROD.CICS.FILE1602\n    owner: zosuser"
+},
+{
+"line": 82991,
+"txt": "    insert_job: PROD.PAY_DATA\n    job_type: ZOSDST\n    machine: ZOS1\n    owner: CYBDL01\n    zos_dataset: CYBER.COPY.JCL\n    zos_trigger_on: 100"
+},
+{
+"line": 83050,
+"txt": "insert_job: PROD.PAY_DATA\njob_type: ZOSDST\nmachine: ZOS1\nowner: CYBDL01\nzos_dataset: USER1.PAYROLL.Gzos_\ntrigger_type: zos_user_id\nzos_trigger_by: CYB1"
+},
+{
+"line": 83062,
+"txt": "insert_job: PROD.PAY_DATA\njob_type: ZOSDST\nmachine: ZOS1\nowner: CYBDL01\nzos_dataset: USER1.PAYROLL.Gzos_\ntrigger_type: zos_job_name\nzos_trigger_by: ABC"
+},
+{
+"line": 83106,
+"txt": "insert_job: CYBER.XFER\njob_type: ZOSDST\nmachine: ZOS1\nowner: CYBDL01\nzos_dataset: CYBER.XFER.001\nzos_ftp_direction: SENDExample: Restrict Triggering to a Specific Host"
+},
+{
+"line": 83153,
+"txt": "insert_job: CYBER.XFER\njob_type: ZOSDST\nmachine: ZOS1\nowner: CYBDL01\nzos_dataset: CYBER.XFER.001\nzos_trigger_type: zos_user_id\nzos_trigger_by: CYBzos_\nftp_direction: RECEIVE\nzos_ftp_userid: CYB"
+},
+{
+"line": 83206,
+"txt": " insert_job: ABC_job\n job_type: ZOSM\n machine: ZOS1\n zos_jobname: ABC\n owner: zosuser\n auth_string: CYBER"
+},
+{
+"line": 83264,
+"txt": " insert_job: CYBDL01A\n job_type: ZOS\n machine: ZOS1\n jcl_library: CYBDL01.JCLLIB\n jcl_member: CYBDL01A\n owner: CYBDL01\n copy_jcl: CYBDL01.COPY.JCLLIB"
+},
+{
+"line": 83274,
+"txt": " insert_job: zos_job\n job_type: ZOS\n machine: zosagt\n jcl_library: CYBDL01.JCLLIB\n jcl_member: CYBDL01A"
+},
+{
+"line": 83298,
+"txt": "    insert_job_type: 2\n    command: /home/scripts/myftp"
+},
+{
+"line": 83302,
+"txt": "    insert_job: ftp_test\n    job_type: 2\n    machine: localhost\n    std_in_file: /tmp/ftp_params"
+},
+{
+"line": 83330,
+"txt": "    insert_job_type: 5\n    description: Web Service Adapter\n    command:ws.exe"
+},
+{
+"line": 83336,
+"txt": "    delete_job_type: 5"
+},
+{
+"line": 83347,
+"txt": " update_job_type: 5\n description: WorldView Adapter\n command: wv.exe"
+},
+{
+"line": 83355,
+"txt": " update_job_type: 7\n description: sleep for a spell\n command: /bin/sleep\n insert_job: sleep_5\n description: sleep for 5 seconds\n job_type: 7\n machine: localhost\n command: 5\n insert_job: sleep_30\n description: sleep for 30 seconds\n job_type: 7\n machine: localhost\n command: 30"
+},
+{
+"line": 83462,
+"txt": "    insert_resource: depletable1\n    res_type: D\n    machine: hostname\n    amount: 1"
+},
+{
+"line": 83470,
+"txt": "    insert_job: ResDepJob\n    job_type: CMD\n    command: /tmp/DBIntensiveApp\n    machine: hostname\n    owner: root@hostname\n    resources: (depletable1,QUANTITY=1)"
+},
+{
+"line": 83484,
+"txt": " update_resource: depletable1\n machine: hostname\n amount: 15"
+},
+{
+"line": 83508,
+"txt": "    insert_resource: r1\n    res_type: R\n    amount: 10"
+},
+{
+"line": 83515,
+"txt": "    insert_job: jr1\n    command: sleep 500\n    machine: hostname\n    resources: (r1,quantity=1, FREE=A)"
+},
+{
+"line": 83537,
+"txt": "    insert_resource: t1\n    machine: mach1\n    res_type: T\n    amount: 1"
+},
+{
+"line": 83543,
+"txt": "     insert_job: jt1\n     command: readnadwritetodisk\n     machine: mach1\n     resources: (t1, quantity=1)"
+},
+{
+"line": 83555,
+"txt": "     update_resource: t1\n     machine: mach1\n     amount: 0"
+},
+{
+"line": 83610,
+"txt": " insert_resource: glob_res\n res_type: D\n amount: 50\n description: \"This resource is permanently consumed.\""
+},
+{
+"line": 83624,
+"txt": " insert_resource: threshold_res\n res_type: T\n machine: unixagent\n amount: 10"
+},
+{
+"line": 83674,
+"txt": " update_resource: mach_res\n machine: unixagent\n amount: 35"
+},
+{
+"line": 83726,
+"txt": " delete_resource: glob_resource"
+},
+{
+"line": 83755,
+"txt": " insert_job: no_free_job\n job_type: CMD\n    machine: unixagent\n    command: /u1/procrun.sh\n    resources: (renew_res, QUANTITY=ALL, free=N)"
+},
+{
+"line": 83788,
+"txt": "    insert_job: res_dep_job\n    job_type: CMD\n    machine: unixagent\n    command: /u1/procrun.sh\n    resources: (D1, QUANTITY=1) AND (T1, QUANTITY=3) AND\n    (R1, QUANTITY=4, FREE=Y) AND\n    (SYSTEM_OS_TYPE, VALUEOP=EQ, VALUE=AIX, VERSION=5.3) AND\n    (SYSTEM_PHYSICAL_MEMORY, VALUEOP=GT, VALUE=2048)"
+},
+{
+"line": 83800,
+"txt": "    insert_job: box1_resource_Y\n    job_type:box\n    resources: (glb_resource1,QUANTITY=1,FREE=Y)"
+},
+{
+"line": 83855,
+"txt": "  update_job: proc_daily\n  resources: (RENEW3, QUANTITY=3) AND (THRESHOLD2, QUANTITY=3) AND (SYSTEM_CPU_COUNT,\n  VALUEOP=GT, VALUE=2)"
+},
+{
+"line": 84090,
+"txt": " insert_resource: dep1\n res_type: D\n amount: 0\n insert_resource: ren1\n res_type: R\n amount: 0\n insert_resource: thr1\n res_type: T\n amount: 1"
+},
+{
+"line": 84102,
+"txt": " insert_job: job1\n job_type: CMD\n command: &sleep 500\n machine: machineGroup1      /* This machine group includes machines M1 and M2. */\n resources: (ren1, QUANTITY=1, FREE=A) AND (dep1, QUANTITY= 1) AND (thr1, QUANTITY= 1)"
+},
+{
+"line": 84320,
+"txt": " insert_job: test_job_with_blob\n job_type: cmd\n command: sleep 60\n machine: juno\n owner: jerry@juno\n std_in_file: $$blobt\n blob_file: /test_job_with_blob_file.txt\n blob_type: in"
+},
+{
+"line": 84351,
+"txt": " insert_blob: test_job_with_blob\n blob_type: in\n blob_file: /test_job_with_blob_file.txt"
+},
+{
+"line": 84380,
+"txt": " delete_blob: test_job_with_blob\n blob_type: input"
+},
+{
+"line": 84389,
+"txt": " delete_blob: test_job_with_blob\n blob_type: inputpayload"
+},
+{
+"line": 84398,
+"txt": " delete_blob: test_job_with_blob\n blob_type: output"
+},
+{
+"line": 84431,
+"txt": " insert_glob: my_text_global_blob\n blob_mode: text\n blob_file: /my_text_global_blob_file.txt"
+},
+{
+"line": 84445,
+"txt": " insert_glob: my_binary_global_blob\n blob_mode: binary\n blob_file: /my_binary_global_blob_file"
+},
+{
+"line": 84464,
+"txt": " delete_glob: my_global_blob"
+},
+{
+"line": 84549,
+"txt": " insert_job: test_job\n job_type: cmd\n command: cat\n machine: juno\n owner: jerry@ca\n permission: gx,ge,wx\n alarm_if_fail: 1"
+},
+{
+"line": 84623,
+"txt": " insert_job: test_job_with_blob               job_type: cmd\n command: cat\n machine: juno\n owner: jerry@juno\n permission:\n std_in_file: $$blobt\n alarm_if_fail: 1\n /* -- test_job_with_blob:insert_blob #1 -- */\n insert_blob: test_job_with_blob\n blob_file: /myblobsdir/test_job_with_blob_1.txt\n /* -- test_job_with_blob:insert_blob #2 -- */\n insert_blob: test_job_with_blob\n blob_file: /myblobsdir/test_job_with_blob_2.txt\n /* -- test_job_with_blob:insert_blob #3 -- */\n insert_blob: test_job_with_blob\n blob_file: /myblobsdir/test_job_with_blob_3.txt"
+},
+{
+"line": 85022,
+"txt": "    insert_job: MSR1\n    job_type: CMD\n     command: sleep 10\n     machine: localhost\n     owner: root@hostname.ca.com\n     condition: s(ZOS01^MSR)"
+},
+{
+"line": 85261,
+"txt": " insert_xinst: CYB\n xtype: e\n xmanager: CM\n xmachine: CYBHOST\n xcrypt_type: NONE\n xport: 7550"
+},
+{
+"line": 85288,
+"txt": "     update_xinst: instance_name"
+},
+{
+"line": 85320,
+"txt": " update_xinst: CYB\n xmachine: CYBHOST2"
+},
+{
+"line": 85342,
+"txt": "      delete_xinst: instance_name"
+},
+{
+"line": 85356,
+"txt": " delete_xinst: CYB"
+},
+{
+"line": 85439,
+"txt": " insert_job: as400_a1\n job_type: CMD\n command: DLYJOB DLY(15)\n machine: usprncax\n owner: user1@usprncax\n permission: gx,wx\n date_conditions: 1\n days_of_week: all\n start_mins: 30"
+},
+{
+"line": 85452,
+"txt": " insert_job: ca71\n job_type: CMD\n command: auto_cnct -a A87SOENF -j RYAKEJ01 -c RUN -p SCHEDULE=RYAKE01 -s CA7\n machine: A87SOENF\n owner: user1@A87SOENF\n permission: gx,wx\n date_conditions: 1\n days_of_week: all\n start_mins: 45"
+},
+{
+"line": 85464,
+"txt": " insert_job: ca72\n job_type: CMD\n command: RYAKEJ01\n machine: A87SOENF\n owner: user1@A87SOENF\n permission: gx,wx\n date_conditions: 1\n days_of_week: all\n start_mins: 45"
+},
+{
+"line": 85476,
+"txt": " insert_job: ca72\n job_type: cmd\n command: job_in_other_instance\n machine: othermachine\n owner: user1@othermachine\n permission: gx,wx\n date_conditions: 1\n days_of_week: all\n    start_mins: 45"
+},
+{
+"line": 85502,
+"txt": "    insert_job: soljob1\n    command: “@SYS$LOGIN:SCHEDULE_WAIT.COM “\n    machine: mylinux\n    owner: user1@mylinux\n    max_exit_success: 1"
+},
+{
+"line": 85558,
+"txt": " insert_job: dep_job1\n machine: localhost\n job_type: CMD\n command: sleep 100\n condition: success(jobA) AND success(jobB^PRD)"
+},
+{
+"line": 85619,
+"txt": " insert_xinst: PRD\n xtype: a\n xmachine: nyc-wall-04\n xport: 9001\n xcrypt_type: DEFAULT"
+},
+{
+"line": 85646,
+"txt": " insert_xinst: CCT\nxtype: c\nxmachine: WACNCTHOST\n/* ----------------- NSM ----------------- */\ninsert_xinst: NSM\nxtype: u\nxmachine: NSMHOST\n/* ----------------- WAE ----------------- */\ninsert_xinst: WAE\nxtype: a\nxmachine: WAAEHOST\nxport: 9001\nxcrypt_type: DEFAULT\n/* ----------------- WEE ----------------- */\ninsert_xinst: WEE\nxtype: e\nxmachine: WAEEHOST\nxport: 7550\n    xcrypt_type: NONE\n    xmanager: WAAEMGR"
+},
+{
+"line": 89545,
+"txt": "    insert_job_type: 1\n    command: /home/scripts/payroll.sh"
+},
+{
+"line": 104255,
+"txt": " insert_monbro: job_restarts\n mode: browser\n restart: y\n all_status:n\n all_events:n\n after_time: \"09/10/2012 00:00:00\""
+},
+{
+"line": 104265,
+"txt": " insert_monbro: track_alarms\n mode: monitor\n alarm:y\n all_status: n\n all_events: n\n alarm_verif: y"
+},
+{
+"line": 105087,
+"txt": " insert_view: PayrollView\n job_columns: job_name,status,server,run_machine,status_time\n alert_columns: alert,severity,status,job,server,status_time,create_time\n description: 'this view contains the payroll jobs'\n insert_filter: ServerAE1\n view: PayrollView\n filter:(application LIKE PAY AND job_name LIKE Payroll*)\n active: true"
+},
+{
+"line": 105448,
+"txt": "  insert_filter: AS1\n  view: MyView1\n  filter: job_name like Backup*\n  alert_policy: FailedJobs, TerminatedJobs\n  active: true"
+},
+{
+"line": 108719,
+"txt": "            insert_machine: SampleMachine\n            type: a\n            factor: 1.00\n            port: 7520\n            node_name: SampleMachine\n        agent_name: WA_AGENT\n        encryption_type: DEFAULT\n        character_code: ASCII\n /* ----------------- SampleJob ----------------- */\n         insert_job: SampleJob   job_type: CMD\n         command: as_test -T 2\n         machine: SampleMachine\n         owner: Administrator@SampleJob\n         permission:\n         date_conditions: 0\n        alarm_if_fail: 1\n        heartbeat_interval: 5\n        alarm_if_terminated: 1"
+},
+{
+"line": 108994,
+"txt": "            insert_job: Sample1Box job_type: BOX\n            owner: Administrator@testmachine\n            permission:\n            date_conditions: 0\n            description: \"Box\"\n            alarm_if_fail: 1\n            alarm_if_terminated: 1\n    /* ----------------- TESTJOB_00001 ----------------- */\n            insert_job: TESTJOB_00001 job_type: CMD\n            command: as_test -T 2\n            machine: localhost\n            owner: Administrator@testmachine\n            permission:\n            date_conditions: 0\n            alarm_if_fail: 1\n            heartbeat_interval: 5\n            alarm_if_terminated: 1\n /* ----------------- TESTJOB_00002 ----------------- */\n         insert_job: TESTJOB_00002   job_type: CMD\n         command: as_test -T 2\n         machine: localhost\n         owner: Administrator@testmachine\n         permission:\n         date_conditions: 0\n         alarm_if_fail: 1\n         heartbeat_interval: 5\n         alarm_if_terminated: 1"
+},
+{
+"line": 109034,
+"txt": "         insert_job: TESTJOB_00001 job_type: CMD\n         command: as_test -T 2\n         machine: localhost\n         owner: Administrator@testmachine\n         permission:\n         date_conditions: 0\n         alarm_if_fail: 1\n         heartbeat_interval: 5\n         alarm_if_terminated: 1"
+},
+{
+"line": 113410,
+"txt": " insert_job: chase\n machine: charley\n command: $AUTOSYS/bin/chase -A -E\n date_conditions: yes\n days_of_week: all\n start_mins: 05,15,25,35,45,55\n max_run_alarm: 5 /* Change if many jobs are running */\n term_run_time: 10 /* Change if many jobs are running */\n # These output files can be changed\n std_out_file: $AUTOUSER/out/chase.out\n std_err_file: $AUTOUSER/out/chase.err"
+},
+{
+"line": 115934,
+"txt": "        insert_job: job1\n        command: ls “/*” /* argument must be delimited in quotes so not to be interpreted\n          as a comment */\n        machine: localhost\n       insert_job: job2\n       command: sleep 5 /* sleep a while */\n       machine: localhost\n       insert_job: job3\n       /* application: accounting\n       box_name: master\n       */\n       command: echo “application and box are commented out”\n       machine: localhost\n       insert_job: job4\n       command: rm $HOME/test/* /* delete files in my test directory */\n       machine: localhost"
+},
+{
+"line": 116910,
+"txt": "    insert_job: abc_box1\n    job_type: BOX\n    owner: Administrator@test004321\n    permission:\n    date_conditions: 1\n    days_of_week: all\n    start_mins: 00, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55\n    alarm_if_fail: 1\n    alarm_if_terminated: 1\n    /* ----------------- xyzjob1 ----------------- */\n    insert_job: xyzjob1\n    job_type: CMD\n    box_name: abc_box1\n    command: sleep 10\n    machine: localhost\n    owner: Administrator@test004321\n    permission:\n date_conditions: 0\n alarm_if_fail: 1\n alarm_if_terminated: 1"
+},
+{
+"line": 117613,
+"txt": "    insert_job: win_cmd\n    job_type: CMD\n    machine: winagent\n    command: as_test -t 5 -e 0"
+},
+{
+"line": 118733,
+"txt": " insert_job: test_job\n job_type: c\n command: sleep 60\n machine: juno\n #owner: jerry@ca\n permission: gx,ge,wx\n alarm_if_fail: 1"
+},
+{
+"line": 119285,
+"txt": "    insert_job: New_Stats_Starter\n    job_type: CMD\n    machine: mombo\n    command: new_stats_starter\n    condition: done(Account_Run) and\n    done(Corp_Run) and done(End_Run)"
+},
+{
+"line": 119711,
+"txt": "   insert_job: NightlyReport\n   job_type: CMD\n   box_name: holdBox\n   alarm_if_fail: 1\n   auto_delete: -1\n   auto_hold: 0\n   box_terminator: 0\n   command: rpt_util nightly\n   date_conditions: 0\n   interactive: 0\n   job_load: 0\n   job_terminator: 0\n   machine: taurus\n   max_exit_success: 0\n   max_run_alarm: 0\n   min_run_alarm: 0\n   n_retrys: 0\n   owner: \"jane@taurus\"\n   priority: 0\n   service_desk: 0\n   term_run_time: 0"
+},
+{
+"line": 120238,
+"txt": "    insert_monbro: xxx\n    mode: m\n    all_events: Y\n    job_filter: a\n    sound: N\n    alarm_verif: N\n    insert_monbro: xxx2\n    mode: b\n    all_events: N\n    alarm: Y\n    all_status: N\n    running: N\n    success: Y\n    failure: Y\n    terminated: N\n    suspended: Y\n    starting: N\n    restart: N\n    job_filter: b\n    job_name: box\n    currun: N\n    after_time: \"11/11/2014 12:12\""
+},
+{
+"line": 120422,
+"txt": "    delete_box: box_name"
+},
+{
+"line": 120428,
+"txt": "    delete_box: Box1\ndelete_job Subcommand -- Delete a Job from the Database"
+},
+{
+"line": 120451,
+"txt": "    delete_job: Job1\ninsert_job Subcommand -- Add a Job to the Database"
+},
+{
+"line": 120482,
+"txt": " insert_job: time_stamp\n machine: prod\n command: time_stamp.bat"
+},
+{
+"line": 120492,
+"txt": " insert_job: EOD_batch_watch\n job_type: fw\n machine: prod\n watch_file: \"C:\\myapps\\EOD_batch.bat\""
+},
+{
+"line": 120499,
+"txt": " insert_job: end_of_day\n job_type: box\noverride_job Subcommand -- Define a Job Override"
+},
+{
+"line": 120535,
+"txt": "     override_job: job_name delete"
+},
+{
+"line": 120577,
+"txt": "    override_job: JobA\n    std_out_file: “C:\\OUTPUT\\SpecialRun.out”"
+},
+{
+"line": 120582,
+"txt": "    override_job: JobA delete"
+},
+{
+"line": 120617,
+"txt": "    insert_job:jobExample\n command:echo\n machine: machine_name\n condition: s(old_job_name)"
+},
+{
+"line": 120662,
+"txt": " update_job: time_stamp\n machine: paris"
+},
+{
+"line": 120987,
+"txt": "        insert_job: test_SAPDA\n        job_class: SAP\n        job_type: SAPDA\n        machine: localhost\n        owner: WAAESAP@waae-jobstest\n        arc_obj_name: BC_ARCHIVE\n        arc_obj_variant: PRODUKTIVMODUS\n        sap_print_parms: prt_arc_mode=BOTH,dest=LP01,title=\"testing\"\n        arc_parms: arc_doc_type=ar01, arc_info=ar1, arc_obj_type=obj01, arc_client=202"
+},
+{
+"line": 121058,
+"txt": "    insert_job: unix_script\n    job_type: CMD\n    machine: unixagent\n    command: /usr/common/backup\n    auto_delete: 5"
+},
+{
+"line": 121099,
+"txt": "    insert_job: holdBox\n    job_type: BOX\n    owner: root@localhost\n    insert_job: autohold\n    job_type: CMD\n    box_name: holdBox\n    command: ls\n    machine: localhost\n    owner: root@localhost\n    auto_hold: y\n    insert_job: autonoHold\n    job_type: CMD\n    box_name: holdBox\n    command: ls\n    machine: localhost\n    owner: root@localhost"
+},
+{
+"line": 121162,
+"txt": " insert_job: test_SAPBDC\n job_type: SAPBDC\n machine: sapagent\n owner: WAAESAP@waae-jobstest\n sap_job_name: ZBDCTEST\n sap_release_option: A\n sap_step_parms: abap_name=ZBDCTEST\n bdc_err_rate: 5"
+},
+{
+"line": 121197,
+"txt": "    insert_job: test_SAPBDC\n    job_type: SAPBDC\n    machine: sapagent\n    owner: WAAESAP@waae-jobstest\n    sap_job_name: ZBDCTEST\n    sap_release_option: A\n    sap_step_parms: abap_name=ZBDCTEST\n    bdc_ext_log: Y"
+},
+{
+"line": 121223,
+"txt": "    insert_job: test_SAPBDC11_SIMPLE\n    job_type: SAPBDC\n    machine: sapagent\n    owner: WAAESAP@waae-jobstest\n    permission:\n    date_conditions: n\n    alarm_if_fail: y\n    sap_job_name: ZBDCTEST\n sap_office: N\n sap_release_option: I\n bdc_ext_log: N\n bdc_proc_rate: 90\n sap_step_parms:\n  abap_name=\"ZBDCTEST\",banner_page=N,release=N,print_imm=N,new_spool=N,footer=N"
+},
+{
+"line": 121260,
+"txt": " insert_job: test_SAPBDC11_SIMPLE2\n job_type: SAPBDC\n machine: sap_agent\n owner: WAAESAP@waae-jobstest\n sap_job_name: ZBDCTEST\n sap_office: N\n sap_release_option: I\n bdc_ext_log: N\n sap_step_parms:\n  abap_name=\"ZBDCTEST\",banner_page=N,release=N,print_imm=N,new_spool=N,footer=N\n bdc_system:dest"
+},
+{
+"line": 121769,
+"txt": " insert_job: create\n job_type: JMXMC\n machine: appagent\n URL: \"service:jmx:rmi:///jndi/rmi://agenttest:5099/jmxserver\"\n mbean_name: \"DefaultDomain:index=CreateIns1,type=cdc.jmx.SimpleDynamic\"\n class_name: cdc.jmx.SimpleDynamic\n jmx_parameter: java.lang.String=\"Hello\""
+},
+{
+"line": 121923,
+"txt": " insert_job: unix_cmd\n job_type: CMD\n machine: unixagent\n command: /bin/date"
+},
+{
+"line": 121932,
+"txt": " insert_job: unix_script\n job_type: CMD\n machine: unixagent\n command: /usr/common/backup"
+},
+{
+"line": 122088,
+"txt": " insert_job: win_batch\n job_type: CMD\n machine: winagent\n command: “C:\\COMMON\\Backup”"
+},
+{
+"line": 122104,
+"txt": " insert_job: win_vbjob\n job_type: CMD\n machine: winagent\n command: \"c:\\winnt\\system32\\wscript.exe\" \"c:\\programs\\vbs\\notify.vbs\""
+},
+{
+"line": 122476,
+"txt": "    insert_job: test_sample_04\n    machine: localhost\n    command: sleep 10\n    condition: success(test_sample_01,12.00) AND failure(test_sample_02,24.00) AND\n     success(test_sample_03)"
+},
+{
+"line": 122557,
+"txt": "    insert_job: zos_job\n    job_type: ZOS\n    machine: zagent\n    jcl_library: CYBJAK1.JCL\n    jcl_member: CYBJAK11\n    condition_code: rc=111,result=SUCCESS,action=CONTINUE,step_name=xyz\n    condition_code: rc=112,result=SUCCESS,action=CONTINUE\n    condition_code: rc=113,result=SUCCESS,action=STOP\n    condition_code: rc=114,result=FAILURE,action=CONTINUE\n    condition_code: rc=115,result=FAILURE,action=STOP"
+},
+{
+"line": 122625,
+"txt": " insert_job: QRY1\n job_type: SQL\n machine: DB_agent\n owner: sys@orcl\n sql_command: SELECT * from NEWORDS\n destination_file: \"c:\\log\\qry1.txt\"\n connect_string: \"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\""
+},
+{
+"line": 122652,
+"txt": " insert_job: QRY2\n job_type: SQL\n machine: DB_agent\n owner: sa@myhost\n sql_command: SELECT * from NEWORDS\n destination_file: \"c:\\log\\qry2.txt\"\n connect_string: \"jdbc:sqlserver://myhost:1433;DatabaseName=ORDERS\""
+},
+{
+"line": 122672,
+"txt": " insert_job: UPDATE\n job_type: SQL\n machine: DB_AGENT\n owner: entadm@myhost\n sql_command: UPDATE ENTADM.STAFF SET YEARS=3 where NAME='Jonson'\n destination_file: \"c:\\log\\updatejob.txt\"\n connect_string: \"jdbc:db2://172.31.255.255:50000/SAMPLE\""
+},
+{
+"line": 122747,
+"txt": " insert_job: publish\n job_type: JMSPUB\n machine: appagent\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n provider_url: \"iiop://172.24.0.0:2809\"\n connection_factory: ConnectionFactory\n destination_name: Queue\n use_topic: FALSE\n message_class: String\n j2ee_user: cyberuser@host\n j2ee_parameter: java.lang.String=\"this is my message\""
+},
+{
+"line": 122863,
+"txt": "    insert_job: ftjob1\n    job_type: FT\n    machine: ftagent\n    watch_file: \"c:\\data\\totals\"\n    watch_file_type: EXPAND\n    continuous: Y\n    watch_file_change_type: DELTA\n    watch_file_change_value: 10240 /* The value must be entered in bytes (10 x 1024 bytes = 10240) */\n    insert_job: ftjob2\n    job_type: FT\n    machine: ftagent\n    watch_file: \"c:\\data\\totals\"\n    watch_file_type: SHRINK\n    continuous: Y\n    watch_file_change_type: DELTA\n    watch_file_change_value: 10240 /* The value must be entered in bytes (10 x 1024 bytes = 10240) */"
+},
+{
+"line": 122953,
+"txt": " insert_job: jmspub3\n job_type: JMSPUB\n machine: jms\n owner: weblogic@mach\n connection_factory: weblogic.examples.jms.QueueConnectionFactory\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n use_topic: false\n provider_url: \"t3://jms_server:7001\"\n message_class: String\n destination_name: weblogic.examples.jms.exampleQueue\n j2ee_parameter: String=\"Hello World\"\n correlation_id: jms_corr_id"
+},
+{
+"line": 122974,
+"txt": " insert_job: jmssub3\n job_type: JMSSUB\n machine: jms\n owner: weblogic@mach\n connection_factory: weblogic.examples.jms.QueueConnectionFactory\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n use_topic: false\n provider_url: \"t3://jms_server:7001\"\n destination_name: weblogic.examples.jms.exampleQueue\n correlation_id: jms_corr_id"
+},
+{
+"line": 122993,
+"txt": " insert_job: jmspub4\n job_type: JMSPUB\n machine: jms\n owner: weblogic@mach\n connection_factory: weblogic.examples.jms.QueueConnectionFactory\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n use_topic: false\n provider_url: \"t3://jms_server:7001\"\n message_class: String\n destination_name: weblogic.examples.jms.exampleQueue\n j2ee_parameter: String=\"Hello World\""
+},
+{
+"line": 123007,
+"txt": " insert_job: jmssub4\n job_type: JMSSUB\n machine: jms\n owner: weblogic@mach\n connection_factory: weblogic.examples.jms.QueueConnectionFactory\n initial_context_factory: weblogic.jndi.WLInitialContextFactory\n use_topic: false\n provider_url: \"t3://jms_server:7001\"\n destination_name: weblogic.examples.jms.exampleQueue\n correlation_id: jmspub4"
+},
+{
+"line": 123332,
+"txt": " insert_job: dbtrig_oracle\n job_type: DBTRIG\n machine: dbagent\n tablename: Inventory_List\n dbtype: Oracle\n trigger_type: INSERT,DELETE\n owner: sys@orcl\n connect_string: \"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\""
+},
+{
+"line": 123446,
+"txt": " insert_job: sql_job1\n job_type: SQL\n machine: SQL_server1\n sql_command: select emp_name from emp where emp_name like 'S%'\n connect_string:\"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\"\n success_criteria: emp_name=S.*\n destination_file: \"c:\\temp\\sql_job1_out.log\""
+},
+{
+"line": 123545,
+"txt": " insert_job: publish\n job_type: JMSPUB\n machine: appagent\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n provider_url: \"iiop://172.24.0.0:2809\"\n connection_factory: ConnectionFactory\n destination_name: Queue1\n destination_user: queuser@host\n use_topic: FALSE\n message_class: String\n j2ee_user: cyberuser@host\n j2ee_parameter: java.lang.String=\"this is my message\""
+},
+{
+"line": 123592,
+"txt": " insert_job: omd_unix\n job_type: OMD\n machine: unixagt\n disk_drive: /export/home\n disk_space: FREE\n disk_format: GB\n lower_boundary: 8\n upper_boundary: 10\n inside_range: TRUE\n no_change: 15"
+},
+{
+"line": 123623,
+"txt": " insert_job: omd_i5\n job_type: OMD\n machine:i5agent\n disk_drive: /\n disk_format: PERCENT\n lower_boundary: 90\n upper_boundary: 100\n inside_range: TRUE\n disk_space: USED"
+},
+{
+"line": 123817,
+"txt": " insert_job: open_window\n job_type: CMD\n machine: winagent\n description: \"Open the Computer Management window\"\n command: compmgmt.msc\n interactive: y\n elevated: y"
+},
+{
+"line": 123931,
+"txt": "    insert_job: execproc\n    job_type: PAPROC\n    machine: localhost\n    endpoint_URL: \"http://capamach:8080/itpam/soap\"\n    pa_name: \"/CAWAAE/Test Process\"\n    owner: pamadmin@capamach\n    pa_monitor_progress: Y\n    pa_parameter: Name=\"strTestName\", Value=\"PA Test\""
+},
+{
+"line": 124512,
+"txt": " insert_job: FTPDL_SINGLE\n job_type: FTP\n machine: ftpagent\n ftp_server_name: hprsupp\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: A\n ftp_remote_name: u1/files/ftpdata/textfile\n ftp_local_name: /export/home/ftpfiles/ftpdata/Folder/textfile\n owner: ftpuser@hprsupp"
+},
+{
+"line": 124526,
+"txt": " insert_job: DOWNLOAD_MULTIPLE\n job_type: FTP\n machine: RAGENT\n ftp_server_name: hprsupp\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: A\n ftp_remote_name: /u1/files/scripts/echo;/u1/files/scripts/echo1;/u1/files/scripts/echo2\n ftp_local_name: /export/home/ftpfiles/ftpdata/echo;/export/home/ftpfiles/ftpdata/\n echo_1;/export/home/ftpfiles/ftpdata/echo_2\n owner: ftpuser@hprsupp"
+},
+{
+"line": 124548,
+"txt": " insert_job: FTPUPLOAD\n job_type: FTP\n machine: ftpagent\n ftp_server_name: hprsupp\n ftp_server_port: 5222\n ftp_transfer_direction: UPLOAD\n ftp_transfer_type: A\n ftp_remote_name: /tmp\n ftp_local_name: /export/home/ftpfiles/ftpdata/text*\n owner: ftpuser@hprsupp"
+},
+{
+"line": 124565,
+"txt": " insert_job: FTP_EBCDIC\n job_type: FTP\n machine: I5AGENT\n ftp_server_name: i5agent\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: E\n ftp_local_name: /QSYS.LIB/ESPLIB.LIB/DOWNLOAD.FILE/DATA.MBR\n ftp_remote_name: /QSYS.LIB/DATALIB.LIB/DATAFILE.FILE/DATA.MBR\n owner: ftpuser@i5agent"
+},
+{
+"line": 124684,
+"txt": " insert_job: FTP_WILDCARD\n job_type: FTP\n machine: ftpagent\n ftp_server_name: hprsupp\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: A\n ftp_remote_name: /u1/files/scripts/r*\n ftp_local_name: /export/home/ftpfiles/ftpdata/WC\n owner: test@hprsupp"
+},
+{
+"line": 124757,
+"txt": " insert_job: FTPT1A\n job_type: FTP\n machine: ftpagent\n ftp_server_name: hpsupport\n ftp_server_port: 5222\n ftp_transfer_direction: DOWNLOAD\n ftp_transfer_type: A\n ftp_remote_name: /u1/qatest/ftpdata/textfile\n ftp_local_name: /export/home/ftpfiles/test1\n owner: ftpuser@hpsupport"
+},
+{
+"line": 124922,
+"txt": " insert_job: UPLOAD_i5\n job_type: FTP\n machine: I5AGENT\n ftp_server_name: hpunix\n ftp_server_port: 5222\n ftp_transfer_direction: UPLOAD\n ftp_transfer_type: A\n ftp_remote_name: /u1/ftpfiles/ftpdata/textdoc\n ftp_local_name: /home/ftp/textdoc\n owner: test@hpunix"
+},
+{
+"line": 124987,
+"txt": "    insert_job:FTP_UPLOAD\n    job_type: FTP\n    machine: winagent\n    owner: user1@winserver\n    ftp_server_name: winserver\n    ftp_server_port: 21\n    ftp_transfer_direction: UPLOAD\n    ftp_use_SSL: TRUE\n    ftp_remote_name: \"c:\\uploaded_files\\filename.txt\"\n    ftp_local_name: \"d:\\files_to_upload\\filename.txt\""
+},
+{
+"line": 125828,
+"txt": "    insert_job: cplusplus_program\n    job_type: CMD\n    machine: unixagent\n    command: /usr/common/backup\n    heartbeat_interval: 2"
+},
+{
+"line": 125862,
+"txt": "    insert_job: i5job_runprog\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n    i5_name: PARAM\n    i5_params: \"ABC C1 P\"\n    owner: ASYSOPR"
+},
+{
+"line": 125873,
+"txt": "    insert_job: i5job_displib\n    job_type: I5\n    machine: i5agent\n    i5_action: COMMAND\n    i5_name: DSPLIBL\n    i5_lib: *LIBL\n    i5_curr_lib: AGTLIB\n    i5_job_name: PAYJOBA\n    i5_job_desc: PRDLIB/PRDOPR\n    i5_job_queue: ABCSYS/PAYROLL"
+},
+{
+"line": 125928,
+"txt": "    insert_job: i5job_returnC\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n    i5_name: SALARY\n    i5_cc_exit: *USER"
+},
+{
+"line": 125971,
+"txt": "    insert_job: i5job_lib\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n    i5_name: MFGDATA\n    i5_curr_lib: PAY1\n    i5_job_desc: CYB1/DFTJOBD"
+},
+{
+"line": 126039,
+"txt": " insert_job: i5job_lib\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: PROCPROG\n i5_job_name: PROG1"
+},
+{
+"line": 126076,
+"txt": " insert_job: i5job_lib\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: PAYLOAD\n i5_curr_lib: PAY1\n i5_job_queue: /QYS.LIB/QBASE.LIB/JQUEUE.JOBQ"
+},
+{
+"line": 126188,
+"txt": " insert_job: i5job_lib\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: PAYJOB\n i5_library_list: \"PAYROLL\""
+},
+{
+"line": 126198,
+"txt": " insert_job: i5job_lib\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROGRAM\n i5_name: ACCTJOB\n i5_library_list: \"PAYROLL FINANCE\""
+},
+{
+"line": 126292,
+"txt": " insert_job: i5job_file\n job_type: I5\n machine: i5agent\n i5_action: RUN_PROG_IN_FILE\n i5_name: CLSRC(BACKUP)"
+},
+{
+"line": 126441,
+"txt": "    insert_job: i5_priority\n    job_type: I5\n    machine: i5agent\n    i5_action: RUN_PROGRAM\n    i5_name: PAYROLL\n    i5_process_priority: HIGH"
+},
+{
+"line": 126493,
+"txt": "    insert_job: informatica\n    job_type: INFORMATICA\n    machine: 160_infor\n    owner: root@informatica\n    informatica_folder_name: FSTL\n    informatica_workflow_name: WF_2\n    informatica_pass_on_success: 1\n    informatica_param_file: C:\\Infa\\wf2.prm"
+},
+{
+"line": 126753,
+"txt": " insert_job: testae_getjob   job_type: HTTP\n machine: localhost\n invocation_type: GET\n provider_url: \"https://github.gwd.broadcom.net:443/ESD/ae\"\n results_file_overwrite: 0\n persist_output_cookies: 1"
+},
+{
+"line": 126761,
+"txt": " insert_job: testae_getjob1   job_type: HTTP\n machine: localhost\n invocation_type: GET\n provider_url: \"https://github.gwd.broadcom.net:443/ESD/ae\"\n input_cookies: testae_getjob\n results_file_overwrite: 0"
+},
+{
+"line": 126804,
+"txt": "    insert_job: omcpu_job\n    job_type: OMCPU\n    machine: winagt\n    cpu_usage: FREE\n    lower_boundary: 25\n    upper_boundary: 75\n    inside_range: FALSE\n    no_change: 10\n    monitor_mode: CONTINUOUS"
+},
+{
+"line": 126910,
+"txt": "    insert_job: google\n    job_type: HTTP\n    machine: appagent\n    invocation_type: GET\n    provider_url: \"http://google.com/search\"\n    j2ee_authentication_order: BASIC,DIGEST,NTLM\n    j2ee_parameter: q=\"ca workload automation\""
+},
+{
+"line": 127053,
+"txt": "insert_job: HTTP.CON_USER\n    job_type: HTTP\n    machine: appagent\n    invocation_type: GET\n    provider_url: \"http://host.example.com/protected\"\n    j2ee_conn_origin: host.example.com\n    j2ee_conn_domain: windows_domain\n    j2ee_conn_user: myuser@windows_domain\n    j2ee_no_global_proxy_defaults: Y\n    j2ee_authentication_order: BASIC,DIGEST,NTLM\n    j2ee_proxy_domain: \"http://host.domain.proxy\"\n    j2ee_proxy_host: proxy.example.com\n    j2ee_proxy_origin_host: \"http://host.origin.proxy\"\n    j2ee_proxy_port: 90\n    j2ee_proxy_user: user01"
+},
+{
+"line": 127658,
+"txt": " insert_job: ZOS_JOB\n job_type: ZOS\n machine: ZOS1\n jcl_library: CYBDL01.JCLLIB(CYBDL01A)"
+},
+{
+"line": 127675,
+"txt": " insert_job: ZOS_TAPE_JOB\n job_type: ZOS\n machine: ZOS1\n jcl_library: CYBDL01.JCLLIB(TAPEJCL)\n jcl_member: CYBTS000"
+},
+{
+"line": 127688,
+"txt": " insert_job: ZOS_SEQ_JOB\n job_type: ZOS\n machine: ZOS1\n jcl_library: seq-CYBSL02.SEQJCL\n jcl_member: CYBTS002"
+},
+{
+"line": 127723,
+"txt": " insert_job: CYBDL01A\n job_type: ZOS\n machine: ZOS1\n jcl_library: CYBDL01.JCLLIB\n jcl_member: CYBDL01A"
+},
+{
+"line": 127742,
+"txt": " insert_job: ZOS_TAPE_JOB\n job_type: ZOS\n machine: ZOS1\n jcl_library: CYBDL01.JCLLIB(CYBBR14)\n jcl_member: CYBTS004"
+},
+{
+"line": 127800,
+"txt": "    insert_job: change\n    job_type: JMXMAS\n    machine: appagent\n    URL: \"service:jmx:rmi:///jndi/rmi://agenttest:5099/jmxserver\"\n    mbean_name: \"DefaultDomain:index=1,type=cdc.jmx.SimpleDynamic\"\n    mbean_attr: State\n    jmx_parameter: payload_job=size\n    condition: success(size)"
+},
+{
+"line": 127887,
+"txt": "    insert_job: unix_cmd\n    job_type: CMD\n    machine: unixagent\n    command: /export/home/payroll/data\n    job_class: JOBCLASS2"
+},
+{
+"line": 127948,
+"txt": " insert_job: sq1\n job_type: WSDOC\n machine: wsagent\n wsdl_operation: getPrice\n port_name: StockQuoteServiceHttpSoap11Endpoint\n service_name: StockQuoteService\n endpoint_URL: \"http://wsservice:8080/axis2/services/StockQuoteService\"\n WSDL_URL: \"http://wsservice:8080/axis2/services/StockQuoteService?wsdl\"\n ws_parameter: param_name=\"/getPrice\",param_value=\"\"\n ws_parameter: param_name=\"/getPrice/symbol\", param_value=\"ABC\"\n ws_global_proxy_defaults: Y\n job_criteria: criteria_xpath=\"//ns:return\", criteria_filter=\".*42.*\""
+},
+{
+"line": 128070,
+"txt": " insert_job: jobterm1\n job_type: C\n box_name: unix_box\n command: sleep 120\n machine: unixagent\n job_terminator: y"
+},
+{
+"line": 128167,
+"txt": " insert_job: cmd_job1\n job_type: CMD\n machine: unixprod\n command: \"/usr/scripts/calcproc.sh\""
+},
+{
+"line": 128495,
+"txt": "    insert_machine: VM\n    machine: mach1\n    machine: mach2\n    machine: mach3\n    machine: mach4\n    machine: mach5\n    machine_method: roundrobin"
+},
+{
+"line": 128525,
+"txt": " insert_machine: VM_JL1\n type: v\n machine_method: roundrobin_jobload\n machine: M1\n max_load: 30\n machine: M2\n max_load: 10\n machine: M3\n max_load: 10\n machine: M4\n max_load: 10"
+},
+{
+"line": 128542,
+"txt": " insert_job: JobL1\n command: sleep 5\n machine: VM_JL1\n job_load: 10\n priority: 1\n insert_job: JobL2\n command: sleep 5\n machine: VM_JL1\n job_load: 10\n priority: 2\n insert_job: JobL3\n command: sleep 5\n machine: VM_JL1\n job_load: 10\n priority: 3\n insert_job: JobL4\n command: sleep 5\n machine: VM_JL1\n job_load: 30\n priority: 4"
+},
+{
+"line": 128621,
+"txt": " insert_job: unix_script\n job_type: CMD\n machine: unixagent\n command: /usr/common/backup\n max_exit_success: 2"
+},
+{
+"line": 128901,
+"txt": " insert_job: mfjcl_job\n job_type: MICROFOCUS\n machine: mfagent\n mf_jcl_type: CONTENT\n mf_server_address_type: NAME\n mf_server: JCLDEMO\n mf_jcl_name: \"C:\\Program Files\\Micro Focus\\es-jcldemo\\sleepsmp2.jcl\""
+},
+{
+"line": 128942,
+"txt": "    insert_job: mf_job_jcl_by_content\n    job_type: MICROFOCUS\n    machine: mfagent\n    mf_server_address_type: ADDRESS\n    mf_server: \"tcp:172.31.255.255:2222\"\n    mf_jcl_type: CONTENT\n    mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\""
+},
+{
+"line": 128986,
+"txt": "    insert_job: mf_job_with_server_by_address\n    job_type: MICROFOCUS\n    machine: mfagent\n    mf_server_address_type: ADDRESS\n    mf_server: \"tcp:172.31.255.255:2222\"\n    mf_jcl_type: CONTENT\n    mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\""
+},
+{
+"line": 129016,
+"txt": "    insert_job: mf_job_test_with_server_by_address\n    job_type: MICROFOCUS\n    machine: mfagent\n    mf_server_address_type: ADDRESS\n    mf_server: \"tcp:172.31.255.255:2222\"\n    mf_jcl_type: CONTENT\n    mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\""
+},
+{
+"line": 129034,
+"txt": " insert_job: mf_job_with_server_by_name\n job_type: MICROFOCUS\n machine: mfagent\n mf_jcl_type: CONTENT\n mf_server_address_type: NAME\n mf_server: JCLDEMO\n mf_jcl_name: \"C:\\Program Files\\Micro Focus\\es-jcldemo\\sleepsmp2.jcl\""
+},
+{
+"line": 129061,
+"txt": " insert_job: mf_job_with_mf_user\n job_type: MICROFOCUS\n machine: mfagent\n mf_server_address_type: NAME\n mf_server: mfprod\n mf_jcl_type: REFERENCE\n mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\"\n mf_user: MFUSER01@mfprod"
+},
+{
+"line": 129325,
+"txt": " insert_job: omp_unix\n job_type: OMP\n machine: unixagt\n process_name: 2568\n process_status: RUNNING\n    monitor_mode: NOW"
+},
+{
+"line": 129372,
+"txt": "    insert_job: dbmon_job1\n    job_type: DBMON\n    machine: dbagt\n    tablename: Inventory_List\n    monitor_type: INCREASE\n    connect_string: \"jdbc:db2://172.31.255.255:50000/SAMPLE\""
+},
+{
+"line": 129493,
+"txt": " insert_job: job3\n job_type: CMD\n machine: localhost\n command: echo \"hello\"\n date_conditions: y\n days_of_week: all\n start_times: \"16:00\"\n must_start_times: \"54:10\"\n must_complete_times: \"54:12\""
+},
+{
+"line": 129547,
+"txt": " insert_job: job2\n job_type: CMD\n machine: localhost\n command: echo \"Hello\"\n date_conditions: y\n days_of_week: all\n start_times: \"12:00, 13:00\"\n must_start_times: \"12:01\"\n must_complete_times: \"12:02\""
+},
+{
+"line": 129558,
+"txt": " insert_job: job2\n job_type: CMD\n machine: localhost\n command: echo \"Hello\"\n date_conditions: y\n days_of_week: all\n start_times: \"12:00, 13:00\"\n must_start_times: \"12:01, 13:01\"\n must_complete_times: \"12:02, 13:02\""
+},
+{
+"line": 129833,
+"txt": " insert_job: job2\n job_type: CMD\n machine: localhost\n command: echo \"Hello\"\n date_conditions: y\n days_of_week: all\n start_times: \"23:58\"\n must_start_times: +3"
+},
+{
+"line": 130084,
+"txt": " insert_job: alarm_notification\n machine: localhost\n job_type: c\n command: as_test -t 2\n send_notification:y\n notification_alarm_types: JOBFAILURE, MAXRUNALARM\n notification_template: emailtemplate\n notification_emailaddress_on_alarm :admin@example.com"
+},
+{
+"line": 130134,
+"txt": " insert_job: email_job_1\n machine: localhost\n job_type: c\n command: as_test -t 2\n send_notification:1\n notification_emailaddress: admin@example.com, admin1@example.com, admin2@example.com\n notification_emailaddress_on_success: success@example.com\n notification_emailaddress_on_terminated: terminate@example.com\n notification_msg:\"email_job_1 has completed\""
+},
+{
+"line": 130197,
+"txt": " insert_job: alarm_notification\n machine: localhost\n job_type: c\n command: as_test -t 2\n send_notification:y\n notification_alarm_types: JOBFAILURE, MAXRUNALARM\n notification_template: emailtemplate\n notification_emailaddress_on_alarm :admin@example.com\n notification_emailaddress: email@example.com"
+},
+{
+"line": 130250,
+"txt": " insert_job: email_job_2\n machine: localhost\n job_type: c\n command: as_test -t 2\n send_notification:f\n notification_template: emailtemplate2\n notification_emailaddress: admin2@example.com\n notification_emailaddress_on_failure:admin@example.com"
+},
+{
+"line": 130301,
+"txt": " insert_job: email_job_2\n machine: localhost\n job_type: c\n command: as_test -t 2\n send_notification:y\n notification_template: emailtemplate2\n notification_emailaddress_on_success:admin@example.com"
+},
+{
+"line": 130342,
+"txt": " insert_job: email_job_2\n machine: localhost\n job_type: c\n command: as_test -t 2\n send_notification: y\n notification_template: emailtemplate2\n notification_emailaddress_on_terminated:admin@example.com"
+},
+{
+"line": 130495,
+"txt": "    insert_job: email_job_2\n    machine: localhost\n    job_type: c\n    command: as_test -t 2\n    send_notification: y\n    notification_emailaddress: admin@example.com\n    notification_emailaddress_on_success: user@example.com\n    notification_template: emailtemplate"
+},
+{
+"line": 130820,
+"txt": " insert_job: oaset_resp\n job_type: oaset\n machine: cyboa\n oracle_appl_name_type: DISPLAY\n oracle_appl_name: Process Manufacturing Financials\n oracle_resp: System Administrator\n oracle_user: SYSADMIN\n oracle_use_arg_def: Y\n oracle_custom_property: key=\":$FLEX$.EAM_SRS_MAINTAINED_ITEM_NAMES_W_ACT\",\n  Value=\"'SELECT EAM_SRS_MAINTAINED_ITEM_NAMES_W_ACT from SOME_TABLE where SOME_KEY =\n  'Default''\""
+},
+{
+"line": 130893,
+"txt": " insert_job: OA7\n job_type: OASET\n machine: localhost\n oracle_appl_name: FND\n oracle_appl_name_type: SHORT\n oracle_req_set: FNDRSSUB873\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_mon_children: Y\n oracle_mon_children_delay: 10\n oracle_save_output: Y\n oracle_use_arg_def: Y"
+},
+{
+"line": 130943,
+"txt": " insert_job: oasg_nomon\n job_type: oasg\n machine: oaagent\n oracle_appl_name_type: DISPLAY\n oracle_appl_name: Application Object Library\n oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_mon_children: Y\n oracle_mon_children_delay: 60"
+},
+{
+"line": 130981,
+"txt": " insert_job: oasg_disp\n job_type: oasg\n machine: oaagent\n oracle_appl_name_type: DISPLAY\n oracle_appl_name: Application Object Library\n oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_desc: CONFIRMED REQ 2010808 by TYB212\n oracle_save_output: N\n oracle_notify_display_users: 'Applications Manager', 'System Administrator'\n oracle_output_format: PDF"
+},
+{
+"line": 131018,
+"txt": " insert_job: oasg_disp\n job_type: oasg\n machine: oaagent\n oracle_appl_name_type: DISPLAY\n oracle_appl_name: Application Object Library\n oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_desc: CONFIRMED REQ 2010808 by TYB212\n oracle_save_output: N\n oracle_notify_users: 'APPSMGR', 'SYSADMIN'\n oracle_output_format: PDF"
+},
+{
+"line": 131049,
+"txt": " insert_job: oasg_short\n job_type: oasg\n machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: ACCOUNTS\n    oracle_output_format: PDF\n    oracle_program: FNDSCARU\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_template_name: OraTemplate\n    oracle_template_language: en\n    oracle_template_territory: US\n    oracle_oprunit: \"MyOrgName\""
+},
+{
+"line": 131097,
+"txt": "    insert_job: oasg_short\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: ACCOUNTS\n    oracle_output_format: PDF\n    oracle_program: FNDSCARU\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_template_language: en\n    oracle_template_territory: US"
+},
+{
+"line": 131145,
+"txt": "    insert_job: oasg_short\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: ACCOUNTS\n    oracle_program: FNDSCARU\n    oracle_user: SYSADMIIN\n    oracle_resp: System Administrator\n    oracle_printer:Q_DEVELOPMENT\n    oracle_print_style: PORTRAIT\n    oracle_print_copies: 15"
+},
+{
+"line": 131195,
+"txt": "    insert_job: oast_short\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: ACCOUNTS\n    oracle_program: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_printer:Q_DEVELOPMENT\n    oracle_print_style: PORTRAIT\n    oracle_print_copies: 15"
+},
+{
+"line": 131246,
+"txt": "    insert_job: oasg_short\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: ACCOUNTS\n    oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_printer:Q_DEVELOPMENT\n oracle_print_style: PORTRAIT\n oracle_print_copies: 15"
+},
+{
+"line": 131291,
+"txt": " insert_job: oasg_disp\n job_type: oasg\n machine: oaagent\n oracle_appl_name: ACCOUNTS\n oracle_program_name_type: DISPLAY\n oracle_program: Application Object Library\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_desc: CONFIRMED REQ 2010808 by TYB212"
+},
+{
+"line": 131344,
+"txt": "    insert_job: oast_short\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name: FNDSCARU\n    oracle_program_name_type: SHORT\n    oracle_program: ACCOUNTS\n    oracle_user: YSADMIN\n oracle_resp: System Administrator"
+},
+{
+"line": 131519,
+"txt": " insert_job: oaset_prog\n job_type: oaset\n machine: oaagent\n oracle_appl_name_type: DISPLAY\n oracle_appl_name: Application Object Library\n oracle_req_set: EXTRACTS\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_printer: \"\\\\printer path\\Q8\"\n oracle_print_style: LANDSCAPE\n oracle_print_copies: 1\n oracle_programdata: index=1, args=\"T23,,R1\", printer=\"\\\\printer\\Q1\",\n  print_style=PORTRAIT, print_copies=2, saveop=Y\n oracle_programdata: index=5, args=\"R,R1,\", printer=\"\\\\printer\\Q2\", print_style=PORTRAIT,\n  print_copies=3, saveop=N"
+},
+{
+"line": 131545,
+"txt": " delete_job: test_OASET\n insert_job: oaset_fmt\n job_type: OASET\n machine: localhost\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_appl_name_type: SHORT\n oracle_appl_name: BIS\n oracle_req_name_type: DISPLAY\n oracle_req_set: FNDRSSUB1310\n oracle_use_arg_def: Y\n    oracle_programdata: index=1, output_format=PDF, template_name=OraTemplate,\n     template_language=en, template_territory=US,\n     notify_users=\"'SYSADMIN','ASGUEST','QATEST1'\"\n    oracle_programdata: index=2, output_format=EXCEL, oprunit=MyOrgName,\n     template_language=en, template_territory=US,\n     notify_users=\"'SYSADMIN','ASGUEST','QATEST1'\"\n    group: OA"
+},
+{
+"line": 131590,
+"txt": "    insert_job: oasg_short\n    job_type: oasg\n    machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: ACCOUNTS\n    oracle_program: FNDSCARU\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_quote_in_default: Y"
+},
+{
+"line": 131873,
+"txt": " insert_job: oasg_short\n job_type: oasg\n machine: oaagent\n oracle_appl_name_type: SHORT\n oracle_appl_name: ACCOUNTS\n oracle_output_format: PDF\n oracle_program: FNDSCARU\n oracle_user: SYSADMIN\n oracle_resp: System Administrator\n oracle_template_name: OraTemplate\n oracle_template_language: en\n oracle_template_territory: US"
+},
+{
+"line": 131994,
+"txt": "    insert_job: oaset_resp\n    job_type: oaset\n    machine: oaagent\n    oracle_appl_name_type: SHORT\n    oracle_appl_name: BIS\n    oracle_req_set_type: SHORT\n    oracle_req_set: FNDRSSUB1310\n    oracle_output_format: PDF\n    oracle_user: SYSADMIN\n    oracle_resp: System Administrator\n    oracle_use_set_defaults_first: Y"
+},
+{
+"line": 132101,
+"txt": " insert_job: mf_job_with_os_user\n job_type: MICROFOCUS\n machine: mfagent\n mf_server_address_type: NAME\n mf_server: mfprod\n mf_jcl_type: REFERENCE\n mf_jcl_name: \"C:\\Program Files\\micro focus\\es-jcldemo\\if.jcl\"\n mf_user: MFUSER01@mfprod\n os_user: OSUSER@osserver"
+},
+{
+"line": 132322,
+"txt": " insert_job: test_job\n job_type: c\n command: sleep 60\n machine: juno\n owner: jerry@jupiter\n permission: wx\n alarm_if_fail: 1"
+},
+{
+"line": 132373,
+"txt": " insert_job: pam1\n job_type: PAPROC\n endpoint_url: \"http://canor01-vm2k3c:8080/itpam/soap\"\n machine: paagent\n owner: pamadmin@capamach\n pa_name: \"/ITPAM Tutorials/S01 Getting started/L01 Creating a Simple Process/L01-\n 2 Running the Process/Running the Process\"\n pa_monitor_progress: Y\n pa_trace: N"
+},
+{
+"line": 132457,
+"txt": " insert_job: srf1\n job_type: PAREQ\n endpoint_URL: \"http://paserver:8080/itpam/soap\"\n machine: paagent\n owner: pamadmin@paserver\n pa_path: \"/ITPAM Tutorials/S05 External Interactions/L06 Start Req Form for Input/\"\n pa_name: \"Start Request Form\"\n pa_parameter: param_name=\"AlarmProcessingProduct\", param_value=\"Test Alarm Product\"\n pa_parameter: param_name=\"Server\", param_value=\"paserver\"\n pa_parameter: param_name=\"Port\", param_value=80\n pa_monitor_progress: Y\n pa_trace: Y"
+},
+{
+"line": 132534,
+"txt": " insert_job: execproc\n job_type: PAPROC\n machine: localhost\n endpoint_URL: \"http://capamach:8080/itpam/soap\"\n pa_name: \"Test Process\"\n owner: pamadmin@capamach\n pa_monitor_progress: Y\n pa_trace: Y\n pa_parameter: Name=\"strTestName\", Value=\"PA Test\""
+},
+{
+"line": 133221,
+"txt": " insert_job: omp_i5_all\n job_type: OMP\n machine: i5agt\n process_name: \"*ALL/*ALL/CYBAGENT\"\n process_status: RUNNING\n monitor_mode: NOW"
+},
+{
+"line": 133231,
+"txt": " insert_job: omp_i5_unix\n job_type: OMP\n machine: i5agt\n process_name: BMPROC\n process_status: RUNNING\n monitor_mode: NOW"
+},
+{
+"line": 133274,
+"txt": " insert_job: omp_win\n job_type: OMP\n machine: winagt\n process_name: \"c:\\Program files\\Agent\\cybAgent.exe\"\n process_status: STOPPED\n monitor_mode: NOW"
+},
+{
+"line": 133341,
+"txt": " insert_job: test_run\n job_type: CMD\n machine: unixagent\n command: /bin/touch /tmp/test_run.out\n profile: /usr/home/my_profile"
+},
+{
+"line": 133350,
+"txt": " insert_job: test_run\n job_type: CMD\n    machine: winagent\n    command: \"c:\\bin\\test.bat\"\n    profile: eng"
+},
+{
+"line": 133365,
+"txt": "    insert_job: test_run\n    job_type: CMD\n    machine: winagent\n    command: \"c:\\bin\\test.bat\"\n    profile: \\\\dev\\share\\cmdprof.txt"
+},
+{
+"line": 133541,
+"txt": " insert_job: pass_args\n job_type: PS\n machine: psagt\n owner:VP1@server01\n ps_process_name: NVSRUN\n ps_process_type: nVision-Report\n ps_dest_type: FILE\n ps_dest_format: XLS\n ps_output_dest: \"c:\\test\\testnv.xls\"\n ps_skip_parm_updates: Yes\n ps_args: \"-NRNVARIABLE -NBUAUS01 -NHLhttp://10.1.1.40/psp/ps/EMPLOYEE/ERP/c/\n REPORT_BOOKS.IC_RUN_DRILLDOWN.GBL?Action=A\""
+},
+{
+"line": 133613,
+"txt": "    insert_job: ps_txtfile\n    job_type: ps\n    machine: psagt\n    owner: VP1@server01\n    ps_output_dest:\"c\\:\\temp\\payroll.txt\"\n    ps_process_name: PAYROLL\n    ps_process_type: Application Engine\n    ps_dest_type: FILE\n    ps_dest_format: TXT\n    ps_run_cntrl_id: PS_ALL"
+},
+{
+"line": 133695,
+"txt": " insert_job: ps_dsfolder\n job_type: ps\n machine: psagt\n ps_process_name: AEMINITEST\n ps_process_type: Application Engine\n ps_dest_type: WEB\n ps_dest_format: PDF\n ps_run_cntrl_id: PS_ALL\n owner: VP1@server01\n ps_detail_folder: GENERAL\n ps_server_name: PSPROD"
+},
+{
+"line": 133738,
+"txt": " insert_job: ps_roles\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: WEB\n ps_dest_format: PDF\n ps_dlist_roles: CLERK,BANK MANAGER,Employee\n owner: VP1@server01"
+},
+{
+"line": 133751,
+"txt": " insert_job: ps_roles\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: WEB\n ps_dest_format: PDF\n ps_dlist_roles: BANK MANAGER\n owner: VP1@server01"
+},
+{
+"line": 133814,
+"txt": " insert_job: ps_nousers\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: WEB\n ps_dest_format: PDF\n ps_dlist_users:\n owner: VP2@server01\n ps_email_web_report: YES\n ps_email_address: user1@example.com;user2@example.com\n ps_email_subject: PeopleSoft Report Status\n ps_email_text: This report is available for distribution.\n ps_email_log: YES"
+},
+{
+"line": 133929,
+"txt": " insert_job: ps_logs\n job_type: PS\n machine: psagt\n ps_process_name: XRFWIN\n ps_process_type: Crystal\n ps_dest_type: EMAIL\n ps_dest_format: PDF\n ps_dlist_users: VP1\n owner: VP2@server01\n ps_email_subject: PeopleSoft Report Logs\n ps_email_text: This report is available for distribution.\n ps_email_log: YES"
+},
+{
+"line": 134169,
+"txt": " insert_job: ps_txtfile\n job_type: ps\n machine: psagt\n ps_process_name: AEMINTEST\n ps_process_type: Application Engine\n ps_run_cntrl_id: PS_ALL"
+},
+{
+"line": 134265,
+"txt": "    insert_job: ps_norestart\n    job_type: PS\n    machine: psagt\n    ps_process_name: XRFWIN\n    ps_process_type: Application Engine\n    ps_restarts: Yes"
+},
+{
+"line": 134316,
+"txt": " insert_job: ps_params\n job_type: ps\n machine: psagent\n ps_process_name: XYZ\n ps_process_type: Application Engine\n owner: VP1@server01\n ps_run_cntrl_id: TEST\n ps_run_control_table: PS_AEREQUESTTBL\n ps_run_cntrl_args: BI_WF_0001, 0, O, N, 0, N, , \"b\\\", sysdate"
+},
+{
+"line": 134392,
+"txt": " insert_job: ps_children\n job_type: ps\n machine: psagt\n ps_process_name: AEMINITEST\n ps_process_type: Application Engine\n owner: VP1@server01\n ps_run_cntrl_id: HDL8010.*"
+},
+{
+"line": 134475,
+"txt": " insert_job: ps_txtfile\n job_type: ps\n machine: psagt\n ps_process_name: DDDAUDIT\n ps_process_type: SQR Report\n ps_server_name: PSPR\n ps_time_zone: CST"
+},
+{
+"line": 134515,
+"txt": "    insert_job: ps_skipparms\n    job_type: ps\n    machine: psagt\n    ps_process_name: OMC3220-\n    ps_process_type: Crystal\n    ps_dest_type: WEB\n    ps_dest_format: PDF\n    ps_run_cntrl_id: test\n    owner: VP1@server01\n    ps_skip_parm_updates: YES\n    ps_args: -TEST, SHARE"
+},
+{
+"line": 134530,
+"txt": "    insert_job: ps_skipparms2\n    job_type: ps\n    machine: psagt\n    ps_process_name: NVSRUN\n    ps_process_type: nVision-Report\n    ps_dest_type: FILE\n    ps_dest_format: XLS\n    ps_output_dest: \"c:\\test\\testnv.xls\"\n    ps_skip_parm_updates: YES\n    ps_args: \"-NRNVARIABLE -NBUAUS01 -NHLhttp://10.1.1.40/psp/ps                       /EMPLOYEE/ERP/c/\n    REPORT_BOOKS.IC_RUN_DRILLDOWN.GBL?Action=A\""
+},
+{
+"line": 134550,
+"txt": " insert_job: ps_updateparms\n job_type: ps\n machine: psagt\n ps_process_name: OMC3220-\n ps_process_type: Crystal\n ps_run_cntrl_id: sample\n ps_skip_parm_updates: NO\n owner: VP2@server01"
+},
+{
+"line": 134622,
+"txt": " insert_job: proxy_job\n job_type: PROXY\n machine: proxyagent\n remote_target: garfunkel\n remote_command: command1\n remote_command: command2"
+},
+{
+"line": 134739,
+"txt": " insert_job: publisher1\n job_type: JMSPUB\n machine: jms\n connection_factory: ConnectionFactory\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n use_topic: false\n provider_url: \"iiop://172.24.0.0:2809\"\n message_class: String\n destination_name: Queue1\n j2ee_parameter: String=\"Hello World\"\n j2ee_user: cyberuser@host\n reply_to: Queue2"
+},
+{
+"line": 134761,
+"txt": " insert_job: subscriber1\n job_type: JMSSUB\n machine: jms\n connection_factory: ConnectionFactory\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n use_topic: false\n provider_url: \"iiop://172.24.0.0:2809\"\n destination_name: Queue1\n j2ee_user: cyberuser@host\n correlation_id: publisher1"
+},
+{
+"line": 134774,
+"txt": " insert_job: publisher2\n job_type: JMSPUB\n machine: jms\n connection_factory: ConnectionFactory\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n use_topic: false\n provider_url: \"iiop://172.24.0.0:2809\"\n message_class: String\n destination_name: reply_to=subscriber1\n j2ee_parameter: String=\"Hello World\"\n j2ee_user: cyberuser@host\n correlation_id: subscriber1"
+},
+{
+"line": 134789,
+"txt": " insert_job: subscriber2\n job_type: JMSSUB\n machine: jms\n connection_factory: ConnectionFactory\n initial_context_factory: com.ibm.websphere.naming.WsnInitialContextFactory\n use_topic: false\n provider_url: \"iiop://172.24.0.0:2809\"\n destination_name: Queue2\n j2ee_user: cyberuser@host\n correlation_id: publisher2"
+},
+{
+"line": 135137,
+"txt": "    insert_job: quote\n    job_type: WBSVC\n    machine: localhost\n    owner: ejmcommander\n    max_run_alarm: 0\n    alarm_if_fail: y\n    send_notification: n\n    wsdl_url: \"http://host:8080/axis/services/StockQuote?wsdl\"\n    target_namespace: \"http://ws.ca.com\"\n    service_name: StockQuoteService\n    port_name: StockQuote\n    wsdl_operation: GetQuote\n    endpoint_url: \"http://host:8080/axis/services/StockQuote\"\n    web_parameter: \"xsd:string=CA\"\n    one_way: false\n    return_class_name: java.lang.String\n    return_xml_name: string\n    return_namespace: \"http://ws.ca.com\""
+},
+{
+"line": 135392,
+"txt": " insert_job: SAPPM_JOB\n job_type: SAPPM\n machine: SAPAGENT\n sap_process_status: RUNNING\n sap_abap_name: RSPARAM"
+},
+{
+"line": 135423,
+"txt": "    insert_job: BWPCTEST\n    job_type: SAPBWPC\n    machine: SAPHTAGENT\n    sap_chain_id: PC_7A3929SH"
+},
+{
+"line": 135463,
+"txt": " insert_job: SAPTEST\n job_type: SAPBWPC\n machine: SAPHTAGENT\n sap_client: 850\n sap_chain_id: DEMO_CHAIN"
+},
+{
+"line": 135487,
+"txt": " insert_job: SAPMON\n job_type: SAPEVT\n machine: SAPAGENT\n sap_event_id: SAP_Event"
+},
+{
+"line": 135515,
+"txt": "    insert_job: SAPTRIG\n    job_type: SAPEVT\n    machine: SAPAGENT\n    sap_event_id: SAP_Event\n    sap_is_trigger: Y\n    sap_event_parm: 2"
+},
+{
+"line": 135571,
+"txt": " insert_job: SAPJOB1\n job_type: SAPBWIP\n machine: sapagent\n sap_info_pack: InfoBw2\n sap_ext_table: field_name=SPTAG, object_name=0CALDAY, sign=I, operation=BT,\n  low=20010101,high=20060606\n sap_ext_table: field_name=VBELN, object_name=0CALDAY, sign=I, operation=BT,\n  low=20010101,high=20060606\n sap_ext_table: field_name=PKUNRE,object_name=0CALDAY, sign=I, operation=BT,\n  low=20010101,high=20060606"
+},
+{
+"line": 135585,
+"txt": " insert_job: SAPJOB2\n job_type: SAPBWIP\n machine: sapagent\n sap_ext_table: field_name=SPTAG,low=20010101,high=20060606"
+},
+{
+"line": 135618,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: SAPAGENT\n sap_fail_msg: Internal problem\n sap_step_parms: abap_name=BTCTEST, variant=TEST\n sap_job_name: SAP_JOB"
+},
+{
+"line": 135639,
+"txt": " insert_job: BWIP\n job_type: SAPBWIP\n machine: sapagent\n sap_info_pack: ZPAK_6C7ZW2JAXS90AK71WD1CYIN"
+},
+{
+"line": 135695,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: SAPAGENT\n sap_job_class: C\n sap_job_name: SAP_JOB\n sap_step_parms: abap_name=BTCTEST"
+},
+{
+"line": 135768,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: sapagent\n sap_job_name: prodrun1\n sap_step_parms: abap_name=BTCTEST, step_user=J01PROD, variant=TEST"
+},
+{
+"line": 135777,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: sapagent\n sap_job_name: \"Today''s Work\"\n sap_step_parms: abap_name=BTCTEST, step_user=J01PROD, variant=TEST"
+},
+{
+"line": 135785,
+"txt": " insert_job: SAPCOPY\n job_type: SAPJC\n machine: sapagent\n sap_job_name: proctest\n sap_job_count: 00458131"
+},
+{
+"line": 135868,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: SAPHTAGENT\n sap_mon_child: Y\n sap_job_name: SAP_JOB\n sap_step_parms: abap_name=ZCHILDJOB1"
+},
+{
+"line": 135896,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: SAPAGENT\n sap_job_name: SAP_JOB\n sap_step_parms: abap_name=RSPARAM, step_user=J01PRO\n    sap_recipients: recipient=SU,rcp_type=SU\n    sap_office: Y"
+},
+{
+"line": 136059,
+"txt": " insert_job: test_SAPDA\n job_class: SAP\n job_type: SAPDA\n machine: sapagent\n    owner: WAAESAP@sapserver\n    arc_obj_name: BC_ARCHIVE\n    arc_obj_variant: PRODUKTIVMODUS\n    sap_print_parms: dest=INHYPR502,prt_arc_mode=PRINT,title=\"testing\", num_lines=65,\n     num_columns=132, format=X_65_132, copies=1"
+},
+{
+"line": 136108,
+"txt": "    insert_job: PMTEST\n    job_type: SAPPM\n    machine: SAPHTAGENT\n    sap_process_status: RUNNING\n    sap_proc_type: BGD\n    sap_proc_user: user14"
+},
+{
+"line": 136271,
+"txt": " insert_job: sap_job\n machine: sapagent\n job_type: SAP\n    sap_job_name: BTCTEST\n    sap_step_parms: abap_name=BTCABAP\n    sap_recipients: rcp_type=INT,recipient=J01PROD@example.com\n    sap_recipients: rcp_type=INT,recipient=J01TEST@example.com,blind_copy=Y\n    sap_recipients: rcp_type=INT,recipient=J02PROD@example.com,Copy=Y\n    sap_recipients: rcp_type=DLI,recipient=\"SAPoffice Dist List\",\n     Express=Y,Copy=Y,no_forward=Y,no_print=Y\n    sap_recipients: rcp_type=SU,recipient=WAAESAP,blind_copy=Y"
+},
+{
+"line": 136385,
+"txt": "    insert_job: test_SAPJC_2\n    job_class: SAP\n    job_type: SAPJC\n    machine: sapagent\n    owner: WAAESAP@sapserver\n    sap_job_name: AM\n    sap_job_count: 11331500\n    sap_release_option: I\n    sap_target_jobname: \"SAPJC_DUP\"\n    sap_step_num:1"
+},
+{
+"line": 136752,
+"txt": "    insert_job: TEST_1\n    job_type: SAP\n    machine: localhost\n job_class: c\n sap_job_name: \"SAP 3 STEPS_@#$\"\n sap_release_option: I\n sap_step_parms:abap_name=BTCTEST,variant=test,arc_printer=LP01,copies=2,prt_arc_mode=BOTH,arc_ob\n sap_step_parms:abap_name=BTCTEST,variant=test2,arc_printer=LP01,copies=3,prt_arc_mode=BOTH,print\n sap_step_parms:abap_name=BTCTEST,variant=test,arc_printer=LP01,copies=1,prt_arc_mode=BOTH,sap_ba"
+},
+{
+"line": 136790,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: SAPHTAGENT\n sap_job_name: SAP_JOB\n sap_success_msg: Program Selections\n sap_step_parms: abap_name=BTCTEST, step_user=J01PROD, variant=TEST"
+},
+{
+"line": 136824,
+"txt": "    insert_job: test_SAPJC_2\n    job_class: SAP\n    job_type: SAPJC\n    machine: sapagent\n    owner: WAAESAP@sapserver\n    sap_job_name: AM\n    sap_job_count: 11331500\n    sap_release_option: I\n    sap_target_jobname: \"SAPJC_DUP\"\n    group: SAPJC"
+},
+{
+"line": 136870,
+"txt": " insert_job: SAPTEST\n job_type: SAP\n machine: SAPHTAGENT\n sap_job_name: SAP_JOB\n sap_step_parms: abap_name=BTCTEST, step_user=J01PROD, variant=TEST\n sap_target_sys: tst005"
+},
+{
+"line": 136941,
+"txt": "    insert_job: sftp_download\n    machine: AGENT_SFTP\n    scp_transfer_direction: DOWNLOAD\n    scp_server_name: abcde01-i12345\n    scp_remote_dir: /ftproot/download\n    scp_remote_name: abc.txt\n    scp_local_name: \"C:\\temp\"\n    scp_protocol: SFTP\n    scp_delete_sourcefile: T\n    scp_delete_sourcedir: T\n    owner: causer@AGENT_SFTP"
+},
+{
+"line": 136986,
+"txt": "    insert_job: sftp_up_mult\n    job_type: SCP\n    machine: WINAGENT\n    scp_transfer_direction: UPLOAD\n    scp_server_name: aixunix\n    scp_remote_dir: /u1/build/uploaded\n    scp_remote_name: \"*\"\n    scp_local_name: \"c:\\temp\\upload\\*\"\n    scp_protocol: SFTP\n    scp_delete_sourcefile: T\n    owner: causer@WINAGENT"
+},
+{
+"line": 137036,
+"txt": " insert_job: scp_download\n job_type: SCP\n machine: WINAGENT\n scp_transfer_direction: DOWNLOAD\n scp_server_name: chi-linux\n scp_remote_dir: /root\n scp_remote_name: install.log\n scp_local_name: \"C:\\temp\\install.log1\"\n scp_protocol: SCP\n owner: causer@WINAGENT"
+},
+{
+"line": 137096,
+"txt": " insert_job: scp_download\n job_type: SCP\n machine: WINAGENT\n scp_transfer_direction: DOWNLOAD\n scp_server_name: chi-linux\n scp_remote_dir: /root\n scp_remote_name: install.log\n scp_local_name: \"C:\\temp\\install.log1\"\n scp_protocol: SCP\n owner: causer@WINAGENT\n scp_local_user: causer@WIAGENT"
+},
+{
+"line": 137339,
+"txt": " insert_job: scp_download\n job_type: SCP\n machine: WINAGENT\n scp_transfer_direction: DOWNLOAD\n scp_server_name: chi-linux\n scp_remote_dir: /root\n scp_remote_name: install.log\n scp_local_name: \"C:\\temp\\install.log1\"\n scp_protocol: SCP\n scp_server_port: 22\n owner: causer@WINAGENT"
+},
+{
+"line": 137383,
+"txt": "    insert_job: scp_download\n    job_type: scp\n    machine: localhost\n    owner:ftpuser@ftpserver\n    scp_local_name: \"c:\\temp\\scp.out\"\n    scp_remote_dir: /etc\n    scp_remote_name: profile.CA\n    scp_server_name: ftpserver\n    scp_target_os: unix\n    scp_transfer_direction: download"
+},
+{
+"line": 137477,
+"txt": " insert_job: test_ZOSM\n job_type: ZOSM\n machine: zosagent\n owner: user1@ca11\n search_bw: 01\n zos_jobname: CYBJAK11"
+},
+{
+"line": 137531,
+"txt": " insert_job: email_job_1\n machine: localhost job_type: c\n command: as_test -t 2\n send_notification: 1\n notification_msg: The server appears to be down."
+},
+{
+"line": 137539,
+"txt": " insert_job: email_job_1\n machine: localhost job_type: c\n command: as_test -t 2\n send_notification: f\n notification_msg: \"notify_job_1 has failed.\""
+},
+{
+"line": 137548,
+"txt": " insert_job: email_job_1\n machine: localhost job_type: c\n command: as_test -t 2\n send_notification: 1\n notification_emailaddress: admin@example.com\n notification_msg: The server appears to be down."
+},
+{
+"line": 137558,
+"txt": " insert_job: email_job_1\n machine: localhost job_type: c\n command: as_test -t 2\n send_notification: y\n notification_template: emailtemplate\n notification_emailaddress: admin@example.com\n notification_emailaddress_on_success: operator@example.com\n notification_emailaddress_on_terminated: terminate@example.com"
+},
+{
+"line": 137727,
+"txt": " insert_job: MFGSORT\n job_type: CMD\n machine: unixagt\n command: /mfg/test/sort\n shell: /bin/csh"
+},
+{
+"line": 137841,
+"txt": " insert_job: setvarv3\n job_type: SNMPSET\n machine: snmpagent\n snmp_mib: cybermation.mib\n snmp_host: host.example.com\n snmp_oid: out456789\n snmp_version: 3\n snmp_context_name: contxtname\n snmp_context_engine_id: 8000000006\n snmp_privacy: AES\n snmp_privacy_user: user1\n snmp_auth_protocol: MD5\n snmp_value: int=8"
+},
+{
+"line": 137893,
+"txt": " insert_job: setvarv3\n job_type: SNMPSET\n machine: snmpagent\n snmp_mib: cybermation.mib\n snmp_host: host.example.com\n snmp_oid: out456789\n snmp_version: 3\n snmp_context_name: contxtname\n snmp_context_engine_id: X'cab0'\n snmp_privacy: AES\n snmp_privacy_user: user1\n snmp_auth_protocol: MD5\n snmp_value: int=8"
+},
+{
+"line": 138161,
+"txt": " insert_job: getsubtree\n job_type: SNMPGET\n machine: snmpagent\n snmp_mib: cybermation.mib\n snmp_host: host.example.com\n snmp_oid: agentVersion\n port: 161\n snmp_version: 2\n snmp_comm_string: public\n snmp_subtree: y"
+},
+{
+"line": 138204,
+"txt": " insert_job: getsubtree\n job_type: SNMPGET\n machine: snmpagent\n snmp_mib: cybermation.mib\n snmp_host: host.example.com\n snmp_oid: tcpipChannelsTable\n port: 161\n snmp_version: 3\n snmp_privacy_user: user@host\n snmp_comm_string: public\n snmp_subtree: y\n snmp_table_view: y"
+},
+{
+"line": 138449,
+"txt": " insert_job: SPJOB\n job_type: DBPROC\n machine: DB_agent\n connect_string: \"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\"\n sp_name: UPDATE_INV\n sp_arg: name=QUANTITY, argtype=IN, datatype=INTEGER, value=3000\n sp_arg: name=NEW_INV, argtype=OUT, datatype=INTEGER"
+},
+{
+"line": 138547,
+"txt": " insert_job: SPJOB\n job_type: DBPROC\n machine: DB_agent\n connect_string: \"jdbc:sqlserver://myhost:1433;DatabaseName=ORDERS\"\n sp_name: PAYROLL\n success_criteria: ename=John.*\n sp_arg: name=ename, argtype=INOUT, datatype=VARCHAR, value=John Evans"
+},
+{
+"line": 138877,
+"txt": " insert_job: test_js2\n command:dir\n machine:localhost\n status:on_ice"
+},
+{
+"line": 138956,
+"txt": " insert_job: unix_err\n job_type: CMD\n machine: unixagent\n command: /usr/common/backup\n std_err_file: /tmp/test.err"
+},
+{
+"line": 138972,
+"txt": " insert_job: win_err\n job_type: CMD\n machine: winagent\n command: “C:\\COMMON\\Backup”\n std_err_file: \"C:\\tmp\\TEST.ERR\""
+},
+{
+"line": 139020,
+"txt": "    insert_job: report_job2\n    job_type: CMD\n    machine: localhost\n    command: myapplication\n    std_err_file: $$globt.some_stderr_data"
+},
+{
+"line": 139097,
+"txt": " insert_job: unix_stdin\n job_type: CMD\n machine: unixagent\n command: /usr/common/backup\n std_in_file: /tmp/test.in"
+},
+{
+"line": 139114,
+"txt": " insert_job: win_stdin\n job_type: CMD\n machine: winagent\n command: “C:\\COMMON\\Backup”\n std_in_file: \"C:\\tmp\\TEST.IN\""
+},
+{
+"line": 139123,
+"txt": " insert_job: win_globalvar\n job_type: CMD\n machine: winagent\n command: “C:\\COMMON\\Backup”\n std_in_file: \"C:\\tmp\\$$Today.in\""
+},
+{
+"line": 139133,
+"txt": " insert_job: report_job1\n job_type: CMD\n command: myapplication\n machine: localhost\n std_in_file: $$blobt\n insert_blob: report_job1\n blob_file: my_args.txt"
+},
+{
+"line": 139151,
+"txt": " insert_job: report_job1\n job_type: CMD\n command: myapplication\n std_out_file: $$blobt\n machine: localhost\n insert_job: report_post_job1\n job_type: CMD\n command: my_other_application\n machine: WinProd1\n std_in_file: $$blobt.report_job1"
+},
+{
+"line": 139165,
+"txt": " insert_job: unix_unique_name\n job_type: CMD\n machine: unixagent\n command: /usr/common/backup\n std_in_file: /tmp/myfile.$$"
+},
+{
+"line": 139257,
+"txt": " insert_job: unix_stdout\n job_type: CMD\n machine: unixagent\n command: /usr/common/backup\n std_out_file: /tmp/test.out"
+},
+{
+"line": 139300,
+"txt": " insert_job: win_stdout\n job_type: CMD\n machine: winagent\n command: “C:\\COMMON\\Backup”\n std_out_file: \"C:\\tmp\\TEST.OUT\""
+},
+{
+"line": 139339,
+"txt": " insert_job: report_job1\n job_type: CMD\n machine: localhost\n command: myapplication\n std_out_file: $$globt.some_stdout_data"
+},
+{
+"line": 139384,
+"txt": " insert_job: tan_job\n job_type: PROXY\n machine: proxagent\n owner: user1@NonStop1400\n remote_target: NonStop1400\n remote_command: who\n submit_modifier: Option1=\"HIGHPIN ON,INSPECT ON\",option2=\"2\",option3=\"ABENDONABEND\""
+},
+{
+"line": 139441,
+"txt": "    insert_job: HTTPJOB\n    job_type: HTTP\n    machine: localhost\n    success_codes: 20-30,100-150"
+},
+{
+"line": 139545,
+"txt": " insert_job: test_db_proc_success_return_10_to_10_check\n job_type: DBPROC\n machine: localhost\n result_type: INTEGER\n sp_name: ujo_sample_procedure\n success_criteria: \"\"return=10\"\""
+},
+{
+"line": 139687,
+"txt": " insert_job: subscribe\n job_type: WBSVC\n machine: wsagent\n target_namespace: \"http://www.webserviceX.NET/\"\n service_name: ValidateEmail\n port_name: ValidateEmailSoap\n wsdl_operation: IsValidEmail\n WSDL_URL: \"http://www.webservicex.net/ValidateEmail.asmx?wsdl\"\n endpoint_URL: \"http://www.webservicex.net/ValidateEmail.asmx\"\n web_parameter: xsd\\:string=\"john.smith@example.com\"\n return_class_name: java.lang.Boolean\n return_xml_name: boolean\n return_namespace: \"http://www.webservicex.net\"\n success_pattern: true"
+},
+{
+"line": 139892,
+"txt": " insert_job: dbmon_job\n job_type: DBMON\n machine: DB_agent\n tablename: Inventory_List\n monitor_type: DECREASE\n connect_string: \"jdbc:db2://172.31.255.255:50000/SAMPLE\""
+},
+{
+"line": 140007,
+"txt": " insert_job: textfile_job1\n job_type: OMTF\n machine: monagt\n text_file_name: DATA SOURCE NAME\n text_file_filter: \"EVENT \"\"COMPUTER() \"\n text_file_mode: LINE\n    lower_boundary: 123\n    upper_boundary: 876"
+},
+{
+"line": 140027,
+"txt": "    insert_job: textfile_job2\n    job_type: OMTF\n    machine: monagt\n    text_file_name: /export/home/agentdir/agentparm.txt\n    text_file_filter: \"=jars*.*\\Z\"\n    text_file_mode: LINE\n    lower_boundary: 1\n    upper_boundary: 110\n    monitor_mode: now"
+},
+{
+"line": 140073,
+"txt": "    insert_job: textfile_job4\n    job_type: OMTF\n    machine: monagt\n    text_file_name: /export/home/agentdir/agentparm.txt\n    text_file_filter: \"C:\\\\\\\\Program Files\"\n    text_file_mode: LINE\n    lower_boundary: 1\n    upper_boundary: 200\n    monitor_mode: now"
+},
+{
+"line": 140233,
+"txt": " insert_job: omtf_unix_regex\n job_type: OMTF\n machine: monagt\n text_file_name: /export/home/systemagent/agentparm.txt\n text_file_filter: \\A\\W\\sRunner\n text_file_mode: REGEX\n upper_boundary: service\n monitor_mode: now"
+},
+{
+"line": 140250,
+"txt": " insert_job: omtf_i5os_line\n job_type: OMTF\n machine: i5agt\n text_file_name: /QSYS.LIB/LIBRARY.LIB/RESULTS.FILE/DATA.MBR\n text_file_filter: Create file failed\n text_file_mode: LINE\n lower_boundary: 1\n upper_boundary: 20\n monitor_mode: now"
+},
+{
+"line": 140395,
+"txt": "    insert_job: timeformat_job\n    job_type: OMTF\n    machine: monagt\n    text_file_name: /export/home/agentdir/log/transmitter.log\n    text_file_filter: UNAGR\n    text_file_mode: DATETIME\n    time_format: \"MM/dd/yyyy HH:mm:ss.SSS zZ\"\n    lower_boundary: \"08/17/2010 00:00:00.000 EST-0500\"\n    upper_boundary: \"08/25/2010 23:59:59.999 EST-0500\"\n    monitor_mode: now"
+},
+{
+"line": 140437,
+"txt": " insert_job: timeformat_job\n job_type: OMTF\n machine: monagt\n monitor_mode: now\n text_file_name: /export/home/logs/transaction.log\n text_file_filter: UNAGR\n text_file_mode: DATETIME\n time_format: \"h:mm a\"\n time_position: 12\n lower_boundary: \"10:08 PM\"\n upper_boundary: \"12:30 PM\"\n monitor_mode: now"
+},
+{
+"line": 140657,
+"txt": "    insert_job: dbtrig_oracle\n    job_type: DBTRIG\n    machine: dbagent\n    tablename: Inventory_List\n    dbtype: Oracle\n    trigger_type: INSERT\n    owner: sys@orcl\n    connect_string: \"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\""
+},
+{
+"line": 141067,
+"txt": " insert_job: QRY1\n job_type: SQL\n machine: dbagent\n owner: dbuser1@orcl\n user_role: as sysdba\n sql_command: SELECT * from NEWORDS\n connect_string: \"jdbc:oracle:thin:@172.31.255.255:1433:ORDERS\""
+},
+{
+"line": 141212,
+"txt": "    insert_job: ft_unix1\n    job_type: FT\n    machine: unixagt\n    watch_file: /tmp/batch.input"
+},
+{
+"line": 141223,
+"txt": "    insert_job: ft_unix3\n    job_type: FT\n    machine: unixagt\n    watch_file: /usr/reports/August??.out"
+},
+{
+"line": 141228,
+"txt": "    insert_job: ft_unix4\n    job_type: FT\n    machine: unixagt\n    watch_file: /tmp/pay*"
+},
+{
+"line": 141239,
+"txt": "    insert_job: ft_win1\n    job_type: FT\n    machine: winagt\n    watch_file: \"C:\\tmp\\BATCH.IN\""
+},
+{
+"line": 141250,
+"txt": "    insert_job: ft_win3\n    job_type: FT\n    machine: winagt\n    watch_file: \"c:\\reports\\August??.out\""
+},
+{
+"line": 141255,
+"txt": "    insert_job: ft_win4\n    job_type: FT\n    machine: winagt\n    watch_file: \"c:\\temp\\pay*\""
+},
+{
+"line": 141270,
+"txt": "    insert_job: ft_i5os1\n    job_type: FT\n    machine: i5agt\n    watch_file: /QSYS.LIB/LIBRARY.LIB/DEPT.FILE/PAYROLL.MB\n    watch_file_type: UPDATE"
+},
+{
+"line": 141280,
+"txt": "    insert_job: ft_i5os2\n    job_type: FT\n    machine: i5agt\n    watch_file: /home/cybesp/PID????.*\n    watch_file_type: CREATE"
+},
+{
+"line": 141288,
+"txt": "     insert_job: ft_i5os3\n     job_type: FT\n     machine: i5agt\n     watch_file: \"LIB/PAY*/*FILE\"\n     watch_file_type: CREATE"
+},
+{
+"line": 141297,
+"txt": "     insert_job: ft_i5os3\n     job_type: FT\n     machine: i5agt\n     watch_file: \"LIB/EXPOBJ/*FILE\"\n     watch_file_type: EXPAND\n     watch_file_type: SIZE\n     watch_file_change_value: 10"
+},
+{
+"line": 141373,
+"txt": " insert_job: ft_win_percent\n job_type: FT\n machine: winagt\n watch_file: \"c:\\amount\\test\"\n watch_file_type: SHRINK\n watch_file_change_type: PERCENT\n watch_file_change_value: 65\n watch_no_change: 30"
+},
+{
+"line": 141431,
+"txt": " insert_job: ft_win_percent\n job_type: FT\n machine: unixagt\n watch_file: /amount/test\n watch_file_type: EXPAND\n watch_file_change_type: PERCENT\n watch_file_change_value: 90"
+},
+{
+"line": 141498,
+"txt": " insert_job: fw_job\n job_type: FW\n machine: unixagent\n watch_file: /tmp/watch_file.log\n watch_file_min_size: 10000\n watch_interval: 60"
+},
+{
+"line": 141574,
+"txt": " insert_job: ft_unix_update\n job_type: FT\n machine: unixagt\n watch_file: /usr/data/payroll\n watch_file_type: UPDATE\n watch_file_recursive: Y"
+},
+{
+"line": 141597,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: ftagt\n watch_file: \"c:\\fwjobs\\inventory.txt\"\n watch_file_type: Expand\n watch_file_change_type: DELTA\n watch_file_change_value: 10\n watch_file_recursive: Y"
+},
+{
+"line": 141732,
+"txt": "    insert_job: ft_win_exist\n    job_type: FT\n    machine: winagt\n    watch_file: \"c:\\bank\\account\\money\"\n    watch_file_type: EXIST"
+},
+{
+"line": 141741,
+"txt": "    insert_job: ft_win_recursive\n    job_type: FT\n    machine: winagt\n    watch_file: \"c:\\bank\\account\\money\"\n    watch_file_type: EXIST\n    watch_file_recursive: Y"
+},
+{
+"line": 141802,
+"txt": " insert_job: ftjob\n job_type: FW\n machine: ftagt\n watch_file: \"c:\\fwjobs\\inventory.txt\"\n watch_file_type: EXPAND\n watch_file_change_type: SIZE\n watch_file_change_value: 1000"
+},
+{
+"line": 141872,
+"txt": "    insert_job: ft_win_shrink\n    job_type: FT\n    machine: winagt\n    watch_file: \"c:\\cost\\cash\"\n    watch_file_type: SHRINK\n    watch_file_change_type: DELTA\n    watch_file_change_value: 10"
+},
+{
+"line": 141950,
+"txt": "    insert_job: FTP_input_companyXYZ\n    job_type: FT\n    machine: localhost\n    watch_file: /in_coming/FTP/companyXYZ.dat\n    watch_file_type: GENERATE\n    watch_no_change: 3"
+},
+{
+"line": 141988,
+"txt": " insert_job: ft_job\n job_type: FT\n machine: winagent\n watch_file: \\\\CYBNT\\MyDesktop\\notify.txt\n watch_file_type: EXIST\n watch_file_win_user: CYBDOM\\JDOE"
+},
+{
+"line": 142208,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Application\n win_event_category: DISK\n win_event_op: EQ\n win_event_id: 14"
+},
+{
+"line": 142230,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Security\n win_event_type: AUDITS\n win_event_source: Security\n win_event_computer: D9GBJG11\n win_event_category: System Event\n win_event_op: GT\n win_event_id: 0"
+},
+{
+"line": 142275,
+"txt": " insert_job: eventlog_job\n job_type: OMEL\n machine: monagt\n win_log_name: Application\n win_event_datetime: \"20100701 00:00:00\""
+},
+{
+"line": 142399,
+"txt": "    insert_job: eventlog_job\n    job_type: OMEL\n    machine: monagt\n    win_log_name: System\n    win_event_type: ERROR\n    win_event_source: Service Control Manager"
+},
+{
+"line": 142430,
+"txt": "    insert_job: eventlog_job\n    job_type: OMEL\n    machine: monagt\n    win_log_name: Application\n    win_event_type: INFO\n    win_event_category: None\n    win_event_source: Userenv\n win_event_computer: LLUSER\n win_event_id: 1000\n win_event_op: EQ"
+},
+{
+"line": 142822,
+"txt": "    insert_job: execws\n    job_type: WSDOC\n    machine: wsmach\n    endpoint_URL: \"https://s3.amazonaws.com/soap\"\n    WSDL_URL: \"http://s3.amazonaws.com/doc/2006-03-01/AmazonS3.wsdl\"\n    service_name: AmazonS3\n    port_name: AmazonS3\n    wsdl_operation: ListAllMyBuckets\n    ws_parameter: param_name=\"/ListAllMyBuckets\", param_value=\"\"\n    ws_parameter: param_name=\"/ListAllMyBuckets/AWSAccessKeyId\",\n     param_value=\"0x0102030405060708\"\n    ws_parameter: param_name=\"/ListAllMyBuckets/Timestamp\",\n     param_value=\"2011-11-10T21:24:21\"\n    ws_parameter: param_name=\"/ListAllMyBuckets/Signature\", param_value=\"0x0102030405060708\"\n    ws_global_proxy_defaults: Y"
+},
+{
+"line": 142929,
+"txt": " insert_job: incpayload\n job_type: WSDOC\n machine: wsmach\n endpoint_URL: \"http://ws1.parasoft.com/glue/calculator\"\n WSDL_URL: \"http://soaptest.parasoft.com/calculator.wsdl\"\n service_name: Calculator\n port_name: ICalculator\n wsdl_operation: add\n ws_parameter: param_name=\"/add\", param_value=\"\"\n ws_parameter: param_name=\"/add/x\", payload_job=\"getmax1\"\n ws_parameter: param_name=\"/add/y\", param_value=\"1.00\"\n ws_proxy_host: 172.31.255.255\n ws_proxy_port: 80\n ws_proxy_user: myuser@mydomain\n ws_proxy_domain: mydomain"
+},
+{
+"line": 143083,
+"txt": " insert_job: showing\n job_type: WSDOC\n machine: wsagent\n endpoint_URL: \"http://www.ignyte.com/webservices/ignyte.whatsshowing.webservice/\n moviefunctions.asmx\"\n WSDL_URL: \"http://www.ignyte.com/webservices/ignyte.whatsshowing.webservice/\n moviefunctions.asmx?wsdl\"\n service_name: MovieInformation\n port_name: MovieInformationSoap\n wsdl_operation: GetTheatersAndMovies\n ws_parameter: param_name=\"/GetTheatersAndMovies\", param_value=\"\"\n ws_parameter: param_name=\"/GetTheatersAndMovies/zipCode\", param_value=\"12590\"\n ws_parameter: param_name=\"/GetTheatersAndMovies/radius\", param_value=\"20\"\n ws_proxy_host: proxyhost.example.com\n ws_proxy_port: 80\n ws_poxy_origin: myhost.example.com\n ws_proxy_user: myuser@mydomain\n ws_proxy_domain: mydomain"
+},
+{
+"line": 143190,
+"txt": "    insert_job: weather\n    job_type: WSDOC\n    machine: wsagent\n    endpoint_URL: \"http://www.webservicex.net/globalweather.asmx\"\n    WSDL_URL: \"http://www.webservicex.net/globalweather.asmx?wsdl\"\n    service_name: GlobalWeather\n    port_name: GlobalWeatherSoap\n    wsdl_operation: GetWeather\n    ws_parameter: param_name=\"/GetWeather\", param_value=\"\"\n    ws_parameter: param_name=\"/GetWeather/CityName\", param_value=\"Raleigh / Durham, Raleigh-\n    Durham International Airport\"\n    ws_parameter: param_name=\"/GetWeather/CountryName\", param_value=\"United States\"\n    ws_proxy_host: proxyhost.example.com\n    ws_proxy_port: 80\n    ws_proxy_user: myuser@mydomain\n    ws_proxy_domain: mydomain\n    ws_proxy_origin: myhost.example.com"
+},
+{
+"line": 143466,
+"txt": " insert_job: PROD.NIGHTLY\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: PROD.CICS.FILE1602"
+},
+{
+"line": 143499,
+"txt": "    insert_job: test_ZOSDST\n    job_type: ZOSDST\n    machine: zosagent\n    owner: user1@ca11\n    zos_dsn_updated: N\n    zos_trigger_on: 0\n    zos_dataset: CYB2.DA.DSTRIG1\n    zos_dsn_renamed: y"
+},
+{
+"line": 143527,
+"txt": "    insert_job: test_ZOSDST_Upd\n    job_type: ZOSDST\n    machine: zosagent\n    owner: user1@ca11\n    zos_dsn_updated: Y\n    zos_dataset: CYB2.DA.DSTRIG1"
+},
+{
+"line": 143561,
+"txt": " insert_job: test_ZOSDST\n job_type: ZOSDST\n machine: zosagent\n owner: user1@ca11\n zos_dsn_updated: N\n zos_trigger_on: 0\n zos_dataset: CYB2.DA.DSTRIG1\n zos_explicit_dsn: y"
+},
+{
+"line": 143597,
+"txt": " insert_job: PROD.PAY_DATA\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: USER1.PAYROLL.G-\n zos_ftp_direction: RECEIVE"
+},
+{
+"line": 143628,
+"txt": " insert_job: CYBER.XFER\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: CYBER.XFER.001\n zos_ftp_direction: RECEIVE\n zos_ftp_host: 172.16.0.0\n zos_ftp_userid: CYB1"
+},
+{
+"line": 143662,
+"txt": " insert_job: CYBER.XFER\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: CYBER.XFER.001\n zos_ftp_direction: RECEIVE\n zos_ftp_host: 172.16.0.0\n zos_ftp_userid: CYBER005"
+},
+{
+"line": 143721,
+"txt": " insert_job: PROD.PAY_DATA\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: USER1.PAYROLL.G-\n zos_trigger_type: zos_job_name\n zos_trigger_by: ABC"
+},
+{
+"line": 143733,
+"txt": " insert_job: PROD.PAY_DATA\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: USER1.PAYROLL.G-\n zos_trigger_type: zos_user_id\n zos_trigger_by: CYB1"
+},
+{
+"line": 143751,
+"txt": " insert_job: CYBER.XFER\n job_type: ZOSDST\n machine: ZOS1\n owner: CYBDL01\n zos_dataset: CYBER.XFER.001\n zos_trigger_type: zos_user_id\n zos_trigger_by: CYB-\n zos_ftp_direction: RECEIVE\n zos_ftp_userid: CYB-"
+},
+{
+"line": 143855,
+"txt": " delete_job_type: value"
+},
+{
+"line": 143861,
+"txt": " delete_job_type: 1\ninsert_job_type Subcommand -- Add a Job Type to the Database"
+},
+{
+"line": 143892,
+"txt": " insert_job_type: 1\n command: /tmp/wv\n description: executes tmp/wv\nupdate_job_type Subcommand -- Update a Job Type in the Database"
+},
+{
+"line": 143925,
+"txt": " update_job_type: 1\n command: /bin/ftp\n description: executes bin/ftp"
+},
+{
+"line": 144002,
+"txt": " delete_machine: mach1"
+},
+{
+"line": 144006,
+"txt": " delete_machine: cheetah\n machine: socrates"
+},
+{
+"line": 144011,
+"txt": " delete_machine: real_machine_name"
+},
+{
+"line": 144018,
+"txt": " delete_machine: realmach1"
+},
+{
+"line": 144022,
+"txt": " delete_machine: virtual_machine_name"
+},
+{
+"line": 144028,
+"txt": " delete_machine: real_machine_pool_name"
+},
+{
+"line": 144038,
+"txt": " delete_machine: real_machine_pool_name\n machine: real_machine_name_referenced"
+},
+{
+"line": 144061,
+"txt": " delete_machine: virtmach1\n machine: realmach1"
+},
+{
+"line": 144068,
+"txt": " delete_machine: real_machine_name\n remove_references: y"
+},
+{
+"line": 144082,
+"txt": " delete_machine: realmach1\n remove_references: y\ninsert_machine Subcommand -- Add a Machine Definition"
+},
+{
+"line": 144150,
+"txt": " insert_machine: plato\n type: n"
+},
+{
+"line": 144156,
+"txt": " insert_machine: cheetah\n type: a\n opsys: windows"
+},
+{
+"line": 144163,
+"txt": " insert_machine: virtual_b\n type: v\n machine: france\n machine: italy"
+},
+{
+"line": 144171,
+"txt": " insert_machine: elm\n type: n max_load: 100 factor: 1.0\n insert_machine: maple\n type: n max_load: 200 factor: 1.0\n insert_machine: trees\n type: v\n machine: elm\n max_load: 50 factor: .1\n machine: maple\n max_load: 100 factor: 1.0"
+},
+{
+"line": 144436,
+"txt": " insert_machine: marmot\n machine: cheetah\n factor: 1\n machine: hippogriff\n factor: .8\n machine: goat\n    factor: .3"
+},
+{
+"line": 144492,
+"txt": "    delete_machine: realmach1\n    force: y"
+},
+{
+"line": 144593,
+"txt": " insert_machine: virtual_a\n machine: test\n machine: prod"
+},
+{
+"line": 144661,
+"txt": "          insert_machine: machine_name command is used (the default)."
+},
+{
+"line": 144778,
+"txt": " delete_machine: realmach1\n remove_references: y"
+},
+{
+"line": 144857,
+"txt": " delete_connectionprofile: conn_name"
+},
+{
+"line": 144866,
+"txt": " delete_connectionprofile: conn1\ninsert_connectionprofile Subcommand -- Add a Connection Profile"
+},
+{
+"line": 144880,
+"txt": " insert_connectionprofile: conn_name"
+},
+{
+"line": 144917,
+"txt": "    insert_connectionprofile: conn1\n    connectionprofile_type: HADOOP\n    hadoop_edgenode: HADOOP_EDGE_NODE\n    hadoop_edgenode_port: 22\n    hadoop_binpath: /usr/bin\n    hadoop_hdfs_namenode: \"hdfs://HADOOP_EDGE_NODE:8020\"\n    hadoop_oozie_server_url: \"http://HADOOP_EDGE_NODE:11000/oozie\"\n    hadoop_hive_jdbcurl: \"jdbc:hive2://HADOOP_EDGE_NODE:10000\"\n    hadoop_hive_driverclass: org.apache.hive.jdbc.HiveDriver\n    hadoop_sqoop_jdbcurl: \"jdbc:sqlserver://\n    DATABASE_SERVER_MACHINE:1433;databaseName=SAMPLE\"\n    hadoop_sqoop_driverclass: com.microsoft.sqlserver.jdbc.SQLServerDriver\nupdate_connectionprofile Subcommand -- Update a Connection Profile"
+},
+{
+"line": 144950,
+"txt": "    update_connectionprofile: conn_name"
+},
+{
+"line": 144994,
+"txt": " insert_connectionprofile: conn2\n connectionprofile_type: HADOOP\n hadoop_edgenode: HADOOP"
+},
+{
+"line": 145073,
+"txt": " delete_resource: mach_resource\n machine: winagent\ninsert_resource Subcommand -- Define a Virtual Resource"
+},
+{
+"line": 145119,
+"txt": " insert_resource: renew_res1\n res_type: R\n machine: unixagent1\n amount: 10"
+},
+{
+"line": 145127,
+"txt": " insert_resource: renew_res1\n res_type: R\n amount: 25"
+},
+{
+"line": 145141,
+"txt": " insert_resource: renew_count\n machine: machine1\n res_type: R\n amount: 10\n insert_resource: renew_count\n machine: machine2\n res_type: R\n amount: 20"
+},
+{
+"line": 145153,
+"txt": " insert_job: res_dep_job\n job_type: CMD\n machine: virtmach\n command: /u1/procrun.sh\n resources: (renew_count, QUANTITY=5, free=Y)"
+},
+{
+"line": 145219,
+"txt": " insert_resource: glob_res\n res_type: D\n amount: 10"
+},
+{
+"line": 145224,
+"txt": " update_resource: glob_res\n amount: 25"
+},
+{
+"line": 145255,
+"txt": " update_resource: count_res\n amount: 30"
+},
+{
+"line": 145261,
+"txt": " update_resource: win_res\n machine: winagent\n amount: +5"
+},
+{
+"line": 145281,
+"txt": " insert_resource: renew_res\n machine: winagent\n res_type: R\n amount: 10\n description: \"This renewable resource is only available for the winagent machine.\""
+},
+{
+"line": 145348,
+"txt": "    update_resource: threshold_res\n    amount: 25"
+},
+{
+"line": 145355,
+"txt": "    update_resource: threshold_res\n    machine: prodserv\n    amount: 25"
+},
+{
+"line": 145396,
+"txt": " insert_resource: renewable_res\n res_type: R\n amount: 10"
+},
+{
+"line": 145401,
+"txt": " insert_job: res_dep_job\n job_type: CMD\n machine: unixagent\n command: /u1/procrun.sh\n resources: (renewable_res, QUANTITY=5, FREE=Y)"
+},
+{
+"line": 145413,
+"txt": " insert_resource: depletable_res\n res_type: D\n machine: winagent\n amount: 25"
+},
+{
+"line": 145438,
+"txt": " delete_xinst: external_instance"
+},
+{
+"line": 145453,
+"txt": " delete_xinst: ACE\ninsert_xinst Subcommand -- Define an External Instance"
+},
+{
+"line": 145470,
+"txt": " insert_xinst: external_instance"
+},
+{
+"line": 145506,
+"txt": " insert_xinst: ACE\n xtype: a\n xmachine: machineA\n xport: 9000"
+},
+{
+"line": 145514,
+"txt": " insert_xinst: ACE\n xtype: a\n xmachine: machineA,machineB\n xport: 9000"
+},
+{
+"line": 145522,
+"txt": " insert_xinst: CA7\n xtype: c\n xmachine: MAINFR1"
+},
+{
+"line": 145529,
+"txt": " insert_xinst: JMO\n xtype: u\n xmachine: unimachA\nupdate_xinst Subcommand -- Update an External Instance Definition"
+},
+{
+"line": 145539,
+"txt": " update_xinst: external_instance"
+},
+{
+"line": 145658,
+"txt": " insert_xinst: ACE\n xtype: a\n xmachine: machineB\n xport: 9100\n xcrypt_type: DEFAULT"
+},
+{
+"line": 145749,
+"txt": "    delete_monbro: monbro_name"
+},
+{
+"line": 145756,
+"txt": "    delete_monbro: track_alarm\ninsert_monbro Subcommand -- Define a Monitor or Report"
+},
+{
+"line": 145766,
+"txt": "    insert_monbro: monbro_name"
+},
+{
+"line": 145803,
+"txt": " insert_monbro: success_report\n mode: b /* \"browser\" can also be specified */\n success: y\n job_filter: a /* the default */\n currun: y /* the default */"
+},
+{
+"line": 145811,
+"txt": " insert_monbro: alarm_monitor\n mode: m /* \"monitor\" can also be specified */\n alarm: y\n job_filter: a /* the default */\nupdate_monbro Subcommand -- Update a Monitor or Report"
+},
+{
+"line": 145824,
+"txt": " update_monbro: monbro_name"
+},
+{
+"line": 145859,
+"txt": "    update_monbro: alarm_monitor\n    terminated: y"
+},
+{
+"line": 146338,
+"txt": "    delete_blob: blob_name"
+},
+{
+"line": 146350,
+"txt": "    delete_blob: Blob1\n    blob_type: in\ndelete_glob Subcommand -- Delete a Glob from the Database"
+},
+{
+"line": 146364,
+"txt": " delete_glob: glob_name"
+},
+{
+"line": 146371,
+"txt": " delete_glob: Glob1\ninsert_blob Subcommand -- Add a Blob to the Database"
+},
+{
+"line": 146378,
+"txt": " insert_blob:        blob_name"
+},
+{
+"line": 146398,
+"txt": " insert_blob: blob_input1\n blob_file: /tmp/test.pl"
+},
+{
+"line": 146421,
+"txt": " insert_glob:         glob_name"
+},
+{
+"line": 146442,
+"txt": " insert_glob: blob_input1\n blob_mode: binary\n blob_file: /tmp/test\nupdate_blob Subcommand -- Update a Blob"
+},
+{
+"line": 146451,
+"txt": " update_blob: blob_name"
+},
+{
+"line": 146478,
+"txt": "    update_glob: glob_name"
+},
+{
+"line": 146488,
+"txt": "    update_blob: Glob1\n    blob_mode:text\n    blob_file:\"updated file path\""
+},
+{
+"line": 146602,
+"txt": "    insert_glob: email_input\n    blob_mode: text\n    blob_type: emailtemplate\n    blob_file: $AUTOSYS/install/email_templates/sample_template"
+},
+{
+"line": 177864,
+"txt": "        insert_job: unc_std_out_path    job_type: CMD\n        command: dir\n        machine: Pasteur\n        owner: louis.pasteur@glitch.com\n        std_out_file: \"\\\\PASCAL\\Temp\\%AUTO_JOB_NAME%.out\"\n        std_err_file: \"\\\\PASCAL\\Temp\\%AUTO_JOB_NAME%.err\"\n        alarm_if_fail: 1"
+}
+]

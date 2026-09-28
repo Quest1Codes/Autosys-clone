@@ -13,6 +13,8 @@ from typing import Generator
 import pytest
 from fastapi.testclient import TestClient
 
+from autosys.timeutil import utcnow
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -105,7 +107,7 @@ def _seed_run(session, job_name: str, status: int, *, retry_count: int = 0, run_
 
     session.add(JobRunRow(
         run_id=str(uuid.uuid4()), job_name=job_name, status=status,
-        start_time=datetime.utcnow(), end_time=datetime.utcnow(),
+        start_time=utcnow(), end_time=utcnow(),
         exit_code=0, machine="m1", retry_count=retry_count, run_date=run_date,
     ))
 
@@ -117,8 +119,8 @@ def _seed_alarm(session, job_name: str, *, cleared: bool):
 
     session.add(AlarmRow(
         alarm_id=str(uuid.uuid4()), job_name=job_name, alarm_type="JOB_FAILURE",
-        message="failed", raised_at=datetime.utcnow(),
-        cleared_at=datetime.utcnow() if cleared else None,
+        message="failed", raised_at=utcnow(),
+        cleared_at=utcnow() if cleared else None,
     ))
 
 

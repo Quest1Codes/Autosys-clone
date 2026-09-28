@@ -26,6 +26,7 @@ import os
 import socket
 import uuid
 from datetime import datetime, timedelta
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from loguru import logger
@@ -68,7 +69,7 @@ class DistributedLock:
 
         Returns True if this instance is now the active scheduler.
         """
-        now = datetime.utcnow()
+        now = utcnow()
         row = session.get(SchedulerLockRow, self.lock_id)
 
         if row is None:
@@ -123,7 +124,7 @@ class DistributedLock:
             return
         row = session.get(SchedulerLockRow, self.lock_id)
         if row and row.instance_id == self.instance_id:
-            row.last_heartbeat = datetime.utcnow()
+            row.last_heartbeat = utcnow()
             session.flush()
 
     def release(self, session: Session) -> None:
@@ -131,7 +132,7 @@ class DistributedLock:
         row = session.get(SchedulerLockRow, self.lock_id)
         if row and row.instance_id == self.instance_id:
             row.is_active = False
-            row.last_heartbeat = datetime.utcnow() - timedelta(seconds=999)
+            row.last_heartbeat = utcnow() - timedelta(seconds=999)
             session.flush()
             self._is_leader = False
             logger.info("HA: lock released by %s", self.instance_id)
@@ -148,7 +149,7 @@ class DistributedLock:
                 "last_heartbeat": None,
                 "stale": True,
             }
-        now = datetime.utcnow()
+        now = utcnow()
         stale_at = now - timedelta(seconds=row.heartbeat_timeout)
         is_stale = row.last_heartbeat < stale_at
         return {

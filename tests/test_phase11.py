@@ -45,7 +45,8 @@ def test_is_triggered_with_run_calendar():
         job_name="cal_job",
         status=8,
         start_times='"06:00"',
-        run_calendar="month_end"
+        run_calendar="month_end",
+        date_conditions=True,
     )
     
     cal_dates = "2026-01-31, 2026-02-28, 2026-03-31"
@@ -74,7 +75,8 @@ def test_is_triggered_with_exclude_calendar():
         job_name="daily_job",
         status=8,
         start_times='"06:00"',
-        exclude_calendar="holidays"
+        exclude_calendar="holidays",
+        date_conditions=True,
     )
     
     calendars = {

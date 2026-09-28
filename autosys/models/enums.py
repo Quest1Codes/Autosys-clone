@@ -38,6 +38,60 @@ class JobType(str, Enum):
     REMOTECMD = "REMOTECMD"
     WOL       = "WOL"
     USERDEFINED = "USERDEFINED"
+    # --- Remaining job types listed in the vendor "job_type" attribute doc ---
+    DBMON     = "DBMON"
+    DBPROC    = "DBPROC"
+    DBTRIG    = "DBTRIG"
+    ENTYBEAN  = "ENTYBEAN"
+    FT        = "FT"        # File Trigger (distinct from FTP)
+    HTTP      = "HTTP"
+    HDFS      = "HDFS"
+    HIVE      = "HIVE"
+    I5        = "I5"
+    JAVARMI   = "JAVARMI"
+    JMSPUB    = "JMSPUB"
+    JMSSUB    = "JMSSUB"
+    JMXMAG    = "JMXMAG"
+    JMXMAS    = "JMXMAS"
+    JMXMC     = "JMXMC"
+    JMXMOP    = "JMXMOP"
+    JMXMREM   = "JMXMREM"
+    JMXSUB    = "JMXSUB"
+    OACOPY    = "OACOPY"
+    OASET     = "OASET"
+    OASG      = "OASG"
+    OMCPU     = "OMCPU"
+    OMD       = "OMD"
+    OMEL      = "OMEL"
+    OMIP      = "OMIP"
+    OMP       = "OMP"
+    OMS       = "OMS"
+    OMTF      = "OMTF"
+    OOZIE     = "OOZIE"
+    PAPROC    = "PAPROC"
+    PAREQ     = "PAREQ"
+    PIG       = "PIG"
+    POJO      = "POJO"
+    PROXY     = "PROXY"
+    SAPBDC    = "SAPBDC"
+    SAPBWIP   = "SAPBWIP"
+    SAPBWPC   = "SAPBWPC"
+    SAPDA     = "SAPDA"
+    SAPEVT    = "SAPEVT"
+    SAPJC     = "SAPJC"
+    SAPPM     = "SAPPM"
+    SCP       = "SCP"
+    SESSBEAN  = "SESSBEAN"
+    SNMPGET   = "SNMPGET"
+    SNMPSET   = "SNMPSET"
+    SQOOP     = "SQOOP"
+    SQL       = "SQL"
+    WSDOC     = "WSDOC"
+    WBSVC     = "WBSVC"
+    SQLAGENT  = "SQLAGENT"
+    ZOS       = "ZOS"
+    ZOSM      = "ZOSM"
+    ZOSDST    = "ZOSDST"
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +164,9 @@ class EventType(str, Enum):
     STARTJOB        - Start the job if all conditions are satisfied.
     FORCE_STARTJOB  - Start the job immediately, ignoring conditions.
     KILLJOB         - Send SIGTERM to the running process → TERMINATED.
-    HOLD_JOB        - Transition job to ON_HOLD.
+    JOB_ON_HOLD     - Transition job to ON_HOLD (the real AutoSys name).
+    HOLD_JOB        - Legacy alias for JOB_ON_HOLD, kept so queued events and
+                      old scripts keep working.
     JOB_OFF_HOLD    - Release a job from ON_HOLD → INACTIVE.
     JOB_ON_ICE      - Transition job to ON_ICE for this run cycle.
     JOB_OFF_ICE     - Release a job from ON_ICE → INACTIVE.
@@ -119,16 +175,31 @@ class EventType(str, Enum):
                       conditions on other jobs).
     CHECK_HEARTBEAT - Ping a System Agent and verify it is reachable.
     SEND_ALERT      - Raise an alarm manually without a job failure.
+    JOB_ON_NOEXEC   - Bypass job execution; evaluated as SUCCESS once its
+                      start conditions are met, without actually running.
+    JOB_OFF_NOEXEC  - Release a job from ON_NOEXEC back to INACTIVE.
+    MACH_ONLINE     - Mark a machine online.
+    MACH_OFFLINE    - Mark a machine offline (jobs bound to it queue/wait).
+    DELETEJOB       - Delete a job definition (event-based equivalent of
+                      ``autosys jobs delete``).
+    STOP_DEMON      - Gracefully stop the Event Processor daemon.
     """
     STARTJOB        = "STARTJOB"
     FORCE_STARTJOB  = "FORCE_STARTJOB"
     KILLJOB         = "KILLJOB"
     CHANGE_STATUS   = "CHANGE_STATUS"
     SET_GLOBAL      = "SET_GLOBAL"
+    JOB_ON_HOLD     = "JOB_ON_HOLD"
     HOLD_JOB        = "HOLD_JOB"
     JOB_ON_ICE      = "JOB_ON_ICE"
     JOB_OFF_HOLD    = "JOB_OFF_HOLD"
     JOB_OFF_ICE     = "JOB_OFF_ICE"
+    JOB_ON_NOEXEC   = "JOB_ON_NOEXEC"
+    JOB_OFF_NOEXEC  = "JOB_OFF_NOEXEC"
+    MACH_ONLINE     = "MACH_ONLINE"
+    MACH_OFFLINE    = "MACH_OFFLINE"
+    DELETEJOB       = "DELETEJOB"
+    STOP_DEMON      = "STOP_DEMON"
     ALARM           = "ALARM"
     COMMENT         = "COMMENT"
     REPLY_RESPONSE  = "REPLY_RESPONSE"
@@ -151,12 +222,18 @@ class AlarmType(str, Enum):
     MIN_RUN_ALARM        - job finished in less than min_run_alarm minutes
                            (unexpectedly short run — data quality signal).
     HEARTBEAT_FAIL       - System Agent did not respond to CHECK_HEARTBEAT.
+    MUST_START_ALARM     - job has not STARTED by its must_start_times
+                           deadline (job attribute: must_start_times).
+    MUST_COMPLETE_ALARM  - job has not COMPLETED by its must_complete_times
+                           deadline (job attribute: must_complete_times).
     """
     ALARM_IF_FAIL       = "ALARM_IF_FAIL"
     ALARM_IF_TERMINATED = "ALARM_IF_TERMINATED"
     MAX_RUN_ALARM       = "MAX_RUN_ALARM"
     MIN_RUN_ALARM       = "MIN_RUN_ALARM"
     HEARTBEAT_FAIL      = "HEARTBEAT_FAIL"
+    MUST_START_ALARM    = "MUST_START_ALARM"
+    MUST_COMPLETE_ALARM = "MUST_COMPLETE_ALARM"
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from fastapi import APIRouter, Response
@@ -88,7 +89,7 @@ def _collect_metrics() -> str:
         ).all()
         lines.append("# HELP autosys_agent_heartbeat_seconds Seconds since last agent heartbeat")
         lines.append("# TYPE autosys_agent_heartbeat_seconds gauge")
-        now = datetime.utcnow()
+        now = utcnow()
         for name, hb in machines:
             if hb:
                 age = (now - hb).total_seconds()

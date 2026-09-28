@@ -8,6 +8,7 @@ insert_job: demo_etl_box   job_type: BOX
 owner: svc_demo
 start_times: "06:00"
 days_of_week: mo,tu,we,th,fr
+date_conditions: 1
 exclude_calendar: us_holidays
 alarm_if_fail: 1
 max_run_alarm: 120
@@ -71,4 +72,5 @@ command: /scripts/cleanup_temp.sh --days 7
 machine: etl-server-01
 start_times: "02:00"
 days_of_week: all
+date_conditions: 1
 alarm_if_fail: 0

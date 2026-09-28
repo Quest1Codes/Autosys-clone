@@ -4,16 +4,26 @@ Time trigger — computes which INACTIVE jobs should fire at a given moment.
 In real AutoSys, the Scheduler ACE evaluates schedule expressions on every
 timer tick (default: every second).  A job fires when:
 
-    1. Its ``start_times`` list includes the current HH:MM.
+    0. ``date_conditions`` is set (1/True) — real AutoSys treats this as
+       *mandatory* for any of the date/time scheduling attributes below to
+       take effect.  A job with ``start_times`` but ``date_conditions: 0``
+       (the default) never self-triggers on a schedule; it can only be
+       started by condition or a manual/API event.
+    1. Its ``start_times`` list includes the current HH:MM, OR its
+       ``start_mins`` list includes the current minute-of-hour (every hour).
     2. Its ``days_of_week`` list includes today's weekday (or is empty = every day).
-    3. It has NOT already been started today (``last_run_date != today``).
+    3. It has NOT already been started today (``last_run_date != today``) —
+       for ``start_times`` jobs.  ``start_mins`` jobs instead only guard
+       against re-firing within the same clock minute, since they are
+       meant to fire repeatedly through the day.
     4. The job is in a state that allows starting (INACTIVE, SUCCESS, FAILURE).
     5. The ``exclude_calendar`` does not include today's date.
        (Phase 4: calendar exclusion is a stub — Phase 5 adds full calendar support.)
 
 The trigger fires at most once per minute — the granularity of AutoSys's
-``start_times`` attribute.  If the daemon misses a tick (e.g. due to restart),
-it will still catch up within one minute window after the scheduled time.
+``start_times``/``start_mins`` attributes.  If the daemon misses a tick
+(e.g. due to restart), it will still catch up within one minute window
+after the scheduled time.
 
 Usage
 -----
@@ -97,6 +107,51 @@ def _already_ran_today(row, today: date) -> bool:
     return row.last_run_date == today.strftime("%Y-%m-%d")
 
 
+def _already_fired_this_minute(row, now: datetime) -> bool:
+    """
+    Return True if ``last_start`` already falls within *now*'s HH:MM minute.
+
+    Used to guard ``start_mins`` jobs against re-firing on every poll tick
+    within the same minute, without blocking them for the rest of the day
+    the way ``_already_ran_today`` would (``start_mins`` jobs are meant to
+    fire repeatedly, e.g. every 15 minutes).
+    """
+    last_start = getattr(row, "last_start", None)
+    if not last_start:
+        return False
+    return (
+        last_start.year == now.year and last_start.month == now.month
+        and last_start.day == now.day and last_start.hour == now.hour
+        and last_start.minute == now.minute
+    )
+
+
+def _get_matching_start_mins(row, now: datetime) -> list[str]:
+    """
+    Return the entries from ``row.start_mins`` that match the current
+    minute-of-hour.
+
+    AutoSys ``start_mins`` fires the job every hour at the listed minute
+    offsets, e.g. ``start_mins: "0,15,30,45"`` runs 4 times an hour.  This
+    is the sub-hourly alternative to ``start_times``.
+    """
+    raw = getattr(row, "start_mins", None)
+    if not raw:
+        return []
+
+    matched = []
+    for m in raw.split(","):
+        m = m.strip()
+        if not m:
+            continue
+        try:
+            if int(m) == now.minute:
+                matched.append(m)
+        except ValueError:
+            continue
+    return matched
+
+
 def _get_matching_start_times(row, now: datetime) -> list[str]:
     """
     Return the start times from ``row.start_times`` that match the
@@ -144,8 +199,16 @@ def is_triggered(row: 'JobRow', now: datetime, calendars: Optional[dict[str, 'Ca
     if not is_startable(status):
         return False
 
-    # Must have start_times defined
-    if not row.start_times:
+    # Real AutoSys requires date_conditions: 1 for any date/time scheduling
+    # attribute (start_times, start_mins, run_calendar, days_of_week, …) to
+    # take effect.  Without it, the job is condition-driven or manual only.
+    if not getattr(row, "date_conditions", False):
+        return False
+
+    # Must have start_times or start_mins defined
+    has_start_times = bool(row.start_times)
+    has_start_mins  = bool(getattr(row, "start_mins", None))
+    if not has_start_times and not has_start_mins:
         return False
 
     today = now.date()
@@ -165,16 +228,25 @@ def is_triggered(row: 'JobRow', now: datetime, calendars: Optional[dict[str, 'Ca
     if not _should_run_today(row, today):
         return False
 
-    if _already_ran_today(row, today):
-        return False
+    matching_times = _get_matching_start_times(row, now) if has_start_times else []
+    matching_mins  = _get_matching_start_mins(row, now) if has_start_mins else []
 
-    matching = _get_matching_start_times(row, now)
-    if not matching:
+    if matching_times:
+        # Once-per-day guard — a start_times job is expected to fire once
+        # per listed time, tracked at day granularity via last_run_date.
+        if _already_ran_today(row, today):
+            return False
+    elif matching_mins:
+        # start_mins jobs fire repeatedly through the day; only guard
+        # against re-firing within the same minute.
+        if _already_fired_this_minute(row, now):
+            return False
+    else:
         return False
 
     logger.debug(
-        "Time trigger: %r fires at %s (matched %s)",
-        row.job_name, now.strftime(_HHMM_FMT), matching,
+        "Time trigger: %r fires at %s (matched times=%s mins=%s)",
+        row.job_name, now.strftime(_HHMM_FMT), matching_times, matching_mins,
     )
     return True
 

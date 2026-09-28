@@ -223,6 +223,38 @@ class TestJobsRouter:
         )
         assert resp.status_code == 202
 
+    def test_sendevent_change_status(self, client, session):
+        # Regression test: this used to 500 — Event() was constructed with
+        # an "attribute" kwarg the model doesn't have (pydantic v2 silently
+        # drops unknown kwargs), so new_status was never set and the
+        # model's own validator raised ValidationError unhandled.
+        _seed_cmd(session, "cs_job")
+        resp = client.post(
+            "/api/v1/jobs/cs_job/sendevent",
+            json={"event_type": "CHANGE_STATUS", "attribute": "SUCCESS"},
+        )
+        assert resp.status_code == 202
+        events_resp = client.get("/api/v1/events")
+        matches = [e for e in events_resp.json() if e["event_type"] == "CHANGE_STATUS"]
+        assert matches
+
+    def test_sendevent_change_status_without_attribute_returns_400(self, client, session):
+        _seed_cmd(session, "cs_job2")
+        resp = client.post(
+            "/api/v1/jobs/cs_job2/sendevent",
+            json={"event_type": "CHANGE_STATUS"},
+        )
+        assert resp.status_code == 400
+
+    def test_sendevent_set_global_rejected(self, client, session):
+        # SET_GLOBAL doesn't target a job — it belongs on PUT /globals/{name}.
+        _seed_cmd(session, "sg_job")
+        resp = client.post(
+            "/api/v1/jobs/sg_job/sendevent",
+            json={"event_type": "SET_GLOBAL", "attribute": "x"},
+        )
+        assert resp.status_code == 400
+
     def test_list_jobs_filter_by_box(self, client, session):
         _seed_box(session, "parent_box")
         _seed_cmd(session, "child_a", box_name="parent_box")

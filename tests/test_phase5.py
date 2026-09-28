@@ -403,6 +403,28 @@ class TestRunRepository:
         assert row.pid       == 12345
         assert row.end_time is not None
 
+    def test_start_and_finish_timestamps_are_utc(self):
+        # Regression test: start()/finish() used to stamp start_time/end_time
+        # with local datetime.now() while EventHistoryRow.created_at (and
+        # every other audited timestamp) uses utcnow() — on a non-UTC
+        # machine the two drift apart by the local UTC offset, silently
+        # breaking anything that windows events against a run's
+        # [start_time, end_time] (e.g. autorep -d). Both must now land
+        # within a few seconds of a fresh utcnow() call.
+        from autosys.timeutil import utcnow
+        _seed_cmd("j")
+        before = utcnow()
+        with sync_session() as session:
+            run_repo.start(session, "utc_check", "j", "echo hi", "localhost", "2026-06-25")
+        with sync_session() as session:
+            run_repo.finish(session, "utc_check", "SUCCESS", 0)
+        after = utcnow()
+        with sync_session() as session:
+            from autosys.db.schema import JobRunRow
+            row = session.get(JobRunRow, "utc_check")
+        assert before <= row.start_time <= after
+        assert before <= row.end_time   <= after
+
     def test_list_runs_newest_first(self):
         _seed_cmd("j")
         with sync_session() as session:

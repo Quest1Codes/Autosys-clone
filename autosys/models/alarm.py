@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -224,12 +225,12 @@ class Alarm(BaseModel):
     # ------------------------------------------------------------------
 
     raised_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp at which this alarm was created by the alarm_manager.  "
             "This is the authoritative time used for SLA compliance reporting "
             "and mean-time-to-acknowledge (MTTA) calculations.  Defaulted to "
-            "``datetime.utcnow()`` so that records created programmatically "
+            "``utcnow()`` so that records created programmatically "
             "without an explicit timestamp are still meaningful.  In real "
             "AutoSys this corresponds to the ``ALARM_TIME`` column in the alarm "
             "log table."

@@ -11,23 +11,33 @@ Scheduler places a STARTJOB event on the queue.
 Grammar (EBNF)
 --------------
 condition   := or_expr
-or_expr     := and_expr  ('|' and_expr)*
-and_expr    := primary   ('&' primary)*
+or_expr     := and_expr  (or_op  and_expr)*
+and_expr    := primary   (and_op primary)*
+or_op       := '|' | 'OR'
+and_op      := '&' | 'AND'
 primary     := '(' condition ')'
              | job_func
              | value_cond
-job_func    := func_name '(' job_ref ')'
+             | exitcode_cond
+job_func    := func_name '(' job_ref [',' lookback] ')'
 func_name   := 'success' | 'failure' | 'done' | 'notrunning'
              | 'terminated' | 'activated'
-value_cond  := 'value' '(' global_name ')' ('=' | '!=') '"' string '"'
+             | 's' | 'f' | 'd' | 'n' | 't'            # real-AE single-letter shorthands
+lookback    := NUMBER                                  # hours, may be fractional: 12, 12.00, 0
+value_cond  := ('value' | 'v') '(' global_name ')' ('=' | '!=') '"' string '"'
+exitcode_cond := ('exitcode' | 'e') '(' job_ref ')' ('=' | '!=') NUMBER
 job_ref     := identifier          # may contain letters, digits, _, ., -, :
 global_name := identifier          # typically UPPERCASE by convention
+
+``AND``/``OR`` are accepted case-insensitively, exactly like ``&``/``|`` —
+real JIL written by hand sometimes uses the keyword form instead of the
+symbol.
 
 Operator precedence (highest to lowest)
 -----------------------------------------
 1. Parentheses   (...)
-2. AND           &
-3. OR            |
+2. AND           &  / AND
+3. OR            |  / OR
 
 So ``success(a) | success(b) & success(c)``
    = ``success(a) | (success(b) & success(c))``
@@ -81,7 +91,10 @@ class JobCondNode(ConditionNode):
     func: str       # "success" | "failure" | "done" | "notrunning" | "terminated" | "activated"
     job_name: str   # the job whose status is tested
     instance: Optional[str] = None
-    look_back: Optional[int] = None
+    look_back: Optional[float] = None
+    # Hours to look back from "now", e.g. `success(job, 12.00)`.  0 means
+    # "no time limit" (equivalent to omitting the lookback entirely) —
+    # matches real AutoSys's `s(job_name, 0)` idiom.
 
 
 @dataclass
@@ -161,17 +174,17 @@ _VALID_FUNCS = frozenset(_FUNC_CHECKS)
 
 class _CondTokenKind:
     FUNC    = "FUNC"      # success, failure, done, …
-    VALUE   = "VALUE"     # the keyword "value"
-    EXITCODE = "EXITCODE" # the keyword "exitcode"
+    VALUE   = "VALUE"     # the keyword "value" (or its shorthand "v")
+    EXITCODE = "EXITCODE" # the keyword "exitcode" (or its shorthand "e")
     LPAREN  = "LPAREN"    # (
     RPAREN  = "RPAREN"    # )
-    AND     = "AND"       # &
-    OR      = "OR"        # |
+    AND     = "AND"       # & or the keyword AND
+    OR      = "OR"        # | or the keyword OR
     NOT     = "NOT"       # ! (reserved)
     EQ      = "EQ"        # =
     NEQ     = "NEQ"       # !=
     QSTRING = "QSTRING"   # "literal" (quotes stripped in .value)
-    NUMBER  = "NUMBER"    # integer literal
+    NUMBER  = "NUMBER"    # integer or decimal literal (e.g. 0, 12, 12.00)
     IDENT   = "IDENT"     # job_name or global_name
     COMMA   = "COMMA"     # ,
     EOF     = "EOF"
@@ -195,7 +208,7 @@ _COND_RE = re.compile(
     r'|(?P<RPAREN>\))'
     r'|(?P<NOT>!)'
     r'|(?P<QSTRING>"(?:[^"\\]|\\.)*")'
-    r'|(?P<NUMBER>-?\d+)'
+    r'|(?P<NUMBER>-?\d+(?:\.\d+)?)'
     r'|(?P<COMMA>,)'
     r'|(?P<IDENT>[A-Za-z0-9_][A-Za-z0-9_.:%^-]*)'
 )
@@ -226,11 +239,16 @@ def _tokenize_condition(expr: str) -> list[_CondToken]:
             continue   # skip whitespace
         if kind == "IDENT":
             val = raw
-            if val in _VALID_FUNCS:
+            val_upper = val.upper()
+            if val_upper == "AND":
+                kind = _CondTokenKind.AND
+            elif val_upper == "OR":
+                kind = _CondTokenKind.OR
+            elif val in _VALID_FUNCS:
                 kind = _CondTokenKind.FUNC
-            elif val == "value":
+            elif val in ("value", "v"):
                 kind = _CondTokenKind.VALUE
-            elif val == "exitcode":
+            elif val in ("exitcode", "e"):
                 kind = _CondTokenKind.EXITCODE
         elif kind == "QSTRING":
             raw = raw[1:-1]   # strip surrounding double-quotes from the token value
@@ -376,7 +394,7 @@ class _CondParser:
         if self._peek().kind == _CondTokenKind.COMMA:
             self._consume(_CondTokenKind.COMMA)
             num_tok = self._consume(_CondTokenKind.NUMBER)
-            look_back = int(num_tok.value)
+            look_back = float(num_tok.value)
 
         self._consume(_CondTokenKind.RPAREN)
         return JobCondNode(func=func_tok.value, job_name=job_name, instance=instance, look_back=look_back)
@@ -486,6 +504,8 @@ def evaluate(
     job_statuses: dict[str, str],
     global_vars: Optional[dict[str, str]] = None,
     job_exitcodes: Optional[dict[str, int]] = None,
+    job_last_times: Optional[dict[str, "Optional[object]"]] = None,
+    now: Optional["object"] = None,
 ) -> bool:
     """
     Walk the condition AST and return True if all conditions are satisfied.
@@ -506,6 +526,23 @@ def evaluate(
     job_exitcodes:
         Mapping of job_name → current exit code.
         If an exitcode condition references a job with no exitcode, it will fail to match.
+    job_last_times:
+        Mapping of job_name → the job's last-completion ``datetime`` (its
+        ``last_end``), or ``None`` if it has never run. Only consulted when
+        a predicate carries a lookback, e.g. ``success(job, 12.00)``.
+    now:
+        Current time as a ``datetime``, used to evaluate lookback windows.
+        Required only when the condition actually uses a lookback; ignored
+        otherwise.
+
+    Lookback semantics
+    ------------------
+    ``success(job, N)`` (real-AutoSys shorthand: ``s(job, N)``) additionally
+    requires that *job* last completed within the past *N* hours (a
+    fractional hour count, e.g. ``12.00`` or ``0.5``).  ``N == 0`` means "no
+    time limit" — the same as omitting the lookback.  If ``now`` or the
+    job's last-completion time is unavailable, a nonzero lookback cannot be
+    verified and the predicate evaluates to False.
 
     Examples
     --------
@@ -524,6 +561,7 @@ def evaluate(
     _global_vars: dict[str, str] = {
         k.upper(): v for k, v in (global_vars or {}).items()
     }
+    _last_times = job_last_times or {}
 
     def _eval(n: ConditionNode) -> bool:
         if isinstance(n, JobCondNode):
@@ -543,7 +581,20 @@ def evaluate(
             checker = _FUNC_CHECKS.get(n.func)
             if checker is None:
                 raise ValueError(f"Unknown condition function: {n.func!r}")
-            return checker(status)
+            if not checker(status):
+                return False
+
+            if n.look_back:  # None or 0 → no time restriction
+                if now is None:
+                    return False  # can't verify recency without "now"
+                last_time = _last_times.get(n.job_name)
+                if last_time is None:
+                    return False  # never completed → can't be "within" any window
+                age_hours = (now - last_time).total_seconds() / 3600.0
+                if age_hours < 0 or age_hours > n.look_back:
+                    return False
+
+            return True
 
         if isinstance(n, ValueCondNode):
             actual = _global_vars.get(n.global_name, "")
@@ -571,30 +622,64 @@ def evaluate(
     return _eval(node)
 
 
-def condition_to_str(node: ConditionNode) -> str:
+# Real AutoSys single-letter shorthand ↔ long-form function name, used by
+# condition_to_str(form=...) to normalise a condition's rendering direction
+# regardless of how it was originally written.  ``activated`` has no real
+# short form, so it round-trips unchanged in both directions.
+_FUNC_SHORT_TO_LONG: dict[str, str] = {
+    "s": "success", "f": "failure", "d": "done", "n": "notrunning", "t": "terminated",
+}
+_FUNC_LONG_TO_SHORT: dict[str, str] = {v: k for k, v in _FUNC_SHORT_TO_LONG.items()}
+
+
+def condition_to_str(node: ConditionNode, form: str = "asis") -> str:
     """
     Render a condition AST back to a human-readable expression string.
 
-    Useful for logging and the WCC dependency graph view (Phase 10).
+    Useful for logging and the WCC dependency graph view.
+
+    Parameters
+    ----------
+    form:
+        ``"asis"`` (default) — echo each predicate using whichever form
+        (short or long) it was originally parsed from; this is what every
+        existing caller gets, unchanged.
+        ``"short"`` — normalise every predicate to AutoSys's single-letter
+        shorthand (``s(job)``), matching real ``autorep -q`` (JIL dump)
+        without ``-w``.
+        ``"long"`` — normalise every predicate to the full function name
+        (``success(job)``), matching real ``autorep -q -w``.
 
     Examples
     --------
     >>> node = parse_condition("success(a) & (success(b) | failure(c))")
     >>> condition_to_str(node)
     'success(a) & (success(b) | failure(c))'
+    >>> condition_to_str(node, form="short")
+    's(a) & (s(b) | f(c))'
     """
     if isinstance(node, JobCondNode):
-        return f"{node.func}({node.job_name})"
+        func = node.func
+        if form == "short":
+            func = _FUNC_LONG_TO_SHORT.get(func, func)
+        elif form == "long":
+            func = _FUNC_SHORT_TO_LONG.get(func, func)
+        job_ref = f"{node.job_name}^{node.instance}" if node.instance else node.job_name
+        if node.look_back is not None:
+            return f"{func}({job_ref}, {node.look_back:g})"
+        return f"{func}({job_ref})"
 
     if isinstance(node, ValueCondNode):
-        return f'value({node.global_name}) {node.op} "{node.expected}"'
+        name = "v" if form == "short" else "value"
+        return f'{name}({node.global_name}) {node.op} "{node.expected}"'
 
     if isinstance(node, ExitCodeCondNode):
-        return f'exitcode({node.job_name}) {node.op} {node.expected}'
+        name = "e" if form == "short" else "exitcode"
+        return f'{name}({node.job_name}) {node.op} {node.expected}'
 
     if isinstance(node, AndNode):
-        left  = condition_to_str(node.left)
-        right = condition_to_str(node.right)
+        left  = condition_to_str(node.left, form=form)
+        right = condition_to_str(node.right, form=form)
         # Wrap OrNode children in parens to preserve precedence visually
         if isinstance(node.left, OrNode):
             left = f"({left})"
@@ -603,12 +688,12 @@ def condition_to_str(node: ConditionNode) -> str:
         return f"{left} & {right}"
 
     if isinstance(node, OrNode):
-        left  = condition_to_str(node.left)
-        right = condition_to_str(node.right)
+        left  = condition_to_str(node.left, form=form)
+        right = condition_to_str(node.right, form=form)
         return f"{left} | {right}"
 
     if isinstance(node, NotNode):
-        return f"!{condition_to_str(node.operand)}"
+        return f"!{condition_to_str(node.operand, form=form)}"
 
     raise TypeError(f"Unknown ConditionNode type: {type(node)!r}")
 

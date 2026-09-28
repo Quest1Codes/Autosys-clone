@@ -8,6 +8,7 @@ insert_job: runnable_box   job_type: BOX
 owner: admin
 start_times: "00:00"
 days_of_week: all
+date_conditions: 1
 
 /* Job 1 — always succeeds */
 insert_job: step_hello   job_type: CMD

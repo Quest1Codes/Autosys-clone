@@ -14,6 +14,7 @@ import asyncio
 import os
 import uuid
 from datetime import datetime, timedelta
+from autosys.timeutil import utcnow
 from typing import Generator
 
 import pytest
@@ -90,7 +91,7 @@ class TestDistributedLock:
         # Simulate primary heartbeat going stale
         with sync_session() as s:
             row = s.get(SchedulerLockRow, "scheduler-primary")
-            row.last_heartbeat = datetime.utcnow() - timedelta(seconds=10)
+            row.last_heartbeat = utcnow() - timedelta(seconds=10)
             s.commit()
         # Standby should now steal the lock
         with sync_session() as s:
@@ -159,7 +160,7 @@ class TestDistributedLock:
             s.commit()
         with sync_session() as s:
             row = s.get(SchedulerLockRow, "scheduler-primary")
-            row.last_heartbeat = datetime.utcnow() - timedelta(seconds=10)
+            row.last_heartbeat = utcnow() - timedelta(seconds=10)
             s.commit()
         with sync_session() as s:
             status = lock.get_status(s)
@@ -336,7 +337,7 @@ class TestEventProcessorHA:
         # Simulate primary crash — heartbeat goes stale
         with sync_session() as s:
             row = s.get(SchedulerLockRow, "scheduler-primary")
-            row.last_heartbeat = datetime.utcnow() - timedelta(seconds=10)
+            row.last_heartbeat = utcnow() - timedelta(seconds=10)
             s.commit()
 
         # Standby takes over

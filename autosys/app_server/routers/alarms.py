@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -74,7 +75,7 @@ def resolve_alarm(
     if row.cleared_at is not None:
         raise HTTPException(status_code=409, detail="Alarm is already resolved")
 
-    row.cleared_at = datetime.utcnow()
+    row.cleared_at = utcnow()
     row.cleared_by = user.username
     session.flush()
     return _row_to_resp(row)
@@ -99,7 +100,7 @@ def raise_alarm(
         alarm_type          = alarm_type,
         message             = message,
         job_status_at_raise = None,
-        raised_at           = datetime.utcnow(),
+        raised_at           = utcnow(),
     )
     session.add(row)
     session.flush()

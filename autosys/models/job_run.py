@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, date
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -253,7 +254,7 @@ class JobRun(BaseModel):
     # ------------------------------------------------------------------
 
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp at which this JobRun row was first written to the "
             "database by the EPS. "

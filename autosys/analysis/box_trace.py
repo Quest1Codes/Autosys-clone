@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 from autosys.analysis.dependency_graph import dependency_wave
 from autosys.db.repository import jobs as job_repo, events as event_repo
 from autosys.db.schema import JobRow
+from autosys.models.enums import JobStatus
 from autosys.models.event import Event
 from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
 from autosys.scheduler.state_machine import _norm_status, TERMINAL_STATES
@@ -132,9 +133,9 @@ def run_box_trace(
     scope = {box_name} | {d.job_name for d in descendants}
 
     now = now or datetime.now()
-    box.status, box.last_start, box.last_end = "INACTIVE", None, None
+    box.status, box.last_start, box.last_end = JobStatus.INACTIVE.value, None, None
     for d in descendants:
-        d.status, d.last_start, d.last_end = "INACTIVE", None, None
+        d.status, d.last_start, d.last_end = JobStatus.INACTIVE.value, None, None
     session.flush()
 
     transitions:    list[BoxTraceTransition] = []

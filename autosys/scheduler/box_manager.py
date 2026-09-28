@@ -63,7 +63,9 @@ from sqlalchemy.orm import Session
 
 from autosys.db.schema import JobRow
 from autosys.models.enums import JobStatus
-from autosys.scheduler.condition_evaluator import is_satisfied, referenced_job_names
+from autosys.scheduler.condition_evaluator import (
+    is_satisfied, referenced_job_names, build_exitcode_snapshot, build_last_times_snapshot,
+)
 from autosys.scheduler.state_machine import _norm_status
 
 # Reuse the same type aliases as event_processor.py
@@ -72,6 +74,11 @@ KillFn     = Callable[[Session, JobRow], None]
 
 # Jobs in one of these states are considered "terminal" for box completion
 _TERMINAL = frozenset({"SUCCESS", "FAILURE", "TERMINATED"})
+
+# The subset of _TERMINAL that trips box_terminator / job_terminator — a
+# clean SUCCESS never does (real AutoSys: "if the job completes with a
+# FAILURE or TERMINATED status...").
+_TERMINAL_FAIL = frozenset({"FAILURE", "TERMINATED"})
 
 # Jobs that are still executing (prevent premature box completion)
 _ACTIVE = frozenset({"STARTING", "RUNNING"})
@@ -111,6 +118,14 @@ class BoxManager:
         self._dispatch_fn  = dispatch_fn or _stub_dispatch
         self._kill_fn      = kill_fn
         self._auto_complete = auto_complete
+        # {job_name: exit_code} / {job_name: last_end} for the tick currently
+        # in progress — set by tick() and consumed by _conditions_met() so
+        # exitcode(job) = N and lookback predicates (success(job, N)) can
+        # resolve without threading new params through every helper on the
+        # call path.
+        self._current_exitcodes: dict[str, Optional[int]] = {}
+        self._current_last_times: dict[str, Optional[datetime]] = {}
+        self._current_now: Optional[datetime] = None
 
     # ------------------------------------------------------------------
     # Main entry point — called each tick
@@ -142,6 +157,9 @@ class BoxManager:
         """
         from autosys.db.repository import jobs as job_repo
 
+        self._current_exitcodes  = build_exitcode_snapshot(session)
+        self._current_last_times = build_last_times_snapshot(session)
+        self._current_now        = now
         running_boxes = job_repo.get_running_boxes(session)
         changes = 0
 
@@ -177,37 +195,78 @@ class BoxManager:
 
         changes = 0
 
-        # Step 1: activate INACTIVE children whose conditions are met
+        # Step 1: activate INACTIVE children whose conditions are met.
+        # ON_NOEXEC children bypass execution entirely — once their
+        # conditions are met they're evaluated straight to SUCCESS, the
+        # same as _handle_startjob does for a top-level ON_NOEXEC job.
         for child in children:
-            if _norm_status(child.status) == "INACTIVE":
-                if self._conditions_met(child, snapshot):
-                    logger.info(
-                        "BOX %r: activating child %r → STARTING",
-                        box.job_name, child.job_name,
-                    )
-                    child.status = JobStatus.STARTING.value
-                    # Update snapshot so later siblings see this child's new status
-                    snapshot[child.job_name] = "STARTING"
+            child_status = _norm_status(child.status)
+            if child_status not in ("INACTIVE", "ON_NOEXEC"):
+                continue
+            if not self._conditions_met(child, snapshot):
+                continue
 
-                    if self._auto_complete:
-                        child.status     = JobStatus.SUCCESS.value
-                        child.last_start = now
-                        child.last_end   = now
-                    else:
-                        self._dispatch_fn(session, child)
+            if child_status == "ON_NOEXEC":
+                logger.info(
+                    "BOX %r: bypassing ON_NOEXEC child %r → SUCCESS",
+                    box.job_name, child.job_name,
+                )
+                child.status     = JobStatus.SUCCESS.value
+                child.last_start = now
+                child.last_end   = now
+                changes += 1
+                continue
 
-                    # NOTE: do NOT update snapshot here — subsequent siblings are
-                    # evaluated against the snapshot built at the START of the tick,
-                    # matching real AutoSys behaviour.  Sequential chains need
-                    # multiple ticks (one per wave of the dependency chain).
-                    changes += 1
+            logger.info(
+                "BOX %r: activating child %r → STARTING",
+                box.job_name, child.job_name,
+            )
+            child.status = JobStatus.STARTING.value
+            # Update snapshot so later siblings see this child's new status
+            snapshot[child.job_name] = "STARTING"
+
+            if self._auto_complete:
+                child.status     = JobStatus.SUCCESS.value
+                child.last_start = now
+                child.last_end   = now
+            else:
+                self._dispatch_fn(session, child)
+
+            # NOTE: do NOT update snapshot here — subsequent siblings are
+            # evaluated against the snapshot built at the START of the tick,
+            # matching real AutoSys behaviour.  Sequential chains need
+            # multiple ticks (one per wave of the dependency chain).
+            changes += 1
+
+        # Step 1.5: box_terminator — a flagged child that just reached FAILURE
+        # or TERMINATED immediately forces the box to TERMINATED, without
+        # waiting for its siblings (real AutoSys: "if the job completes with
+        # a FAILURE or TERMINATED status, the box terminates").
+        terminator_child = next(
+            (c for c in children
+             if getattr(c, "box_terminator", False)
+             and _norm_status(c.status) in _TERMINAL_FAIL),
+            None,
+        )
+        if terminator_child is not None:
+            box.status   = JobStatus.TERMINATED.value
+            box.last_end = now
+            logger.info(
+                "BOX %r → TERMINATED (box_terminator child %r reached %s)",
+                box.job_name, terminator_child.job_name, terminator_child.status,
+            )
+            changes += 1
+            changes += self._terminate_job_terminator_children(session, box, children, now)
+            return changes
 
         # Step 2: check box_failure and box_success conditions first
         if box.box_failure and self._conditions_met(box, snapshot, box.box_failure):
             box.status = JobStatus.FAILURE.value
             box.last_end = now
             logger.info("BOX %r completed → FAILURE (box_failure condition met)", box.job_name)
-            return changes + 1
+            changes += 1
+            changes += self._terminate_job_terminator_children(session, box, children, now)
+            return changes
 
         if box.box_success and self._conditions_met(box, snapshot, box.box_success):
             box.status = JobStatus.SUCCESS.value
@@ -226,7 +285,9 @@ class BoxManager:
                     "BOX %r → FAILURE (child failed, default fail-fast)",
                     box.job_name,
                 )
-                return changes + 1
+                changes += 1
+                changes += self._terminate_job_terminator_children(session, box, children, now)
+                return changes
 
         # All-terminal check.  A child that's still INACTIVE but whose
         # condition can never be satisfied anymore — e.g. an alert job with
@@ -262,6 +323,46 @@ class BoxManager:
             {c.job_name: c.status for c in children},
         )
         changes += 1
+        if box.status in (JobStatus.TERMINATED.value, JobStatus.FAILURE.value):
+            changes += self._terminate_job_terminator_children(session, box, children, now)
+        return changes
+
+    def _terminate_job_terminator_children(
+        self,
+        session:  Session,
+        box:      JobRow,
+        children: list,
+        now:      datetime,
+    ) -> int:
+        """
+        Force-terminate any not-yet-terminal child flagged job_terminator: 1.
+
+        Called whenever the box has just been decided FAILURE or TERMINATED.
+        Real AutoSys: "if the box that contains the job completes with a
+        FAILURE or TERMINATED status, the job terminates."  A child that
+        already reached a terminal state on its own is left as-is.
+        """
+        changes = 0
+        for child in children:
+            if not getattr(child, "job_terminator", False):
+                continue
+            if _norm_status(child.status) in _TERMINAL:
+                continue
+            if _norm_status(child.status) in _ACTIVE and self._kill_fn is not None:
+                try:
+                    self._kill_fn(session, child)
+                except Exception as exc:
+                    logger.warning(
+                        "job_terminator: kill_fn raised for %r: %s",
+                        child.job_name, exc,
+                    )
+            child.status   = JobStatus.TERMINATED.value
+            child.last_end = now
+            changes += 1
+            logger.info(
+                "BOX %r: job_terminator child %r → TERMINATED (box ended %s)",
+                box.job_name, child.job_name, box.status,
+            )
         return changes
 
     # ------------------------------------------------------------------
@@ -352,7 +453,12 @@ class BoxManager:
             return True
 
         try:
-            return is_satisfied(condition, snapshot)
+            return is_satisfied(
+                condition, snapshot,
+                job_exitcodes=self._current_exitcodes,
+                job_last_times=self._current_last_times,
+                now=self._current_now,
+            )
         except Exception as exc:
             logger.warning(
                 "BoxManager: condition eval error for %r (%r): %s",

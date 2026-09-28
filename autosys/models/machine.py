@@ -34,7 +34,7 @@ you can separate the logical name from the IP:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -62,6 +62,9 @@ class MachineDef(BaseModel):
         enforce it until Phase 8.
     description:
         Free-text description stored in the DB.
+    members:
+        For virtual machines (``type: v``) / pools: the repeated
+        ``machine:`` entries with their per-member ``max_load`` / ``factor``.
     """
 
     machine_name: str
@@ -70,6 +73,9 @@ class MachineDef(BaseModel):
     port:         int          = Field(default=7520, ge=1, le=65535)
     max_load:     int          = Field(default=100, ge=1)
     description:  Optional[str] = None
+    # Virtual machine / pool members, in JIL order.  Each dict is
+    # {"machine": str, "max_load": int | None, "factor": float | None}.
+    members:      list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _default_host(self) -> "MachineDef":

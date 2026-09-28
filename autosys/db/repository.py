@@ -39,7 +39,9 @@ from sqlalchemy import select, func, text
 from sqlalchemy.orm import Session
 
 from autosys.models.enums import JobStatus
+from autosys.timeutil import utcnow
 from autosys.db.schema import (
+    AlarmRow,
     EventHistoryRow,
     EventQueueRow,
     GlobalVariableRow,
@@ -87,6 +89,11 @@ def _job_to_row_kwargs(job: Job) -> dict:
     """
     data = job.model_dump(exclude_none=True)
 
+    # extra_attrs (dict) -> JSON text column; always written so an update
+    # replaces the stored bag.
+    extras = data.pop("extra_attrs", None) or {}
+    data["extra_attrs_json"] = json.dumps(extras) if extras else None
+
     for key in _LIST_ATTRS:
         if key in data:
             lst = data[key]
@@ -112,9 +119,22 @@ def _row_to_job(row: JobRow) -> Job:
     data: dict = {}
     for col in row.__table__.columns:
         val = getattr(row, col.name)
-        if val is not None:
-            data[col.name] = val
-    return parse_job(data)
+        if val is None:
+            continue
+        if col.name == "extra_attrs_json":
+            try:
+                data["extra_attrs"] = json.loads(val)
+            except (TypeError, ValueError):
+                pass
+            continue
+        data[col.name] = val
+    try:
+        return parse_job(data)
+    except Exception:
+        # A definition that was loaded leniently (CMD without a command, ...)
+        # must still be readable.
+        from autosys.models.job import parse_job_lenient
+        return parse_job_lenient(data)[0]
 
 
 # ===========================================================================
@@ -159,6 +179,11 @@ class JobRepository:
         existing: Optional[JobRow] = session.get(JobRow, job.job_name)
 
         if existing is None:
+            # ``status:`` on insert_job sets the job's initial status; every
+            # other runtime column is left to the scheduler.
+            initial = getattr(job, "status", None)
+            if initial not in (None, JobStatus.INACTIVE.value):
+                kwargs["status"] = int(initial)
             row = JobRow(**kwargs)
             session.add(row)
             return "inserted"
@@ -167,7 +192,7 @@ class JobRepository:
             for key, value in kwargs.items():
                 if key not in _RUNTIME_COLS:
                     setattr(existing, key, value)
-            existing.updated_at = datetime.now()
+            existing.updated_at = utcnow()
             return "updated"
 
     def delete(self, session: Session, job_name: str) -> bool:
@@ -188,69 +213,68 @@ class JobRepository:
         Rename a job and update all dependency references.
 
         Returns True if the job existed, False otherwise.
+
+        The mutations below are ordered so the rename is FK-safe with
+        checking left ON throughout: a full copy is inserted under
+        ``new_name`` first, every dependent row is repointed at it (now
+        valid, since ``new_name`` already exists), and only then is the
+        ``old_name`` row -- now unreferenced -- deleted. This matters
+        because the "disable FK checking, rename the PK, re-enable it"
+        approach a raw PRAGMA/SET toggle below is a best-effort attempt at
+        (still made, for whatever direct callers outside a transaction it
+        still helps) is a silent no-op on SQLite when this runs inside an
+        open transaction or savepoint -- which every stanza does under the
+        tolerant JIL ingester's per-op isolation -- leaving FK checking ON
+        and the PK rename failing with a FOREIGN KEY constraint error.
         """
         row: Optional[JobRow] = session.get(JobRow, old_name)
         if row is None:
             return False
 
         session.flush()
-        session.expire(row)
 
-        # Disable FK checking during PK rename
         from autosys.db.connection import is_sqlite
         _is_sqlite = is_sqlite()
-        if _is_sqlite:
-            session.execute(text("PRAGMA foreign_keys=OFF"))
-        else:
-            session.execute(text("SET session_replication_role = 'replica'"))
+        try:
+            if _is_sqlite:
+                session.execute(text("PRAGMA foreign_keys=OFF"))
+            else:
+                session.execute(text("SET session_replication_role = 'replica'"))
+        except Exception:
+            pass    # best-effort; the insert-then-repoint order below does not need it
 
-        # Rename the job PK
-        session.execute(
-            JobRow.__table__.update()
-            .where(JobRow.job_name == old_name)
-            .values(job_name=new_name)
-        )
+        # Insert a full copy of the row under new_name.
+        cols = {c.name: getattr(row, c.name) for c in JobRow.__table__.columns
+                if c.name != "job_name"}
+        session.execute(JobRow.__table__.insert().values(job_name=new_name, **cols))
+        session.flush()
 
-        # Update FK references in job_runs
-        session.execute(
-            JobRunRow.__table__.update()
-            .where(JobRunRow.job_name == old_name)
-            .values(job_name=new_name)
-        )
+        # Repoint every FK-referencing row at new_name (new_name now exists,
+        # so this is valid even with FK checking on).
+        for table_col in (
+            (JobRow.__table__, JobRow.box_name),        # other jobs' box_name
+            (JobRunRow.__table__, JobRunRow.job_name),
+            (EventQueueRow.__table__, EventQueueRow.job_name),
+            (EventHistoryRow.__table__, EventHistoryRow.job_name),
+            (JobOutputRow.__table__, JobOutputRow.job_name),
+            (AlarmRow.__table__, AlarmRow.job_name),
+            (MonitorRow.__table__, MonitorRow.job_name),
+            (BlobRow.__table__, BlobRow.job_name),
+        ):
+            table, col = table_col
+            session.execute(table.update().where(col == old_name).values({col.name: new_name}))
+        session.flush()
 
-        # Update event_queue references
-        session.execute(
-            EventQueueRow.__table__.update()
-            .where(EventQueueRow.job_name == old_name)
-            .values(job_name=new_name)
-        )
+        # old_name is now unreferenced -- safe to drop.
+        session.execute(JobRow.__table__.delete().where(JobRow.job_name == old_name))
 
-        # Update event_history references
-        session.execute(
-            EventHistoryRow.__table__.update()
-            .where(EventHistoryRow.job_name == old_name)
-            .values(job_name=new_name)
-        )
-
-        # Update job_output references
-        session.execute(
-            JobOutputRow.__table__.update()
-            .where(JobOutputRow.job_name == old_name)
-            .values(job_name=new_name)
-        )
-
-        # Update all jobs that reference old_name in box_name
-        session.execute(
-            JobRow.__table__.update()
-            .where(JobRow.box_name == old_name)
-            .values(box_name=new_name)
-        )
-
-        # Re-enable FK
-        if _is_sqlite:
-            session.execute(text("PRAGMA foreign_keys=ON"))
-        else:
-            session.execute(text("SET session_replication_role = 'origin'"))
+        try:
+            if _is_sqlite:
+                session.execute(text("PRAGMA foreign_keys=ON"))
+            else:
+                session.execute(text("SET session_replication_role = 'origin'"))
+        except Exception:
+            pass
 
         # Update condition strings (safe, no FK involved)
         all_jobs = session.scalars(
@@ -468,7 +492,22 @@ class EventRepository:
         row: Optional[EventQueueRow] = session.get(EventQueueRow, event_id)
         if row:
             row.processed    = True
-            row.processed_at = datetime.now()
+            row.processed_at = utcnow()
+
+    def archive_older_than(self, session: Session, cutoff: datetime) -> int:
+        """
+        Delete every ``EventHistoryRow`` created before *cutoff*.
+
+        Mirrors real AutoSys's ``archive_events`` utility, which purges old
+        processed events from the audit history so it doesn't grow
+        unbounded.  Returns the number of rows deleted.
+        """
+        rows = list(session.scalars(
+            select(EventHistoryRow).where(EventHistoryRow.created_at < cutoff)
+        ))
+        for row in rows:
+            session.delete(row)
+        return len(rows)
 
 
 # ===========================================================================
@@ -504,7 +543,7 @@ class GlobalVarRepository:
             ))
         else:
             row.value      = value
-            row.updated_at = datetime.now()
+            row.updated_at = utcnow()
 
     def get(self, session: Session, name: str) -> Optional[str]:
         """Return a global variable's value, or None if not defined."""
@@ -559,12 +598,11 @@ class RunRepository:
         The PID and exit_code are left NULL here and filled in by
         ``finish()`` when the process exits.
         """
-        from datetime import datetime as _dt
         row = JobRunRow(
             run_id     = run_id,
             job_name   = job_name,
             status     = JobStatus.RUNNING.value,
-            start_time = datetime.now(),
+            start_time = utcnow(),
             machine    = machine,
             run_date   = run_date,
         )
@@ -585,7 +623,6 @@ class RunRepository:
         Called by AgentDispatch._run_job() from the background thread,
         in its own session (separate from the dispatch session).
         """
-        from datetime import datetime as _dt
         if isinstance(status, str):
             try:
                 status = JobStatus[status.upper()].value
@@ -595,7 +632,7 @@ class RunRepository:
         if row is None:
             return
         row.status    = status
-        row.end_time  = _dt.now()
+        row.end_time  = utcnow()
         row.exit_code = exit_code
         if pid is not None:
             row.pid = pid
@@ -629,6 +666,36 @@ class RunRepository:
         """
         return self.get_history(session, job_name=job_name, limit=limit)
 
+    def count_runs(self, session: Session, job_name: str) -> int:
+        """Return the total number of run records for *job_name* (its ``runnum``)."""
+        from sqlalchemy import func, select
+        return session.scalar(
+            select(func.count()).select_from(JobRunRow)
+            .where(JobRunRow.job_name == job_name)
+        ) or 0
+
+    def get_run_by_number(
+        self, session: Session, job_name: str, run_num: int,
+    ) -> Optional[JobRunRow]:
+        """
+        Return the *run_num*-th run of *job_name* in chronological order
+        (1 = first run ever, matching AutoSys's ``-R run_num``).  A negative
+        *run_num* counts back from the most recent run (-1 = most recent,
+        -2 = one before that), also matching real ``autorep -R``.
+        """
+        from sqlalchemy import asc, desc, select
+        if run_num > 0:
+            q = (
+                select(JobRunRow).where(JobRunRow.job_name == job_name)
+                .order_by(asc(JobRunRow.start_time)).limit(1).offset(run_num - 1)
+            )
+        else:
+            q = (
+                select(JobRunRow).where(JobRunRow.job_name == job_name)
+                .order_by(desc(JobRunRow.start_time)).limit(1).offset(-run_num - 1)
+            )
+        return session.scalars(q).first()
+
     def latest_run_id(self, session: Session, job_name: str) -> Optional[str]:
         """
         Return the run_id of the most recent execution of *job_name*.
@@ -643,6 +710,25 @@ class RunRepository:
             .limit(1)
         ).first()
         return row.run_id if row else None
+
+    def latest_exit_codes(self, session: Session) -> dict[str, Optional[int]]:
+        """
+        Return {job_name: exit_code} for each job's most recent run.
+
+        Used by the condition evaluator to resolve ``exitcode(job) = N``
+        conditions.  A job with no runs yet, or whose latest run hasn't
+        finished (exit_code still NULL), is simply absent from the dict —
+        ``exitcode(...)`` conditions on it are then unsatisfied.
+        """
+        from sqlalchemy import select, desc
+        rows = session.scalars(
+            select(JobRunRow).order_by(JobRunRow.job_name, desc(JobRunRow.start_time))
+        )
+        latest: dict[str, Optional[int]] = {}
+        for row in rows:
+            if row.job_name not in latest:
+                latest[row.job_name] = row.exit_code
+        return latest
 
 
 # ===========================================================================
@@ -759,6 +845,7 @@ class MachineRepository:
         port:         int   = 7520,
         status:       str   = "UNKNOWN",
         description:  Optional[str] = None,
+        members_json: Optional[str] = None,
     ) -> MachineRow:
         """
         Upsert a machine record.
@@ -767,7 +854,6 @@ class MachineRepository:
         ``status``, and ``description`` in-place.  This is called both
         by ``autosys machine register`` and by the agent server on startup.
         """
-        from datetime import datetime as _dt
         row: Optional[MachineRow] = session.get(MachineRow, machine_name)
         if row is None:
             row = MachineRow(
@@ -776,6 +862,7 @@ class MachineRepository:
                 port         = port,
                 status       = status,
                 description  = description,
+                members_json = members_json,
             )
             session.add(row)
             session.flush()   # make it persistent so subsequent session.get() calls find it
@@ -785,6 +872,8 @@ class MachineRepository:
             row.status      = status
             if description is not None:
                 row.description = description
+            if members_json is not None:
+                row.members_json = members_json
         return row
 
     def get(self, session: Session, machine_name: str) -> Optional[MachineRow]:
@@ -810,12 +899,11 @@ class MachineRepository:
           - The CHECK_HEARTBEAT event handler (marks UP or DOWN depending on
             whether the agent responded)
         """
-        from datetime import datetime as _dt
         row = session.get(MachineRow, machine_name)
         if row is None:
             return
         row.status         = status
-        row.last_heartbeat = _dt.now()
+        row.last_heartbeat = utcnow()
 
     def set_status(
         self,

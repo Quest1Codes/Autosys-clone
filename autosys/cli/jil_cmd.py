@@ -20,11 +20,63 @@ from rich import box as rich_box
 
 from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo
-from autosys.parser.jil_parser import parse_jil_file, parse_jil, JILParseError
+from autosys.parser.jil_parser import parse_jil_file, JILParseError
+from autosys.parser.jil_apply import apply_operation
+from autosys.parser.lexer import LexError
 from autosys.parser.jil_writer import jobs_to_jil, job_to_jil
 
 _console = Console()
 _err     = Console(stderr=True)
+
+# Printed action -> colour, for the per-stanza lines `jil import` prints.
+_ACTION_COLOURS = {
+    "INSERTED": "green", "UPDATED": "yellow", "DELETED": "red", "MACHINE": "blue",
+    "SKIPPED": "magenta", "OK": "cyan", "RENAMED": "cyan", "RESOURCE": "blue",
+    "JOB_TYPE": "blue", "MONBRO": "blue", "BLOB": "blue", "GLOB": "blue",
+    "XINST": "blue", "PROFILE": "blue", "CALENDAR": "blue",
+}
+# ApplyResult.counter key -> the plural noun used in the summary line.
+_COUNTER_LABELS = [
+    ("machines", "machine"), ("resources", "resource"), ("job_types", "job type"),
+    ("monitors", "monitor"), ("blobs", "blob"), ("globs", "glob"), ("xinsts", "xinst"),
+    ("profiles", "profile"), ("calendars", "calendar"),
+]
+
+
+def _print_import_results(
+    results: list[tuple[str, str, str]], counters: dict[str, int], dry_run: bool, quiet: bool,
+) -> None:
+    """Print `jil import`'s per-stanza lines and summary — shared by --strict and
+    the tolerant default, so the two report their (differently-derived) results
+    identically."""
+    if not quiet:
+        for action, name, jtype in results:
+            colour = _ACTION_COLOURS.get(action, "white")
+            _console.print(f"  [{colour}]{action:<8}[/{colour}]  {name:<30}  {jtype}")
+        _console.print()
+
+    n_inserted = counters.get("inserted", 0)
+    n_updated  = counters.get("updated", 0)
+    n_deleted  = counters.get("deleted", 0)
+    n_jobs = n_inserted + n_updated + n_deleted
+    total  = n_jobs + sum(counters.get(k, 0) for k, _ in _COUNTER_LABELS)
+
+    if dry_run:
+        _console.print(
+            f"[cyan]Validation OK[/cyan] — "
+            f"{total} stanza{'s' if total != 1 else ''} parsed successfully."
+        )
+    else:
+        parts = [f"{n_jobs} job{'s' if n_jobs != 1 else ''} imported"]
+        for key, label in _COUNTER_LABELS:
+            n = counters.get(key, 0)
+            if n:
+                parts.append(f"{n} {label}{'s' if n != 1 else ''}")
+        _console.print(
+            "[green]" + ", ".join(parts) + "[/green] "
+            f"({n_inserted} inserted, {n_updated} updated, {n_deleted} deleted)."
+        )
+    _console.print()
 
 
 # ===========================================================================
@@ -46,13 +98,24 @@ def jil_group() -> None:
               help="Parse and validate only — do NOT write to the database.")
 @click.option("--quiet", "-q", is_flag=True, default=False,
               help="Suppress per-job lines; only print the summary.")
-def jil_import(file: Path, dry_run: bool, quiet: bool) -> None:
+@click.option("--strict", is_flag=True, default=False,
+              help="Fail the whole import on the first malformed stanza instead of "
+                   "quarantining it and importing everything else (the pre-tolerant-"
+                   "ingest behaviour).")
+def jil_import(file: Path, dry_run: bool, quiet: bool, strict: bool) -> None:
     """
     Parse FILE and persist all insert_job / update_job stanzas to the DB.
 
     Mirrors the real AutoSys ``jil < file.jil`` command.  Each stanza
     produces one DB upsert; the operation that was performed (inserted /
     updated) is shown for each job.
+
+    By default a malformed stanza is quarantined — archived verbatim and
+    reported as SKIPPED — rather than failing the whole file; this is the
+    same lossless ingestion ``jil import-dir`` uses, including the raw-text
+    archive in ``ujo_jil_file`` / ``ujo_jil_stanza``.  Pass --strict for the
+    old behaviour: stop and exit 1 on the first stanza that fails to parse
+    or validate.
 
     With --dry-run the file is parsed and validated but nothing is written
     to the database.
@@ -72,373 +135,50 @@ def jil_import(file: Path, dry_run: bool, quiet: bool) -> None:
     label = "[dim]DRY-RUN[/dim] " if dry_run else ""
     _console.print(f"\n{label}Importing [bold]{file.name}[/bold] …\n")
 
-    try:
-        ops = parse_jil_file(str(file))
-    except JILParseError as exc:
-        _err.print(f"[red]Parse error:[/red] {exc}")
-        sys.exit(1)
-    except Exception as exc:
-        _err.print(f"[red]Error reading {file}:[/red] {exc}")
-        sys.exit(1)
+    if strict:
+        try:
+            ops = parse_jil_file(str(file))
+        except (JILParseError, LexError) as exc:
+            _err.print(f"[red]Parse error:[/red] {exc}")
+            sys.exit(1)
+        except Exception as exc:
+            _err.print(f"[red]Error reading {file}:[/red] {exc}")
+            sys.exit(1)
 
-    # Tally by directive
-    n_inserted = n_updated = n_deleted = n_machines = 0
-    n_resources = n_job_types = n_monitors = n_blobs = n_globs = 0
-    n_xinsts = n_profiles = n_calendars = 0
-    results: list[tuple[str, str, str]] = []   # (action, name, type)
+        results: list[tuple[str, str, str]] = []
+        counters: dict[str, int] = {}
+        with sync_session() as session:
+            for op in ops:
+                # The session runs with autoflush off: flush so a later
+                # stanza about the same object (insert_x then update_x)
+                # sees this one.
+                session.flush()
+                result = apply_operation(session, op, dry_run=dry_run)
+                results.append((result.action, result.name, result.detail))
+                if result.counter:
+                    counters[result.counter] = counters.get(result.counter, 0) + result.count
+        _print_import_results(results, counters, dry_run, quiet)
+        return
+
+    # Tolerant default: the same lossless ingester `jil import-dir` uses for
+    # a whole directory. Nothing here raises for content reasons — a bad
+    # stanza is archived and reported SKIPPED, not a crash.
+    from autosys.parser.jil_ingest import ingest_file
 
     with sync_session() as session:
-        for op in ops:
+        report = ingest_file(session, file, dry_run=dry_run)
 
-            # ---- machine definition ----
-            if op.op == "insert_machine":
-                m = op.machine
-                if not dry_run:
-                    from autosys.db.repository import machines as machine_repo
-                    machine_repo.register(
-                        session,
-                        machine_name = m.machine_name,
-                        host         = m.host or m.machine_name,
-                        port         = m.port,
-                    )
-                n_machines += 1
-                results.append(("MACHINE", m.machine_name, f"port:{m.port}"))
-                continue
+    for issue in report.issues:            # file-level (unreadable, odd encoding, ...)
+        _console.print(f"  [yellow]{issue['code']}[/yellow]: {issue['message']}")
+    _print_import_results(report.results, report.counters, dry_run, quiet)
 
-            if op.op == "update_machine":
-                m = op.machine
-                if not dry_run:
-                    from autosys.db.repository import machines as machine_repo
-                    machine_repo.register(
-                        session,
-                        machine_name = m.machine_name,
-                        host         = m.host or m.machine_name,
-                        port         = m.port,
-                    )
-                n_machines += 1
-                results.append(("MACHINE", m.machine_name, "updated"))
-                continue
-
-            if op.op == "delete_machine":
-                name = op.raw_attrs.get("machine_name", "")
-                if not dry_run:
-                    from autosys.db.repository import machines as machine_repo
-                    machine_repo.delete(session, name)
-                n_machines += 1
-                results.append(("DELETED", name, "machine"))
-                continue
-
-            # ---- rename_job ----
-            if op.op == "rename":
-                old_name = op.raw_attrs.get("job_name", "")
-                new_name = op.raw_attrs.get("new_name", "")
-                if not dry_run:
-                    job_repo.rename(session, old_name, new_name)
-                results.append(("RENAMED", old_name, f"→ {new_name}"))
-                continue
-
-            # ---- delete_box ----
-            if op.op == "delete" and op.job is not None and str(op.job.job_type) == "BOX":
-                name = op.job.job_name
-                if not dry_run:
-                    count = job_repo.delete_box(session, name)
-                else:
-                    count = 0
-                n_deleted += count
-                results.append(("DELETED", name, f"box ({count} jobs)"))
-                continue
-
-            # ---- override_job (apply as update) ----
-            if op.op == "override":
-                job = op.job
-                name = job.job_name
-                if dry_run:
-                    action = "OK"
-                else:
-                    result = job_repo.upsert(session, job)
-                    action = result.upper()
-                results.append((action, name, "override"))
-                continue
-
-            # ---- resources ----
-            if op.op in ("insert_resource", "update_resource"):
-                name = op.raw_attrs.get("resource_name", "")
-                max_load = int(op.raw_attrs.get("max_load", "1"))
-                desc = op.raw_attrs.get("description")
-                if not dry_run:
-                    from autosys.db.repository import resources as resource_repo
-                    resource_repo.upsert(session, name, max_load=max_load, description=desc)
-                n_resources += 1
-                results.append(("RESOURCE", name, f"max_load:{max_load}"))
-                continue
-
-            if op.op == "delete_resource":
-                name = op.raw_attrs.get("resource_name", "")
-                if not dry_run:
-                    from autosys.db.repository import resources as resource_repo
-                    resource_repo.delete(session, name)
-                n_resources += 1
-                results.append(("DELETED", name, "resource"))
-                continue
-
-            # ---- job types ----
-            if op.op in ("insert_job_type", "update_job_type"):
-                name = op.raw_attrs.get("job_type_name", "")
-                cmd = op.raw_attrs.get("command")
-                desc = op.raw_attrs.get("description")
-                if not dry_run:
-                    from autosys.db.repository import job_types as job_type_repo
-                    job_type_repo.upsert(session, name, command_template=cmd, description=desc)
-                n_job_types += 1
-                results.append(("JOB_TYPE", name, desc or ""))
-                continue
-
-            if op.op == "delete_job_type":
-                name = op.raw_attrs.get("job_type_name", "")
-                if not dry_run:
-                    from autosys.db.repository import job_types as job_type_repo
-                    job_type_repo.delete(session, name)
-                n_job_types += 1
-                results.append(("DELETED", name, "job_type"))
-                continue
-
-            # ---- monbro ----
-            if op.op in ("insert_monbro", "update_monbro"):
-                name = op.raw_attrs.get("monbro_name", "")
-                mtype = op.raw_attrs.get("monbro_type", "FILE_MONITOR")
-                jname = op.raw_attrs.get("job_name")
-                import json as _json
-                attrs = {k: v for k, v in op.raw_attrs.items()
-                         if k not in ("monbro_name", "monbro_type", "job_name")}
-                attrs_json = _json.dumps(attrs) if attrs else None
-                if not dry_run:
-                    from autosys.db.repository import monitors as monitor_repo
-                    monitor_repo.upsert(session, name, mtype, job_name=jname,
-                                       attributes_json=attrs_json)
-                n_monitors += 1
-                results.append(("MONBRO", name, mtype))
-                continue
-
-            if op.op == "delete_monbro":
-                name = op.raw_attrs.get("monbro_name", "")
-                if not dry_run:
-                    from autosys.db.repository import monitors as monitor_repo
-                    monitor_repo.delete(session, name)
-                n_monitors += 1
-                results.append(("DELETED", name, "monbro"))
-                continue
-
-            # ---- blobs ----
-            if op.op == "insert_blob":
-                name = op.raw_attrs.get("blob_name", "")
-                jname = op.raw_attrs.get("job_name")
-                bfile = op.raw_attrs.get("blob_file", "")
-                content = ""
-                if bfile:
-                    try:
-                        with open(bfile) as bf:
-                            content = bf.read()
-                    except OSError:
-                        content = ""
-                if not dry_run:
-                    from autosys.db.repository import blobs as blob_repo
-                    blob_repo.insert(session, name, content, job_name=jname)
-                n_blobs += 1
-                results.append(("BLOB", name, jname or ""))
-                continue
-
-            if op.op == "delete_blob":
-                name = op.raw_attrs.get("blob_name", "")
-                if not dry_run:
-                    from autosys.db.repository import blobs as blob_repo
-                    blob_repo.delete(session, name)
-                n_blobs += 1
-                results.append(("DELETED", name, "blob"))
-                continue
-
-            # ---- globs ----
-            if op.op == "insert_glob":
-                name = op.raw_attrs.get("global_name", "")
-                gfile = op.raw_attrs.get("blob_file", "")
-                content = ""
-                if gfile:
-                    try:
-                        with open(gfile) as gf:
-                            content = gf.read()
-                    except OSError:
-                        content = ""
-                if not dry_run:
-                    from autosys.db.repository import globs2 as glob_repo
-                    glob_repo.upsert(session, name, content)
-                n_globs += 1
-                results.append(("GLOB", name, ""))
-                continue
-
-            if op.op == "delete_glob":
-                name = op.raw_attrs.get("global_name", "")
-                if not dry_run:
-                    from autosys.db.repository import globs2 as glob_repo
-                    glob_repo.delete(session, name)
-                n_globs += 1
-                results.append(("DELETED", name, "glob"))
-                continue
-
-            # ---- xinst ----
-            if op.op in ("insert_xinst", "update_xinst"):
-                name = op.raw_attrs.get("xinst_name", "")
-                inst = op.raw_attrs.get("instance_name", name)
-                host = op.raw_attrs.get("host", "localhost")
-                port = int(op.raw_attrs.get("port", "9000"))
-                desc = op.raw_attrs.get("description")
-                if not dry_run:
-                    from autosys.db.repository import xinsts as xinst_repo
-                    xinst_repo.upsert(session, name, inst, host, port=port, description=desc)
-                n_xinsts += 1
-                results.append(("XINST", name, f"{host}:{port}"))
-                continue
-
-            if op.op == "delete_xinst":
-                name = op.raw_attrs.get("xinst_name", "")
-                if not dry_run:
-                    from autosys.db.repository import xinsts as xinst_repo
-                    xinst_repo.delete(session, name)
-                n_xinsts += 1
-                results.append(("DELETED", name, "xinst"))
-                continue
-
-            # ---- connection profiles ----
-            if op.op == "insert_connectionprofile":
-                name = op.raw_attrs.get("profile_name", "")
-                ptype = op.raw_attrs.get("profile_type", "HADOOP")
-                import json as _json
-                attrs = {k: v for k, v in op.raw_attrs.items()
-                         if k not in ("profile_name", "profile_type")}
-                attrs_json = _json.dumps(attrs) if attrs else None
-                if not dry_run:
-                    from autosys.db.repository import profiles as profile_repo
-                    profile_repo.upsert(session, name, ptype, attributes_json=attrs_json)
-                n_profiles += 1
-                results.append(("PROFILE", name, ptype))
-                continue
-
-            if op.op == "delete_connectionprofile":
-                name = op.raw_attrs.get("profile_name", "")
-                if not dry_run:
-                    from autosys.db.repository import profiles as profile_repo
-                    profile_repo.delete(session, name)
-                n_profiles += 1
-                results.append(("DELETED", name, "profile"))
-                continue
-
-            # ---- calendars ----
-            if op.op in ("insert_calendar", "update_calendar"):
-                name = op.raw_attrs.get("calendar_name", "")
-                if not dry_run:
-                    from autosys.db.repository import calendars as cal_repo
-                    from autosys.db.schema import CalendarRow
-                    cal_repo.upsert(session, CalendarRow(
-                        calendar_name=name,
-                        dates_json=op.raw_attrs.get("dates_json", "[]"),
-                        description=op.raw_attrs.get("description"),
-                    ))
-                n_calendars += 1
-                results.append(("CALENDAR", name, ""))
-                continue
-
-            if op.op == "delete_calendar":
-                name = op.raw_attrs.get("calendar_name", "")
-                if not dry_run:
-                    from autosys.db.repository import calendars as cal_repo
-                    cal_repo.delete(session, name)
-                n_calendars += 1
-                results.append(("DELETED", name, "calendar"))
-                continue
-
-            # ---- job definition (insert/update/delete) ----
-            if op.job is None:
-                results.append(("SKIPPED", op.op, "unsupported"))
-                continue
-
-            job   = op.job
-            name  = job.job_name
-            jtype = str(job.job_type)
-
-            if op.op == "delete":
-                if not dry_run:
-                    job_repo.delete(session, name)
-                action = "DELETED"
-                n_deleted += 1
-            else:
-                if dry_run:
-                    action = "OK"
-                else:
-                    result = job_repo.upsert(session, job)
-                    action = result.upper()   # "INSERTED" or "UPDATED"
-                    if action == "INSERTED":
-                        n_inserted += 1
-                    else:
-                        n_updated += 1
-
-            results.append((action, name, jtype))
-
-    if not quiet:
-        for action, name, jtype in results:
-            colour = {
-                "INSERTED": "green",
-                "UPDATED":  "yellow",
-                "DELETED":  "red",
-                "MACHINE":  "blue",
-                "SKIPPED":  "magenta",
-                "OK":       "cyan",
-                "RENAMED":  "cyan",
-                "RESOURCE": "blue",
-                "JOB_TYPE": "blue",
-                "MONBRO":   "blue",
-                "BLOB":     "blue",
-                "GLOB":     "blue",
-                "XINST":    "blue",
-                "PROFILE":  "blue",
-                "CALENDAR": "blue",
-            }.get(action, "white")
-            _console.print(
-                f"  [{colour}]{action:<8}[/{colour}]  "
-                f"{name:<30}  {jtype}"
-            )
-        _console.print()
-
-    n_jobs = n_inserted + n_updated + n_deleted
-    total  = (n_jobs + n_machines + n_resources + n_job_types + n_monitors
-              + n_blobs + n_globs + n_xinsts + n_profiles + n_calendars)
-    if dry_run:
+    n_quarantined = report.dispositions.get("QUARANTINED", 0)
+    if n_quarantined:
         _console.print(
-            f"[cyan]Validation OK[/cyan] — "
-            f"{total} stanza{'s' if total != 1 else ''} parsed successfully."
+            f"[yellow]{n_quarantined} stanza{'s' if n_quarantined != 1 else ''} could not be "
+            "read as JIL and were archived, not imported — see the SKIPPED line(s) above, "
+            "or re-run with --strict for a hard failure.[/yellow]\n"
         )
-    else:
-        parts = [f"{n_jobs} job{'s' if n_jobs != 1 else ''} imported"]
-        if n_machines:
-            parts.append(f"{n_machines} machine{'s' if n_machines != 1 else ''}")
-        if n_resources:
-            parts.append(f"{n_resources} resource{'s' if n_resources != 1 else ''}")
-        if n_job_types:
-            parts.append(f"{n_job_types} job type{'s' if n_job_types != 1 else ''}")
-        if n_monitors:
-            parts.append(f"{n_monitors} monitor{'s' if n_monitors != 1 else ''}")
-        if n_blobs:
-            parts.append(f"{n_blobs} blob{'s' if n_blobs != 1 else ''}")
-        if n_globs:
-            parts.append(f"{n_globs} glob{'s' if n_globs != 1 else ''}")
-        if n_xinsts:
-            parts.append(f"{n_xinsts} xinst{'s' if n_xinsts != 1 else ''}")
-        if n_profiles:
-            parts.append(f"{n_profiles} profile{'s' if n_profiles != 1 else ''}")
-        if n_calendars:
-            parts.append(f"{n_calendars} calendar{'s' if n_calendars != 1 else ''}")
-        _console.print(
-            "[green]" + ", ".join(parts) + "[/green] "
-            f"({n_inserted} inserted, {n_updated} updated, {n_deleted} deleted)."
-        )
-    _console.print()
 
 
 # ===========================================================================
@@ -497,67 +237,137 @@ def jil_export(job_name: str, export_all: bool, op: str) -> None:
 @click.argument("file", type=click.Path(exists=True, readable=True, path_type=Path))
 @click.option("--quiet", "-q", is_flag=True, default=False,
               help="Suppress per-job lines; only print the summary.")
-def jil_validate(file: Path, quiet: bool) -> None:
+@click.option("--strict", is_flag=True, default=False,
+              help="Fail on the first malformed stanza instead of quarantining it "
+                   "and reporting the rest (the pre-tolerant-ingest behaviour).")
+def jil_validate(file: Path, quiet: bool, strict: bool) -> None:
     """
     Parse and validate FILE without writing to the database.
 
-    Identical to ``jil import --dry-run``.  Use this as a quick sanity-
-    check before deploying a JIL file to production.
+    Exactly ``jil import --dry-run`` — tolerant by default (a malformed
+    stanza is quarantined and reported, not a hard failure), --strict for
+    the old all-or-nothing contract. Use this as a quick sanity-check before
+    importing a JIL file for real.
 
     Example
     -------
     \\b
         $ autosys jil validate examples/demo_etl.jil
-          OK  demo_etl_box
-          OK  check_source_ready
+          OK        demo_etl_box                    BOX
+          OK        check_source_ready              CMD
           ...
-        JIL file is valid: 7 jobs defined.
+        JIL file is valid: 7 stanzas parsed.
     """
     _console.print(f"\nValidating [bold]{file.name}[/bold] …\n")
 
-    try:
-        ops = parse_jil_file(str(file))
-    except JILParseError as exc:
-        _err.print(f"[red]Parse error:[/red] {exc}")
-        sys.exit(1)
-    except Exception as exc:
-        _err.print(f"[red]Error reading {file}:[/red] {exc}")
-        sys.exit(1)
+    if strict:
+        try:
+            ops = parse_jil_file(str(file))
+        except (JILParseError, LexError) as exc:
+            _err.print(f"[red]Parse error:[/red] {exc}")
+            sys.exit(1)
+        except Exception as exc:
+            _err.print(f"[red]Error reading {file}:[/red] {exc}")
+            sys.exit(1)
+        if not quiet:
+            for op in ops:
+                if op.job is not None:
+                    name, jtype = op.job.job_name, str(op.job.job_type)
+                elif op.machine is not None:
+                    name, jtype = op.machine.machine_name, "machine"
+                else:
+                    name = next((v for k, v in op.raw_attrs.items() if k.endswith("_name")), op.op)
+                    jtype = op.op
+                _console.print(f"  [green]OK[/green]  {name:<30}  {jtype}")
+            _console.print()
+        n = len(ops)
+        _console.print(f"[green]JIL file is valid[/green]: {n} stanza{'s' if n != 1 else ''} parsed.\n")
+        return
 
+    from autosys.parser.jil_ingest import ingest_file
+    with sync_session() as session:
+        report = ingest_file(session, file, dry_run=True)
+
+    for issue in report.issues:
+        _console.print(f"  [yellow]{issue['code']}[/yellow]: {issue['message']}")
     if not quiet:
-        for op in ops:
-            if op.job is not None:
-                _console.print(
-                    f"  [green]OK[/green]  "
-                    f"{op.job.job_name:<30}  {op.job.job_type}"
-                )
-            elif op.machine is not None:
-                _console.print(
-                    f"  [green]OK[/green]  "
-                    f"{op.machine.machine_name:<30}  machine"
-                )
-            else:
-                name = (
-                    op.raw_attrs.get("resource_name")
-                    or op.raw_attrs.get("job_type_name")
-                    or op.raw_attrs.get("monbro_name")
-                    or op.raw_attrs.get("blob_name")
-                    or op.raw_attrs.get("global_name")
-                    or op.raw_attrs.get("xinst_name")
-                    or op.raw_attrs.get("profile_name")
-                    or op.raw_attrs.get("calendar_name")
-                    or op.raw_attrs.get("machine_name")
-                    or op.raw_attrs.get("job_name")
-                    or op.op
-                )
-                _console.print(
-                    f"  [green]OK[/green]  "
-                    f"{name:<30}  {op.op}"
-                )
+        for action, name, jtype in report.results:
+            colour = _ACTION_COLOURS.get(action, "white")
+            _console.print(f"  [{colour}]{action:<8}[/{colour}]  {name:<30}  {jtype}")
         _console.print()
 
-    n = len(ops)
-    _console.print(
-        f"[green]JIL file is valid[/green]: "
-        f"{n} stanza{'s' if n != 1 else ''} parsed.\n"
-    )
+    n = len(report.results)
+    n_quarantined = report.dispositions.get("QUARANTINED", 0)
+    if n_quarantined:
+        _console.print(
+            f"[yellow]{n_quarantined} of {n} stanzas could not be read as JIL and were "
+            "quarantined — see the SKIPPED line(s) above, or re-run with --strict for a hard "
+            "failure.[/yellow]\n"
+        )
+    else:
+        _console.print(f"[green]JIL file is valid[/green]: {n} stanza{'s' if n != 1 else ''} parsed.\n")
+
+
+# ===========================================================================
+# jil import-dir  — lossless bulk ingestion
+# ===========================================================================
+
+@jil_group.command("import-dir")
+@click.argument("path", type=click.Path(exists=True, readable=True, path_type=Path))
+@click.option("--pattern", default="*.jil", show_default=True, help="Glob for files under PATH.")
+@click.option("--exclude", "excludes", multiple=True,
+              help="Glob(s) of file names to skip (repeatable).")
+@click.option("--duplicates", type=click.Choice(["first", "last"]), default="first",
+              show_default=True,
+              help="When a job is defined twice: keep the first (later archived as "
+                   "DUPLICATE) or let the last overwrite. Both stay in the archive.")
+@click.option("--commit-every", default=200, show_default=True, help="Files per commit.")
+@click.option("--report", "report_path", type=click.Path(path_type=Path), default=None,
+              help="Write the JSON summary here.")
+@click.option("--quiet", "-q", is_flag=True, default=False)
+def jil_import_dir(path: Path, pattern: str, excludes: tuple, duplicates: str, commit_every: int,
+                   report_path: Path, quiet: bool) -> None:
+    """
+    Ingest every JIL file under PATH without losing anything.
+
+    Never aborts on bad content: every stanza is archived verbatim and ends as
+    LOADED, LOADED_WITH_WARNINGS, ARCHIVE_ONLY, QUARANTINED or DUPLICATE.
+    Files in any common encoding are decoded (UTF-8/16, cp1252, latin-1).
+
+    A dead database connection is different — every remaining file would
+    fail the same way, so the run stops there instead of logging one error
+    per file. Re-run this command on the files after the one it stopped at
+    (sorted order is deterministic) to resume; everything up to that point
+    is already durably committed.
+    """
+    import json
+    from autosys.parser.jil_ingest import ingest_paths, iter_files
+
+    import fnmatch
+    files = [f for f in iter_files(path, pattern)
+             if not any(fnmatch.fnmatch(f.name, x) for x in excludes)]
+
+    def _tick(n, rep):
+        if not quiet and (n % 1000 == 0 or n == len(files)):
+            _console.print(f"  {n}/{len(files)} files")
+
+    summary = ingest_paths(sync_session, files, commit_every=commit_every,
+                           duplicates=duplicates, progress=_tick)
+    data = summary.as_dict()
+    if report_path:
+        report_path.write_text(json.dumps(data, indent=2))
+    _console.print(f"[bold]{data['files']}[/bold] files, [bold]{data['stanzas']}[/bold] stanzas")
+    for k, v in sorted(data["dispositions"].items()):
+        _console.print(f"  {k:<22}{v}")
+
+    if summary.aborted:
+        _err.print(
+            f"\n[red]Stopped[/red]: the database connection was lost while processing "
+            f"[bold]{summary.last_path}[/bold].\n"
+            f"[green]{summary.files_committed}[/green] of {len(files)} files are durably "
+            f"committed. Re-run this command once the database is back up — files already "
+            f"committed are safely re-imported as no-ops (or use --duplicates to control "
+            f"that), so pointing it at the same PATH again is enough.\n"
+            f"[dim]{summary.abort_reason}[/dim]"
+        )
+        sys.exit(1)

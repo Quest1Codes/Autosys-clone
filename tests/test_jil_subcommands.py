@@ -206,11 +206,33 @@ class TestDeleteBox:
             box_name: del_box
             """, tmp_path,
         )
-        _run_import("delete_job: del_box   job_type: BOX", tmp_path)
+        # delete_box removes the box AND every job in it (vendor PDF).
+        _run_import("delete_box: del_box", tmp_path)
         with sync_session() as session:
             assert job_repo.get_row(session, "del_box") is None
             assert job_repo.get_row(session, "c1") is None
             assert job_repo.get_row(session, "c2") is None
+
+    def test_delete_job_on_box_keeps_children_standalone(self, tmp_path):
+        # PDF: "If the specified job is a box job, the box job is deleted and
+        # the jobs in the box become stand-alone jobs."
+        _run_import(
+            """
+            insert_job: keep_box   job_type: BOX
+            owner: svc
+
+            insert_job: k1   job_type: CMD
+            command: echo hi
+            machine: localhost
+            box_name: keep_box
+            """, tmp_path,
+        )
+        _run_import("delete_job: keep_box", tmp_path)
+        with sync_session() as session:
+            assert job_repo.get_row(session, "keep_box") is None
+            child = job_repo.get_row(session, "k1")
+            assert child is not None
+            assert child.box_name is None
 
 
 # ===========================================================================

@@ -138,11 +138,27 @@ class TestUrlConversion:
         url = _get_db_url(async_=True)
         assert url == "postgresql+asyncpg://user:pass@localhost/autosys"
 
-    def test_sync_url_unchanged(self, monkeypatch):
+    def test_sync_url_pins_psycopg2(self, monkeypatch):
+        # SQLAlchemy >= 2.1 changed the *default* DBAPI for a bare
+        # "postgresql://" URL from psycopg2 to psycopg (v3); pyproject.toml
+        # only pins psycopg2-binary, so a bare URL must be rewritten or a
+        # fresh install starts failing with "No module named 'psycopg'".
         monkeypatch.setenv("AUTOSYS_DB_URL", "postgresql://user:pass@localhost/autosys")
         reset_engines()
         url = _get_db_url(async_=False)
-        assert url == "postgresql://user:pass@localhost/autosys"
+        assert url == "postgresql+psycopg2://user:pass@localhost/autosys"
+
+    def test_sync_url_already_pinned_unchanged(self, monkeypatch):
+        monkeypatch.setenv("AUTOSYS_DB_URL", "postgresql+psycopg2://user:pass@localhost/autosys")
+        reset_engines()
+        url = _get_db_url(async_=False)
+        assert url == "postgresql+psycopg2://user:pass@localhost/autosys"
+
+    def test_sync_sqlite_url_unchanged(self, monkeypatch):
+        monkeypatch.setenv("AUTOSYS_DB_URL", "sqlite:///tmp/test.db")
+        reset_engines()
+        url = _get_db_url(async_=False)
+        assert url == "sqlite:///tmp/test.db"
 
 
 # ===========================================================================

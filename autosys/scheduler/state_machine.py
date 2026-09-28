@@ -66,22 +66,28 @@ def _norm_status(s: int | str | JobStatus | None) -> str:
 # Map each from-status to the set of statuses it can legally transition to.
 # CHANGE_STATUS (force=True) bypasses this table entirely.
 VALID_TRANSITIONS: dict[str, frozenset[str]] = {
-    "INACTIVE":            frozenset({"ACTIVATED", "STARTING", "ON_HOLD", "ON_ICE"}),
-    "ACTIVATED":           frozenset({"RUNNING", "STARTING", "INACTIVE", "ON_HOLD", "FAILURE"}),
+    # ON_NOEXEC is reachable from any status except STARTING/RUNNING/ON_ICE —
+    # real AutoSys: "the scheduler ignores the JOB_ON_NOEXEC event if sent to
+    # a non-box job that is in the STARTING, RUNNING, or ON_ICE status."
+    "INACTIVE":            frozenset({"ACTIVATED", "STARTING", "ON_HOLD", "ON_ICE", "ON_NOEXEC"}),
+    "ACTIVATED":           frozenset({"RUNNING", "STARTING", "INACTIVE", "ON_HOLD", "FAILURE", "ON_NOEXEC"}),
     "STARTING":            frozenset({"RUNNING", "FAILURE", "INACTIVE"}),
     "RUNNING":             frozenset({"SUCCESS", "FAILURE", "TERMINATED"}),
-    "SUCCESS":             frozenset({"INACTIVE", "ACTIVATED", "STARTING"}),
-    "FAILURE":             frozenset({"INACTIVE", "RESTART", "ACTIVATED", "STARTING"}),
-    "TERMINATED":          frozenset({"INACTIVE", "STARTING"}),
+    "SUCCESS":             frozenset({"INACTIVE", "ACTIVATED", "STARTING", "ON_NOEXEC"}),
+    "FAILURE":             frozenset({"INACTIVE", "RESTART", "ACTIVATED", "STARTING", "ON_NOEXEC"}),
+    "TERMINATED":          frozenset({"INACTIVE", "STARTING", "ON_NOEXEC"}),
     "RESTART":             frozenset({"STARTING", "INACTIVE", "FAILURE"}),
-    "ON_HOLD":             frozenset({"INACTIVE", "ACTIVATED"}),
+    "ON_HOLD":             frozenset({"INACTIVE", "ACTIVATED", "ON_NOEXEC"}),
     "ON_ICE":              frozenset({"INACTIVE"}),
     "WAIT_REPLY":          frozenset({"RUNNING", "FAILURE", "INACTIVE", "STARTING"}),
     "QUE_WAIT":            frozenset({"STARTING", "INACTIVE"}),
     "REFRESH_DEPENDENCIES": frozenset({"INACTIVE", "STARTING", "ACTIVATED"}),
     "PEND_MACH":           frozenset({"STARTING", "INACTIVE"}),
     "RESWAIT":             frozenset({"STARTING", "INACTIVE"}),
-    "ON_NOEXEC":           frozenset({"INACTIVE"}),
+    # JOB_OFF_NOEXEC returns the job to INACTIVE; the bypass mechanism
+    # itself (once the job's start conditions are met) evaluates it
+    # straight to SUCCESS without ever running its command.
+    "ON_NOEXEC":           frozenset({"INACTIVE", "SUCCESS"}),
     "SUSPENDED":           frozenset({"INACTIVE", "STARTING", "RUNNING"}),
 }
 

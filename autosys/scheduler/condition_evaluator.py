@@ -43,6 +43,7 @@ Examples
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from loguru import logger
@@ -62,6 +63,9 @@ def is_satisfied(
     globals_dict: Optional[dict[str, str]] = None,
     date_conditions: bool = False,
     today_str: Optional[str] = None,
+    job_exitcodes: Optional[dict[str, int]] = None,
+    job_last_times: Optional[dict[str, Optional[datetime]]] = None,
+    now: Optional[datetime] = None,
 ) -> bool:
     """
     Return True if *condition_str* is satisfied given the current *job_statuses*.
@@ -78,6 +82,16 @@ def is_satisfied(
     globals_dict:
         Optional ``{name: value}`` dict of AutoSys global variables.
         Required for ``value(GLOBAL) = "x"`` conditions to work correctly.
+    job_exitcodes:
+        Optional ``{job_name: exit_code}`` dict of each job's most recent
+        run.  Required for ``exitcode(job) = N`` conditions to work
+        correctly; see ``autosys.db.repository.runs.latest_exit_codes()``.
+    job_last_times:
+        Optional ``{job_name: last_end}`` dict.  Required for lookback
+        predicates like ``success(job, 12.00)`` to work correctly; see
+        ``build_last_times_snapshot()``.
+    now:
+        Current time; required for lookback predicates.
     date_conditions:
         If True, only consider job statuses for jobs that ran *today*.
         Any job whose last_run_date != today is treated as INACTIVE for
@@ -112,7 +126,11 @@ def is_satisfied(
 
     try:
         node = parse_condition(condition_str)
-        result = evaluate(node, effective_statuses, global_vars=globals_dict)
+        result = evaluate(
+            node, effective_statuses,
+            global_vars=globals_dict, job_exitcodes=job_exitcodes,
+            job_last_times=job_last_times, now=now,
+        )
         logger.debug(
             "Condition %r → %s  (given %d job statuses)",
             condition_str, result, len(job_statuses),
@@ -178,3 +196,28 @@ def build_status_snapshot(session) -> dict[str, str]:
     from autosys.db.repository import jobs as job_repo
     rows = job_repo.list_all(session)
     return {row.job_name: _norm_status(row.status) for row in rows}
+
+
+def build_exitcode_snapshot(session) -> dict[str, Optional[int]]:
+    """
+    Build a {job_name: exit_code} snapshot from each job's most recent run.
+
+    Companion to ``build_status_snapshot()`` — pass the result as
+    ``job_exitcodes=`` to ``is_satisfied()`` so ``exitcode(job) = N``
+    conditions (and the ``e(job) = N`` shorthand) can resolve.
+    """
+    from autosys.db.repository import runs as run_repo
+    return run_repo.latest_exit_codes(session)
+
+
+def build_last_times_snapshot(session) -> dict[str, Optional[datetime]]:
+    """
+    Build a {job_name: last_end} snapshot for lookback predicates.
+
+    Companion to ``build_status_snapshot()`` — pass the result as
+    ``job_last_times=`` (together with ``now=``) to ``is_satisfied()`` so
+    lookback predicates like ``success(job, 12.00)`` can resolve.
+    """
+    from autosys.db.repository import jobs as job_repo
+    rows = job_repo.list_all(session)
+    return {row.job_name: row.last_end for row in rows}

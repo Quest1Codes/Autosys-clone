@@ -17,7 +17,13 @@ dependencies = [
     "pydantic-settings",
 
     # ORM & database
-    "sqlalchemy >= 2.0",
+    # The [asyncio] extra pulls in greenlet, which SQLAlchemy >= 2.1 requires
+    # at import time for sqlalchemy.ext.asyncio (this codebase uses both
+    # sync_session and async_session) -- without it, any environment that
+    # resolves 2.1+ (no upper bound is pinned here) crashes on startup with
+    # "ImportError: ... requires that the Python 'greenlet' library is
+    # installed", even though nothing else about the code changed.
+    "sqlalchemy[asyncio] >= 2.0",
     "aiosqlite",           # async SQLite driver
 
     # Async runtime

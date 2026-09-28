@@ -52,6 +52,7 @@ be reconsidered.
 from __future__ import annotations
 
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -203,7 +204,7 @@ class VirtualResource(BaseModel):
     )
 
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp when this resource record was first created in the "
             "``virtual_resources`` table.  Set automatically on insertion by "

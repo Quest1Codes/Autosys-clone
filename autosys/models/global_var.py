@@ -86,6 +86,7 @@ policy: it raises a ``ValueError`` if a caller tries to persist a
 from __future__ import annotations
 
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -204,7 +205,7 @@ class GlobalVariable(BaseModel):
     # ------------------------------------------------------------------
 
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp of the most recent write to this variable, "
             "including the initial creation.  Updated every time the value "

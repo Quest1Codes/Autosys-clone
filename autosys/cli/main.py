@@ -43,6 +43,10 @@ from autosys.cli.chase_cmd      import chase
 from autosys.cli.autoping_cmd   import autoping
 from autosys.cli.autocal_cmd    import autocal_group
 from autosys.cli.analyze_cmd    import analyze, migration_report
+from autosys.cli.monbro_cmd     import monbro
+from autosys.cli.dbstatistics_cmd import dbstatistics
+from autosys.cli.archive_events_cmd import archive_events
+from autosys.cli.job_depends_cmd import job_depends
 
 _console = Console()
 _err     = Console(stderr=True)
@@ -110,3 +114,7 @@ autosys.add_command(autoping)
 autosys.add_command(autocal_group)
 autosys.add_command(analyze)
 autosys.add_command(migration_report)
+autosys.add_command(monbro)
+autosys.add_command(dbstatistics)
+autosys.add_command(archive_events)
+autosys.add_command(job_depends)

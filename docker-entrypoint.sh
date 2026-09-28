@@ -66,27 +66,71 @@ else
 fi
 
 # No command given: this is the client-facing `docker run <image>` path --
-# start everything a real engagement needs from the one container: the
-# assessment API + EPS (9000, what the frp tunnel above exposes to Shinro),
-# the WCC dashboard backend (127.0.0.1-only -- nginx is the only thing that
-# talks to it), and nginx (8080, the client's own browser talks to this and
-# only this to log in and load their JIL files). A command IS still honoured
-# below for the multi-container compose files in this repo, which run
-# `serve`/`wcc` as separate containers.
+# start everything a real engagement needs from the one container: PostgreSQL
+# (see below -- there is no separate DB container to pair with a one-line
+# `docker run`, and 300k+ files means many concurrent writers, which SQLite's
+# single-writer model cannot do), the assessment API + EPS (9000, what the frp
+# tunnel above exposes to Shinro), the WCC dashboard backend (127.0.0.1-only --
+# nginx is the only thing that talks to it), and nginx (8080, the client's own
+# browser talks to this and only this to log in and load their JIL files). A
+# command IS still honoured below for the multi-container compose files in
+# this repo, which run `serve`/`wcc` as separate containers against their own
+# separate `postgres` service -- none of the bootstrapping below runs there.
 if [ "$#" -eq 0 ]; then
   PIDS=()
+  PG_STARTED=""
   cleanup() {
     trap - TERM INT
     for pid in "${PIDS[@]}"; do
       kill "$pid" 2>/dev/null || true
     done
+    if [ -n "$PG_STARTED" ]; then
+      su postgres -c "'${PG_BIN}/pg_ctl' -D '${PGDATA}' -m fast stop" 2>/dev/null || true
+    fi
   }
   trap cleanup TERM INT
 
+  # ---------------------------------------------------------------------
+  # Bundled PostgreSQL. Data lives under the same /app/data volume every
+  # other piece of state already uses, so one `docker run -v` is still
+  # enough to persist everything across restarts.
+  # ---------------------------------------------------------------------
+  PG_BIN="$(dirname "$(find /usr/lib/postgresql -maxdepth 3 -name initdb | head -n1)")"
+  PGDATA=/app/data/pgdata
+  PG_PASSWORD="${AUTOSYS_DB_PASSWORD:-autosys}"
+
+  mkdir -p "$PGDATA"
+  chown -R postgres:postgres /app/data
+
+  if [ ! -s "$PGDATA/PG_VERSION" ]; then
+    echo "[entrypoint] initializing PostgreSQL data directory"
+    su postgres -c "'${PG_BIN}/initdb' -D '${PGDATA}' -U postgres --auth=trust" \
+      > /tmp/initdb.log 2>&1 \
+      || { echo "[entrypoint] initdb failed:"; cat /tmp/initdb.log; exit 1; }
+  fi
+
+  echo "[entrypoint] starting PostgreSQL"
+  su postgres -c "'${PG_BIN}/pg_ctl' -D '${PGDATA}' -l /tmp/postgres.log -w -o '-c listen_addresses=localhost' start"
+  PG_STARTED=1
+
+  for i in $(seq 1 30); do
+    su postgres -c "'${PG_BIN}/pg_isready' -q" && break
+    sleep 1
+  done
+
+  su postgres -c "'${PG_BIN}/psql' -U postgres -tAc \"SELECT 1 FROM pg_roles WHERE rolname='autosys'\"" \
+    | grep -q 1 \
+    || su postgres -c "'${PG_BIN}/psql' -U postgres -c \"CREATE ROLE autosys LOGIN PASSWORD '${PG_PASSWORD}'\""
+  su postgres -c "'${PG_BIN}/psql' -U postgres -tAc \"SELECT 1 FROM pg_database WHERE datname='autosys'\"" \
+    | grep -q 1 \
+    || su postgres -c "'${PG_BIN}/createdb' -U postgres -O autosys autosys"
+
+  export AUTOSYS_DB_URL="postgresql+psycopg2://autosys:${PG_PASSWORD}@localhost:5432/autosys"
+
   # Every `autosys` invocation runs schema init (create_all_sync) via the CLI's
   # root callback before its subcommand -- starting serve and wcc in the same
-  # instant races two of these against a fresh sqlite file and hits "database
-  # is locked". Running one command synchronously first does it exactly once.
+  # instant would race two of these. Running one command synchronously first
+  # does it exactly once.
   echo "[entrypoint] initializing database schema"
   autosys scheduler status >/dev/null 2>&1 || true
 

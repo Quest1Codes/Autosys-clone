@@ -1,11 +1,35 @@
-# Distribution compose file — no source tree required.
+# Distribution compose file — no source tree required. Same 3-container
+# layout as docker-compose.yml, pulling prebuilt images from GHCR instead
+# of building locally. See docker-compose.yml's header for the other ways
+# to run this project (offline tarball, or the single all-in-one container
+# via plain `docker run`).
 #
 #   docker compose -f docker-compose.dist.yml pull
 #   docker compose -f docker-compose.dist.yml up -d
 #
 # Then open http://localhost:8080  (login: admin / admin)
+#
+# api/wcc now talk to the postgres service below rather than SQLite. This
+# needs psycopg2/asyncpg inside the image (Dockerfile installs the [pg]
+# extra) -- an image published before that change won't have it; rebuild
+# and push a new tag before relying on this file.
 
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${AUTOSYS_DB_USER:-autosys}
+      POSTGRES_PASSWORD: ${AUTOSYS_DB_PASSWORD:-autosys}
+      POSTGRES_DB: ${AUTOSYS_DB_NAME:-autosys}
+    volumes:
+      - autosys-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AUTOSYS_DB_USER:-autosys}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   api:
     image: ghcr.io/raghav-quest1/autosys-clone:latest
     command: ["autosys", "scheduler", "serve", "--host", "0.0.0.0", "--port", "9000", "--dry-run"]
@@ -14,9 +38,12 @@ services:
     volumes:
       - autosys-data:/app/data
     environment:
-      AUTOSYS_DB_URL: sqlite:///data/autosys.db
+      AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
       AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   wcc:
@@ -25,9 +52,12 @@ services:
     volumes:
       - autosys-data:/app/data
     environment:
-      AUTOSYS_DB_URL: sqlite:///data/autosys.db
+      AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
     depends_on:
-      - api
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
     restart: unless-stopped
 
   web:
@@ -41,3 +71,4 @@ services:
 
 volumes:
   autosys-data:
+  autosys-pgdata:

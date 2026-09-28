@@ -23,6 +23,7 @@ import os
 import shutil
 import subprocess
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from loguru import logger
@@ -68,21 +69,8 @@ class MonitorEvaluator:
         return (self._alarm_count, self._event_count)
 
     def _evaluate_one(self, session: Session, mon: MonitorRow) -> None:
-        """Evaluate a single monitor definition."""
-        attrs = {}
-        if mon.attributes_json:
-            try:
-                attrs = json.loads(mon.attributes_json)
-            except json.JSONDecodeError:
-                logger.warning("Monitor %r: invalid JSON attributes", mon.monbro_name)
-                return
-
-        handler = _HANDLERS.get(mon.monbro_type)
-        if handler is None:
-            logger.debug("Monitor %r: no handler for type %r", mon.monbro_name, mon.monbro_type)
-            return
-
-        result = handler(attrs)
+        """Evaluate a single monitor definition (tick-loop entry point)."""
+        result = self.evaluate_one(session, mon)
         if result is None:
             return
 
@@ -94,6 +82,39 @@ class MonitorEvaluator:
             self._enqueue_event(session, mon, result["event"])
             self._event_count += 1
 
+    def evaluate_one(self, session: Session, mon: MonitorRow) -> Optional[dict]:
+        """
+        Run *mon*'s handler once and return its raw result dict (or None if
+        nothing triggered), WITHOUT recording alarms/events or touching the
+        instance counters — the side effects `_evaluate_one` layers on top.
+
+        Public so callers that want the result itself (e.g. ``autosys
+        monbro``, which prints what a monitor found without necessarily
+        persisting alarms twice) can invoke a single monitor by name.
+        """
+        attrs = {}
+        if mon.attributes_json:
+            try:
+                attrs = json.loads(mon.attributes_json)
+            except json.JSONDecodeError:
+                logger.warning("Monitor %r: invalid JSON attributes", mon.monbro_name)
+                return None
+
+        handler = _HANDLERS.get(mon.monbro_type)
+        if handler is None:
+            logger.debug("Monitor %r: no handler for type %r", mon.monbro_name, mon.monbro_type)
+            return None
+
+        return handler(attrs)
+
+    def raise_alarm(self, session: Session, mon: MonitorRow, message: str) -> None:
+        """Public wrapper for `_raise_alarm` — records an alarm for *mon*."""
+        self._raise_alarm(session, mon, message)
+
+    def enqueue_event(self, session: Session, mon: MonitorRow, event_type: str) -> None:
+        """Public wrapper for `_enqueue_event` — enqueues *mon*'s linked-job event."""
+        self._enqueue_event(session, mon, event_type)
+
     def _raise_alarm(self, session: Session, mon: MonitorRow, message: str) -> None:
         """Raise an alarm for this monitor."""
         alarm = AlarmRow(
@@ -101,7 +122,7 @@ class MonitorEvaluator:
             job_name=mon.job_name or mon.monbro_name,
             alarm_type=mon.monbro_type,
             message=message,
-            raised_at=datetime.utcnow(),
+            raised_at=utcnow(),
         )
         session.add(alarm)
 

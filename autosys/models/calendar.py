@@ -62,6 +62,7 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from autosys.timeutil import utcnow
 from pathlib import Path
 from typing import List, Optional
 
@@ -173,7 +174,7 @@ class Calendar(BaseModel):
     )
 
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp when this calendar record was first created in the "
             "``calendars`` table.  Set automatically on initial insertion and "
@@ -183,7 +184,7 @@ class Calendar(BaseModel):
     )
 
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description=(
             "UTC timestamp of the most recent modification to this calendar "
             "record.  The ``calendar_manager`` updates this field each time "
@@ -322,7 +323,7 @@ class Calendar(BaseModel):
         Parameters
         ----------
         d:
-            The date to look up.  Typically ``datetime.utcnow().date()`` or
+            The date to look up.  Typically ``utcnow().date()`` or
             the Scheduler's current logical date.
 
         Returns
@@ -399,7 +400,7 @@ class Calendar(BaseModel):
         Calendar
             A fully constructed ``Calendar`` instance populated with the dates
             parsed from the file.  ``created_at`` and ``updated_at`` are both
-            set to ``datetime.utcnow()`` at construction time.
+            set to ``utcnow()`` at construction time.
 
         Raises
         ------

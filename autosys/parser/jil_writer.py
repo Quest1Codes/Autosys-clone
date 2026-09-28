@@ -42,9 +42,9 @@ from autosys.models.job import (
 # Attributes not in this list are appended alphabetically at the end.
 _ATTR_ORDER: list[str] = [
     # Identity
-    "owner", "permission", "run_as_user", "description",
+    "owner", "permission", "description",
     # BOX containment
-    "box_name", "box_success", "box_failure", "box_terminator",
+    "box_name", "box_success", "box_failure", "box_terminator", "job_terminator",
     # Execution
     "command", "machine", "run_window", "profile",
     "std_out_file", "std_err_file", "std_in_file",
@@ -70,11 +70,16 @@ _ATTR_ORDER: list[str] = [
     "notification_type", "send_report",
     # FTP-specific
     "ftp_server", "ftp_user", "ftp_type", "ftp_src", "ftp_dest",
+    "ftp_server_name", "ftp_server_port", "ftp_transfer_direction",
+    "ftp_transfer_type", "ftp_remote_name", "ftp_local_name", "ftp_use_SSL",
     # FILEWATCH-specific
     "watch_file", "watch_file_min_size", "watch_interval",
     # Resources string
     "resources",
 ]
+
+# Internal canonical job_type -> code used in vendor JIL (parse_job accepts both).
+_WRITER_TYPE_CODES: dict[str, str] = {"FILEWATCH": "FW"}
 
 _ATTR_ORDER_IDX: dict[str, int] = {k: i for i, k in enumerate(_ATTR_ORDER)}
 
@@ -83,6 +88,7 @@ _BOOL_DEFAULTS: dict[str, bool] = {
     "alarm_if_fail":        False,
     "alarm_if_terminated":  False,
     "box_terminator":       False,
+    "job_terminator":       False,
     "date_conditions":      False,
     "send_report":          False,
     "auto_delete":          False,
@@ -102,7 +108,12 @@ _SKIP_ALWAYS = frozenset({
     "job_name", "job_type",           # encoded in the header line
     "status", "last_start", "last_end", "last_run_date",
     "created_at", "updated_at",
+    "extra_attrs",                    # emitted separately, after known attrs
 })
+
+# Legacy FTP names that are derived from the vendor-doc names (see FtpJob);
+# not re-emitted when the vendor-doc vocabulary is present.
+_LEGACY_FTP = ("ftp_server", "ftp_user", "ftp_type", "ftp_src", "ftp_dest")
 
 
 # ===========================================================================
@@ -200,14 +211,25 @@ def job_to_jil(job: Job, op: str = "insert") -> str:
     lines: list[str] = []
 
     # --- Header ---
-    lines.append(f"{directive}: {job.job_name}   job_type: {job.job_type}")
+    jt = getattr(job.job_type, "value", job.job_type)
+    jt = _WRITER_TYPE_CODES.get(jt, jt)
+    # A user-defined job type keeps the name the JIL used.
+    user_type = (getattr(job, "extra_attrs", None) or {}).get("user_job_type")
+    if jt == "USERDEFINED" and user_type:
+        jt = user_type
+    lines.append(f"{directive}: {job.job_name}   job_type: {jt}")
 
     # --- Gather all serialisable attributes ---
     raw = job.model_dump()
 
     attrs: list[tuple[str, str]] = []
+    extras = dict(raw.get("extra_attrs") or {})
+    extras.pop("user_job_type", None)          # emitted as the header's job_type
+    pdf_ftp = any(k.lower() == "ftp_server_name" for k in extras)
     for attr, raw_value in raw.items():
         if attr in _SKIP_ALWAYS:
+            continue
+        if pdf_ftp and attr in _LEGACY_FTP:
             continue
 
         formatted = _format_value(raw_value)
@@ -234,6 +256,12 @@ def job_to_jil(job: Job, op: str = "insert") -> str:
         return (idx, pair[0])
 
     attrs.sort(key=_sort_key)
+
+    # Extras (attributes without a dedicated field): after the known ones, in
+    # insertion order, so round trips do not lose them.
+    for k, v in extras.items():
+        fv = _format_value(str(v)) if v is not None else None
+        attrs.append((k, fv if fv is not None else '""'))
 
     for attr, value in attrs:
         lines.append(f"{attr}: {value}")
@@ -317,12 +345,24 @@ def machine_to_jil(machine_row) -> str:
         lines.append(f"    host: {host}")
 
     port = getattr(machine_row, "port", 7520)
-    lines.append(f"    type: a")
+    members = getattr(machine_row, "members", None)
+    if members is None:
+        import json as _json
+        mj = getattr(machine_row, "members_json", None)
+        members = _json.loads(mj) if mj else []
+    lines.append(f"    type: {'v' if members else 'a'}")
     lines.append(f"    port: {port}")
 
     max_load = getattr(machine_row, "max_load", None)
     if max_load:
         lines.append(f"    max_load: {max_load}")
+
+    for m in members:
+        lines.append(f"    machine: {m.get('machine')}")
+        if m.get("max_load") is not None:
+            lines.append(f"    max_load: {m['max_load']}")
+        if m.get("factor") is not None:
+            lines.append(f"    factor: {m['factor']}")
 
     description = getattr(machine_row, "description", None)
     if description:

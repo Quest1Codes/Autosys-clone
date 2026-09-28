@@ -53,8 +53,8 @@ class JobDetailResponse(JobResponse):
     sub_application:   Optional[str]   = None
     command_timeout:   Optional[int]   = None
     continuous:        bool            = False
-    cpu_usage:         Optional[int]   = None
-    disk_space:        Optional[int]   = None
+    cpu_usage:         Optional[str]   = None
+    disk_space:        Optional[str]   = None
     auth_string:       Optional[str]   = None
     connection_retry:  Optional[int]   = None
     connection_timeout: Optional[int]  = None
@@ -65,7 +65,7 @@ class JobDetailResponse(JobResponse):
 class SendEventRequest(BaseModel):
     """Body for POST /api/v1/jobs/{name}/sendevent."""
     event_type: str = Field(..., description="e.g. STARTJOB, KILLJOB, FORCE_STARTJOB, JOB_ON_HOLD")
-    attribute:  Optional[str] = Field(None, description="Extra attribute (e.g. new value for SET_GLOBAL)")
+    attribute:  Optional[str] = Field(None, description="Extra attribute (required for CHANGE_STATUS: the new status name)")
 
 
 class SendEventResponse(BaseModel):
@@ -196,13 +196,19 @@ class JILJobResult(BaseModel):
 
 
 class JILImportResponse(BaseModel):
-    success:    bool
-    jobs:       list[JILJobResult] = []
-    n_inserted: int = 0
-    n_updated:  int = 0
-    n_deleted:  int = 0
-    n_machines: int = 0
-    error:      Optional[str] = None
+    success:      bool
+    jobs:         list[JILJobResult] = []
+    n_inserted:   int = 0
+    n_updated:    int = 0
+    n_deleted:    int = 0
+    n_machines:   int = 0
+    # Stanzas that were NOT lost, but need a look: n_quarantined couldn't be
+    # read as JIL at all (archived verbatim, not persisted); n_warnings loaded
+    # but with something imperfect (see each one's `jobs[].type` for why).
+    # success=True says nothing about these — check them separately.
+    n_quarantined: int = 0
+    n_warnings:    int = 0
+    error:        Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

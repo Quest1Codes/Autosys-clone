@@ -110,23 +110,33 @@ class TestJILParsing:
         """)
         assert ops[0].job.continuous is True
 
-    def test_cpu_usage_int(self):
+    def test_cpu_usage_free_used(self):
+        # PDF: "cpu_usage: FREE | USED" (OMCPU jobs) — not a number.
         ops = _parse("""
             insert_job: j7   job_type: CMD
             command: echo hi
             machine: localhost
-            cpu_usage: 80
+            cpu_usage: USED
         """)
-        assert ops[0].job.cpu_usage == 80
+        assert ops[0].job.cpu_usage == "USED"
 
-    def test_disk_space_int(self):
+    def test_disk_space_free_used(self):
         ops = _parse("""
             insert_job: j8   job_type: CMD
             command: echo hi
             machine: localhost
-            disk_space: 500
+            disk_space: free
         """)
-        assert ops[0].job.disk_space == 500
+        assert ops[0].job.disk_space == "free"
+
+    def test_cpu_usage_rejects_numbers(self):
+        with pytest.raises(Exception):
+            _parse("""
+                insert_job: j9   job_type: CMD
+                command: echo hi
+                machine: localhost
+                cpu_usage: 80
+            """)
 
     def test_auth_string(self):
         ops = _parse("""
@@ -188,8 +198,8 @@ class TestDBPersistence:
             sub_application: monthly
             command_timeout: 60
             continuous: 0
-            cpu_usage: 75
-            disk_space: 200
+            cpu_usage: USED
+            disk_space: FREE
             auth_string: secret_token
             connection_retry: 2
             connection_timeout: 10
@@ -205,8 +215,8 @@ class TestDBPersistence:
             assert row.sub_application == "monthly"
             assert row.command_timeout == 60
             assert row.continuous is False
-            assert row.cpu_usage == 75
-            assert row.disk_space == 200
+            assert row.cpu_usage == "USED"
+            assert row.disk_space == "FREE"
             assert row.auth_string == "secret_token"
             assert row.connection_retry == 2
             assert row.connection_timeout == 10
@@ -268,8 +278,8 @@ class TestJILWriterRoundTrip:
             application: payroll
             sub_application: weekly
             command_timeout: 120
-            cpu_usage: 90
-            disk_space: 1000
+            cpu_usage: USED
+            disk_space: FREE
             auth_string: my_auth
             connection_retry: 5
             connection_timeout: 30
@@ -288,8 +298,8 @@ class TestJILWriterRoundTrip:
         assert job2.application == "payroll"
         assert job2.sub_application == "weekly"
         assert job2.command_timeout == 120
-        assert job2.cpu_usage == 90
-        assert job2.disk_space == 1000
+        assert job2.cpu_usage == "USED"
+        assert job2.disk_space == "FREE"
         assert job2.auth_string == "my_auth"
         assert job2.connection_retry == 5
         assert job2.connection_timeout == 30
@@ -322,7 +332,7 @@ class TestAutorepOutput:
         """, tmp_path)
 
         runner = CliRunner()
-        result = runner.invoke(autosys, ["autorep", "-J", "ar_job", "-q"])
+        result = runner.invoke(autosys, ["autorep", "-J", "ar_job", "--tsv"])
         assert result.exit_code == 0
         lines = result.output.strip().split("\n")
         # TSV output: job_name, last_start, last_end, status, run_count, type, application

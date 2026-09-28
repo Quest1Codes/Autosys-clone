@@ -74,6 +74,11 @@ def _make_job(
     min_run_alarm:       int  | None = None,
     machine:             str  | None = None,
     last_start:          datetime | None = None,
+    last_run_date:       str  | None = None,
+    term_run_time:       int  | None = None,
+    must_start_times:    str  | None = None,
+    must_complete_times: str  | None = None,
+    start_times:         str  | None = None,
 ) -> JobRow:
     row = JobRow(
         job_name            = name,
@@ -85,6 +90,11 @@ def _make_job(
         min_run_alarm       = min_run_alarm,
         machine             = machine,
         last_start          = last_start,
+        last_run_date       = last_run_date,
+        term_run_time       = term_run_time,
+        must_start_times    = must_start_times,
+        must_complete_times = must_complete_times,
+        start_times         = start_times,
     )
     session.add(row)
     session.flush()
@@ -270,6 +280,123 @@ class TestAlarmManagerMinRun:
         new = am.evaluate(session, _NOW)
         alarm = next(a for a in new if a.alarm_type == "MIN_RUN_ALARM")
         assert alarm.run_id == run.run_id
+
+
+# ===========================================================================
+# TestAlarmManagerMustStart
+# ===========================================================================
+
+class TestAlarmManagerMustStart:
+
+    def test_alarm_raised_absolute_after_deadline(self, session, am):
+        _make_job(session, "job_a", status=8, must_start_times="06:00")
+        new = am.evaluate(session, _NOW.replace(hour=6, minute=1))
+        assert any(a.alarm_type == "MUST_START_ALARM" for a in new)
+
+    def test_no_alarm_absolute_before_deadline(self, session, am):
+        _make_job(session, "job_a", status=8, must_start_times="06:00")
+        new = am.evaluate(session, _NOW.replace(hour=5, minute=59))
+        assert not any(a.alarm_type == "MUST_START_ALARM" for a in new)
+
+    def test_no_alarm_if_already_started_today(self, session, am):
+        now = _NOW.replace(hour=6, minute=1)
+        _make_job(
+            session, "job_a", status=1, must_start_times="06:00",
+            last_run_date=now.strftime("%Y-%m-%d"), last_start=now,
+        )
+        new = am.evaluate(session, now)
+        assert not any(a.alarm_type == "MUST_START_ALARM" for a in new)
+
+    def test_alarm_raised_relative_to_start_times(self, session, am):
+        _make_job(
+            session, "job_a", status=8,
+            start_times="05:00", must_start_times="+30",
+        )
+        new = am.evaluate(session, _NOW.replace(hour=5, minute=31))
+        assert any(a.alarm_type == "MUST_START_ALARM" for a in new)
+
+    def test_no_alarm_relative_before_deadline(self, session, am):
+        _make_job(
+            session, "job_a", status=8,
+            start_times="05:00", must_start_times="+30",
+        )
+        new = am.evaluate(session, _NOW.replace(hour=5, minute=29))
+        assert not any(a.alarm_type == "MUST_START_ALARM" for a in new)
+
+    def test_alarm_message_contains_job_name(self, session, am):
+        _make_job(session, "job_a", status=8, must_start_times="06:00")
+        new = am.evaluate(session, _NOW.replace(hour=6, minute=1))
+        alarm = next(a for a in new if a.alarm_type == "MUST_START_ALARM")
+        assert "job_a" in alarm.message
+
+    def test_alarm_deduped_on_second_tick(self, session, am):
+        now = _NOW.replace(hour=6, minute=1)
+        _make_job(session, "job_a", status=8, must_start_times="06:00")
+        am.evaluate(session, now)
+        session.flush()
+        new2 = am.evaluate(session, now + timedelta(minutes=5))
+        assert not any(a.alarm_type == "MUST_START_ALARM" for a in new2)
+
+
+# ===========================================================================
+# TestAlarmManagerMustComplete
+# ===========================================================================
+
+class TestAlarmManagerMustComplete:
+
+    def test_alarm_raised_absolute_after_deadline(self, session, am):
+        now = _NOW.replace(hour=6, minute=1)
+        _make_job(
+            session, "job_a", status=1, must_complete_times="06:00",
+            last_run_date=now.strftime("%Y-%m-%d"),
+        )
+        new = am.evaluate(session, now)
+        assert any(a.alarm_type == "MUST_COMPLETE_ALARM" for a in new)
+
+    def test_no_alarm_before_deadline(self, session, am):
+        now = _NOW.replace(hour=5, minute=59)
+        _make_job(
+            session, "job_a", status=1, must_complete_times="06:00",
+            last_run_date=now.strftime("%Y-%m-%d"),
+        )
+        new = am.evaluate(session, now)
+        assert not any(a.alarm_type == "MUST_COMPLETE_ALARM" for a in new)
+
+    def test_no_alarm_if_job_already_terminal(self, session, am):
+        now = _NOW.replace(hour=6, minute=1)
+        _make_job(
+            session, "job_a", status=4, must_complete_times="06:00",
+            last_run_date=now.strftime("%Y-%m-%d"),
+        )
+        new = am.evaluate(session, now)
+        assert not any(a.alarm_type == "MUST_COMPLETE_ALARM" for a in new)
+
+    def test_no_alarm_if_not_started_today(self, session, am):
+        now = _NOW.replace(hour=6, minute=1)
+        _make_job(session, "job_a", status=8, must_complete_times="06:00")
+        new = am.evaluate(session, now)
+        assert not any(a.alarm_type == "MUST_COMPLETE_ALARM" for a in new)
+
+    def test_alarm_raised_relative_to_start_times(self, session, am):
+        now = _NOW.replace(hour=5, minute=31)
+        _make_job(
+            session, "job_a", status=1,
+            start_times="05:00", must_complete_times="+30",
+            last_run_date=now.strftime("%Y-%m-%d"),
+        )
+        new = am.evaluate(session, now)
+        assert any(a.alarm_type == "MUST_COMPLETE_ALARM" for a in new)
+
+    def test_alarm_deduped_on_second_tick(self, session, am):
+        now = _NOW.replace(hour=6, minute=1)
+        _make_job(
+            session, "job_a", status=1, must_complete_times="06:00",
+            last_run_date=now.strftime("%Y-%m-%d"),
+        )
+        am.evaluate(session, now)
+        session.flush()
+        new2 = am.evaluate(session, now + timedelta(minutes=5))
+        assert not any(a.alarm_type == "MUST_COMPLETE_ALARM" for a in new2)
 
 
 # ===========================================================================
@@ -582,3 +709,99 @@ class TestEPSIntegration:
             eps.process_one_tick(s, now=_NOW)
 
         assert "ALARM_IF_FAIL" in dispatched
+
+
+# ===========================================================================
+# TestTermRunTime
+# ===========================================================================
+
+class TestTermRunTime:
+    """term_run_time watchdog — EventProcessor terminates jobs that overrun."""
+
+    def _make_eps(self):
+        from autosys.scheduler.event_processor import EventProcessor
+        return EventProcessor(auto_complete=False, alarm_manager=None)
+
+    def test_job_terminated_after_term_run_time_exceeded(self, session):
+        start = _NOW - timedelta(minutes=31)
+        job = _make_job(session, "long_job", status=1, last_start=start)
+        job.term_run_time = 30
+        session.commit()
+
+        eps = self._make_eps()
+        with sync_session() as s:
+            eps.process_one_tick(s, now=_NOW)
+
+        with sync_session() as s:
+            row = s.get(JobRow, "long_job")
+            assert row.status == 6  # TERMINATED
+            assert row.last_end is not None
+
+    def test_job_not_terminated_within_term_run_time(self, session):
+        start = _NOW - timedelta(minutes=10)
+        job = _make_job(session, "short_job", status=1, last_start=start)
+        job.term_run_time = 30
+        session.commit()
+
+        eps = self._make_eps()
+        with sync_session() as s:
+            eps.process_one_tick(s, now=_NOW)
+
+        with sync_session() as s:
+            row = s.get(JobRow, "short_job")
+            assert row.status == 1  # still RUNNING
+
+    def test_no_enforcement_when_term_run_time_zero(self, session):
+        start = _NOW - timedelta(minutes=1000)
+        job = _make_job(session, "forever_job", status=1, last_start=start)
+        job.term_run_time = 0
+        session.commit()
+
+        eps = self._make_eps()
+        with sync_session() as s:
+            eps.process_one_tick(s, now=_NOW)
+
+        with sync_session() as s:
+            row = s.get(JobRow, "forever_job")
+            assert row.status == 1
+
+    def test_no_enforcement_when_term_run_time_none(self, session):
+        start = _NOW - timedelta(minutes=1000)
+        _make_job(session, "forever_job2", status=1, last_start=start)
+        session.commit()
+
+        eps = self._make_eps()
+        with sync_session() as s:
+            eps.process_one_tick(s, now=_NOW)
+
+        with sync_session() as s:
+            row = s.get(JobRow, "forever_job2")
+            assert row.status == 1
+
+    def test_no_enforcement_for_non_running_job(self, session):
+        start = _NOW - timedelta(minutes=1000)
+        job = _make_job(session, "done_job", status=4, last_start=start)
+        job.term_run_time = 30
+        session.commit()
+
+        eps = self._make_eps()
+        with sync_session() as s:
+            eps.process_one_tick(s, now=_NOW)
+
+        with sync_session() as s:
+            row = s.get(JobRow, "done_job")
+            assert row.status == 4  # unchanged (SUCCESS)
+
+    def test_direct_check_term_run_time_method(self, session):
+        start = _NOW - timedelta(minutes=31)
+        job = _make_job(session, "direct_job", status=1, last_start=start)
+        job.term_run_time = 30
+        session.commit()
+
+        eps = self._make_eps()
+        with sync_session() as s:
+            eps._check_term_run_time(s, _NOW)
+
+        with sync_session() as s:
+            row = s.get(JobRow, "direct_job")
+            assert row.status == 6

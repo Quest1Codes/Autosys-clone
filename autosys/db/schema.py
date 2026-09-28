@@ -36,6 +36,8 @@ JobRunRow   <──  AlarmRow  (run_id FK)
 from __future__ import annotations
 
 from datetime import datetime
+from autosys.models.enums import JobStatus
+from autosys.timeutil import utcnow
 from typing import Optional
 
 from sqlalchemy import (
@@ -84,7 +86,6 @@ class JobRow(Base):
     description     = Column(Text)
     owner           = Column(String(128))
     permission      = Column(String(64))
-    run_as_user     = Column(String(128))
     group           = Column(String(128), index=True)
 
     # --- Execution (CMD) ---
@@ -106,6 +107,7 @@ class JobRow(Base):
     box_success     = Column(String(255))
     box_failure     = Column(String(255))
     box_terminator  = Column(Boolean, default=False, nullable=False)
+    job_terminator  = Column(Boolean, default=False, nullable=False)
 
     # --- Scheduling ---
     # Stored as comma-separated strings to keep the schema flat (mirrors
@@ -148,8 +150,8 @@ class JobRow(Base):
     sub_application      = Column(String(255))
     command_timeout      = Column(Integer)
     continuous           = Column(Boolean, default=False, nullable=False)
-    cpu_usage            = Column(Integer)
-    disk_space           = Column(Integer)
+    cpu_usage            = Column(String(8))     # FREE | USED
+    disk_space           = Column(String(8))     # FREE | USED
     auth_string          = Column(Text)
     connection_retry     = Column(Integer)
     connection_timeout   = Column(Integer)
@@ -172,15 +174,18 @@ class JobRow(Base):
     watch_file_min_size = Column(Integer, default=0, nullable=False)
     watch_interval      = Column(Integer, default=60, nullable=False)
 
+    # --- Attributes with no dedicated column (JSON object, insertion-ordered) ---
+    extra_attrs_json = Column(Text, nullable=True)
+
     # --- Runtime tracking ---
-    status        = Column(Integer, default=8)   # JobStatus.INACTIVE
+    status        = Column(Integer, default=JobStatus.INACTIVE.value)
     last_start    = Column(DateTime, nullable=True)
     last_end        = Column(DateTime)
     last_run_date   = Column(String(10))   # "YYYY-MM-DD"
 
     # --- Metadata ---
-    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at      = Column(DateTime, default=utcnow, nullable=False)
+    updated_at      = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     # --- Relationships ---
     runs     = relationship("JobRunRow", back_populates="job", cascade="all, delete-orphan")
@@ -240,7 +245,7 @@ class JobRunRow(Base):
     pid          = Column(Integer)                                 # OS PID on the agent
     stdout_path  = Column(Text)
     stderr_path  = Column(Text)
-    created_at   = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at   = Column(DateTime, default=utcnow, nullable=False)
 
     # --- Relationships ---
     job    = relationship("JobRow",   back_populates="runs")
@@ -289,7 +294,7 @@ class EventQueueRow(Base):
     comment       = Column(Text)         # for COMMENT
     resource_name = Column(String(255))  # for RELEASE_RESOURCE
     source        = Column(String(16),  default="internal", nullable=False)
-    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
     processed     = Column(Boolean, default=False, nullable=False)
     processed_at  = Column(DateTime)
 
@@ -350,7 +355,7 @@ class GlobalVariableRow(Base):
 
     global_name  = Column(String(128), primary_key=True)    # always uppercase
     value       = Column(Text, nullable=False)
-    updated_at  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at  = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
     updated_by  = Column(String(128))
 
     def __repr__(self) -> str:
@@ -375,8 +380,8 @@ class CalendarRow(Base):
     calendar_name = Column(String(128), primary_key=True)
     dates_json    = Column(Text, nullable=False)   # JSON: ["2025-01-01", ...]
     description   = Column(Text)
-    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
+    updated_at    = Column(DateTime, default=utcnow, onupdate=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<CalendarRow {self.calendar_name!r}>"
@@ -436,7 +441,7 @@ class VirtualResourceRow(Base):
     max_load      = Column(Integer, nullable=False)
     current_load  = Column(Integer, default=0, nullable=False)
     description   = Column(Text)
-    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<VirtualResourceRow {self.resource_name} {self.current_load}/{self.max_load}>"
@@ -465,7 +470,10 @@ class MachineRow(Base):
     status          = Column(String(16), default="UNKNOWN", nullable=False, index=True)
     last_heartbeat  = Column(DateTime)
     description     = Column(Text)
-    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+    # Virtual machine / pool members: JSON list of
+    # {"machine": str, "max_load": int|None, "factor": float|None}
+    members_json    = Column(Text, nullable=True)
+    created_at      = Column(DateTime, default=utcnow, nullable=False)
 
     # --- Relationships ---
     # viewonly=True avoids FK ambiguity with the machine string column on JobRow.
@@ -528,7 +536,7 @@ class JobOutputRow(Base):
     line_no      = Column(Integer,     nullable=False)
     stream       = Column(String(6),   nullable=False, default="stdout")
     content      = Column(Text,        nullable=False, default="")
-    created_at   = Column(DateTime,    default=datetime.utcnow, nullable=False)
+    created_at   = Column(DateTime,    default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return (
@@ -548,7 +556,7 @@ class JobTypeRow(Base):
     type_name        = Column(String(128), primary_key=True)
     command_template = Column(Text)
     description      = Column(Text)
-    created_at       = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at       = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<JobTypeRow {self.type_name}>"
@@ -566,7 +574,7 @@ class MonitorRow(Base):
     monbro_type      = Column(String(32), nullable=False)
     job_name         = Column(String(255), ForeignKey("ujo_job.job_name"), nullable=True)
     attributes_json  = Column(Text)
-    created_at       = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at       = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<MonitorRow {self.monbro_name} type={self.monbro_type}>"
@@ -584,7 +592,7 @@ class BlobRow(Base):
     blob_name   = Column(String(255), nullable=False, index=True)
     job_name    = Column(String(255), ForeignKey("ujo_job.job_name"), nullable=True)
     content     = Column(Text, nullable=False)
-    created_at  = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at  = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<BlobRow {self.blob_name} job={self.job_name}>"
@@ -600,7 +608,7 @@ class GlobRow(Base):
 
     glob_name   = Column(String(255), primary_key=True)
     content     = Column(Text, nullable=False)
-    created_at  = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at  = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<GlobRow {self.glob_name}>"
@@ -619,7 +627,7 @@ class ExternalInstanceRow(Base):
     host            = Column(String(255), nullable=False)
     port            = Column(Integer, default=9000, nullable=False)
     description     = Column(Text)
-    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at      = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<ExternalInstanceRow {self.xinst_name} → {self.host}:{self.port}>"
@@ -636,7 +644,7 @@ class ConnectionProfileRow(Base):
     profile_name    = Column(String(128), primary_key=True)
     profile_type    = Column(String(64), nullable=False)
     attributes_json = Column(Text)
-    created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at      = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<ConnectionProfileRow {self.profile_name} type={self.profile_type}>"
@@ -660,8 +668,8 @@ class SchedulerLockRow(Base):
     instance_id      = Column(String(128), nullable=False)
     role             = Column(String(32), nullable=False, default="primary")
     is_active        = Column(Boolean, default=True, nullable=False)
-    last_heartbeat   = Column(DateTime, default=datetime.utcnow, nullable=False)
-    acquired_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
+    last_heartbeat   = Column(DateTime, default=utcnow, nullable=False)
+    acquired_at      = Column(DateTime, default=utcnow, nullable=False)
     heartbeat_timeout = Column(Integer, default=5, nullable=False)
 
     def __repr__(self) -> str:
@@ -681,7 +689,69 @@ class ReportRow(Base):
     date_from     = Column(DateTime, nullable=False)
     date_to       = Column(DateTime, nullable=False)
     content_json  = Column(Text)
-    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at    = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
         return f"<ReportRow {self.report_id} type={self.report_type}>"
+
+
+# ---------------------------------------------------------------------------
+# 19. JIL source archive  (lossless record of every imported stanza)
+# ---------------------------------------------------------------------------
+
+class JilFileRow(Base):
+    """One row per imported JIL file: where it came from and how it decoded."""
+    __tablename__ = "ujo_jil_file"
+
+    file_id     = Column(Integer, primary_key=True, autoincrement=True)
+    path        = Column(String(1024), nullable=False, unique=True, index=True)
+    sha256      = Column(String(64))
+    size_bytes  = Column(Integer)
+    encoding    = Column(String(32))
+    n_stanzas   = Column(Integer, default=0, nullable=False)
+    n_issues    = Column(Integer, default=0, nullable=False)
+    status      = Column(String(24))     # OK | WARN | ERROR_RECOVERED
+    imported_at = Column(DateTime, default=utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<JilFileRow {self.path} {self.status}>"
+
+
+class JilStanzaRow(Base):
+    """
+    One row per stanza (contiguous source block) of an imported file.
+
+    The ``raw_text`` of a file's stanzas, in ``seq`` order, concatenates back
+    to the decoded file — nothing is lost even when the typed tables cannot
+    represent a stanza.
+
+    disposition:
+      LOADED                 stored in its typed table, no problems
+      LOADED_WITH_WARNINGS   stored, but something was imperfect (see issues_json)
+      ARCHIVE_ONLY           valid but no typed table (views, filters, ...)
+      QUARANTINED            not parseable JIL; kept verbatim
+      DUPLICATE              a later definition of an already-defined object
+    """
+    __tablename__ = "ujo_jil_stanza"
+    __table_args__ = (
+        Index("ix_jil_stanza_obj", "directive", "object_name"),
+        Index("ix_jil_stanza_file_seq", "file_id", "seq"),
+    )
+
+    stanza_id   = Column(Integer, primary_key=True, autoincrement=True)
+    file_id     = Column(Integer, ForeignKey("ujo_jil_file.file_id", ondelete="CASCADE"),
+                         nullable=False)
+    seq         = Column(Integer, nullable=False)
+    start_line  = Column(Integer)
+    end_line    = Column(Integer)
+    directive   = Column(String(64))
+    object_name = Column(String(255))
+    disposition = Column(String(24), nullable=False, index=True)
+    raw_text    = Column(Text, nullable=False)
+    # True when NUL bytes were escaped (PostgreSQL text cannot store them):
+    # original = raw_text.replace('\\0', NUL) after un-doubling backslashes.
+    raw_escaped = Column(Boolean, default=False, nullable=False, server_default="0")
+    issues_json = Column(Text)
+
+    def __repr__(self) -> str:
+        return f"<JilStanzaRow {self.directive} {self.object_name} {self.disposition}>"

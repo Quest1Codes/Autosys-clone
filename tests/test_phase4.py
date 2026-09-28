@@ -160,6 +160,33 @@ class TestStateMachine:
         with pytest.raises(InvalidTransitionError):
             validate_transition("job", "STARTING", "ACTIVATED")
 
+    # -- ON_NOEXEC — previously defined but unreachable (no transition
+    # in or out of it existed anywhere in the table) --------------------
+
+    def test_valid_transition_inactive_to_on_noexec(self):
+        validate_transition("job", "INACTIVE", "ON_NOEXEC")
+
+    def test_valid_transition_on_noexec_to_inactive(self):
+        validate_transition("job", "ON_NOEXEC", "INACTIVE")
+
+    def test_valid_transition_on_noexec_to_success(self):
+        validate_transition("job", "ON_NOEXEC", "SUCCESS")
+
+    def test_valid_transition_success_to_on_noexec(self):
+        validate_transition("job", "SUCCESS", "ON_NOEXEC")
+
+    def test_invalid_starting_to_on_noexec(self):
+        with pytest.raises(InvalidTransitionError):
+            validate_transition("job", "STARTING", "ON_NOEXEC")
+
+    def test_invalid_running_to_on_noexec(self):
+        with pytest.raises(InvalidTransitionError):
+            validate_transition("job", "RUNNING", "ON_NOEXEC")
+
+    def test_invalid_on_ice_to_on_noexec(self):
+        with pytest.raises(InvalidTransitionError):
+            validate_transition("job", "ON_ICE", "ON_NOEXEC")
+
     def test_force_bypasses_validation(self):
         # force=True allows any transition
         validate_transition("job", "RUNNING", "INACTIVE", force=True)   # no raise
@@ -255,6 +282,32 @@ class TestConditionEvaluator:
         result = is_satisfied("this is not valid jil condition!!!", {})
         assert result is False   # should not raise, just return False
 
+    def test_and_keyword_same_as_ampersand(self):
+        statuses = {"a": 4, "b": 4}
+        assert is_satisfied("success(a) AND success(b)", statuses) is True
+
+    def test_or_keyword_same_as_pipe(self):
+        statuses = {"a": 5, "b": 4}
+        assert is_satisfied("success(a) OR success(b)", statuses) is True
+
+    def test_v_shorthand_for_value(self):
+        assert is_satisfied('v(ENV) = "PROD"', {}, globals_dict={"ENV": "PROD"}) is True
+
+    def test_e_shorthand_for_exitcode(self):
+        assert is_satisfied("e(a) = 0", {}, job_exitcodes={"a": 0}) is True
+        assert is_satisfied("e(a) = 0", {}, job_exitcodes={"a": 1}) is False
+
+    def test_lookback_wired_through_is_satisfied(self):
+        now = datetime(2026, 1, 1, 12, 0)
+        assert is_satisfied(
+            "success(a, 12.00)", {"a": 4},
+            job_last_times={"a": datetime(2026, 1, 1, 6, 0)}, now=now,
+        ) is True
+        assert is_satisfied(
+            "success(a, 12.00)", {"a": 4},
+            job_last_times={"a": datetime(2025, 12, 1)}, now=now,
+        ) is False
+
 
 # ===========================================================================
 # 3. Time Trigger
@@ -266,19 +319,25 @@ class TestTimeTrigger:
         self,
         job_name="sched_job",
         start_times="06:00",
+        start_mins=None,
         days_of_week="mo,tu,we,th,fr",
         status=8,
         last_run_date=None,
+        last_start=None,
+        date_conditions=True,
     ):
         """Create a minimal in-memory stub that quacks like a JobRow."""
         class Row:
             pass
         r = Row()
-        r.job_name      = job_name
-        r.start_times   = start_times
-        r.days_of_week  = days_of_week
-        r.status        = status
-        r.last_run_date = last_run_date
+        r.job_name        = job_name
+        r.start_times     = start_times
+        r.start_mins      = start_mins
+        r.days_of_week     = days_of_week
+        r.status          = status
+        r.last_run_date   = last_run_date
+        r.last_start      = last_start
+        r.date_conditions = date_conditions
         return r
 
     def test_fires_at_correct_time(self):
@@ -360,7 +419,75 @@ class TestTimeTrigger:
         now = datetime(2026, 6, 24, 6, 0)
         triggered = get_triggered_jobs(rows, now)
         assert len(triggered) == 1
-        assert triggered[0].job_name == "j1"
+
+    # -- date_conditions gate --------------------------------------------
+    # Real AutoSys requires date_conditions: 1 for start_times/start_mins/
+    # days_of_week/run_calendar to take effect at all.
+
+    def test_date_conditions_false_blocks_schedule(self):
+        row = self._make_row(
+            start_times="06:00", days_of_week=None, date_conditions=False,
+        )
+        now = datetime(2026, 6, 24, 6, 0)
+        assert is_triggered(row, now) is False
+
+    def test_date_conditions_true_allows_schedule(self):
+        row = self._make_row(
+            start_times="06:00", days_of_week=None, date_conditions=True,
+        )
+        now = datetime(2026, 6, 24, 6, 0)
+        assert is_triggered(row, now) is True
+
+    def test_date_conditions_defaults_off_on_real_jobrow(self):
+        # Sanity check against the real schema default (not the test stub,
+        # whose _make_row defaults date_conditions=True for convenience).
+        from autosys.db.schema import JobRow
+        row = JobRow(job_name="x", job_type="CMD", command="echo hi",
+                      machine="localhost", owner="o", start_times="06:00")
+        now = datetime(2026, 6, 24, 6, 0)
+        assert is_triggered(row, now) is False
+
+    # -- start_mins ---------------------------------------------------------
+
+    def test_start_mins_fires_on_matching_minute(self):
+        row = self._make_row(
+            start_times=None, start_mins="0,15,30,45", days_of_week=None,
+        )
+        now = datetime(2026, 6, 24, 9, 15)
+        assert is_triggered(row, now) is True
+
+    def test_start_mins_does_not_fire_on_other_minute(self):
+        row = self._make_row(
+            start_times=None, start_mins="0,15,30,45", days_of_week=None,
+        )
+        now = datetime(2026, 6, 24, 9, 20)
+        assert is_triggered(row, now) is False
+
+    def test_start_mins_fires_every_hour_not_just_once_a_day(self):
+        # Unlike start_times, a start_mins job already having last_run_date
+        # set to today must NOT block it from firing again later that day.
+        row = self._make_row(
+            start_times=None, start_mins="0", days_of_week=None,
+            last_run_date="2026-06-24",
+        )
+        now = datetime(2026, 6, 24, 11, 0)
+        assert is_triggered(row, now) is True
+
+    def test_start_mins_does_not_refire_within_same_minute(self):
+        row = self._make_row(
+            start_times=None, start_mins="0", days_of_week=None,
+            last_start=datetime(2026, 6, 24, 9, 0, 45),
+        )
+        now = datetime(2026, 6, 24, 9, 0, 50)
+        assert is_triggered(row, now) is False
+
+    def test_start_mins_refires_next_hour(self):
+        row = self._make_row(
+            start_times=None, start_mins="0", days_of_week=None,
+            last_start=datetime(2026, 6, 24, 9, 0, 45),
+        )
+        now = datetime(2026, 6, 24, 10, 0, 0)
+        assert is_triggered(row, now) is True
 
 
 # ===========================================================================
@@ -538,6 +665,7 @@ class TestEventProcessor:
             job_type="BOX",
             start_times="06:00",
             days_of_week="mo,tu,we,th,fr",
+            date_conditions=True,
         )
         with sync_session() as session:
             job_repo.upsert(session, box)
@@ -558,11 +686,30 @@ class TestEventProcessor:
             job_name="sched_box",
             job_type="BOX",
             start_times="06:00",
+            date_conditions=True,
         )
         with sync_session() as session:
             job_repo.upsert(session, box)
 
         _tick(now=datetime(2026, 6, 24, 7, 0))
+
+        with sync_session() as session:
+            pending = event_repo.dequeue_pending(session)
+        assert pending == []
+
+    def test_time_trigger_requires_date_conditions(self):
+        """start_times without date_conditions: 1 never self-triggers."""
+        box = BoxJob(
+            job_name="sched_box",
+            job_type="BOX",
+            start_times="06:00",
+            days_of_week="mo,tu,we,th,fr",
+            date_conditions=False,
+        )
+        with sync_session() as session:
+            job_repo.upsert(session, box)
+
+        _tick(now=datetime(2026, 6, 24, 6, 0))
 
         with sync_session() as session:
             pending = event_repo.dequeue_pending(session)
@@ -658,6 +805,23 @@ class TestCLISchedulerRunOnce:
         assert "check_source_ready" in result.output
         # Job should have moved from INACTIVE to SUCCESS
         assert "SUCCESS" in result.output
+
+    def test_sendevent_unknown_job_rejected(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            autosys, ["sendevent", "-E", "STARTJOB", "-J", "no_such_job"],
+            catch_exceptions=False,
+        )
+        assert result.exit_code == 1
+        # nothing was queued
+        assert "No events pending" in self._run("scheduler", "run-once").output
+
+    def test_sendevent_job_on_hold(self):
+        self._run("jil", "import", str(_DEMO_JIL))
+        result = self._run("sendevent", "-E", "JOB_ON_HOLD", "-J", "check_source_ready")
+        assert result.exit_code == 0
+        result = self._run("scheduler", "run-once")
+        assert "ON_HOLD" in result.output
 
     def test_run_once_quiet_flag(self):
         result = self._run("scheduler", "run-once", "--quiet")

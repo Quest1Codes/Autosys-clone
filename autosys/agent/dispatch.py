@@ -39,6 +39,8 @@ Phase 6 will add SSH-based remote dispatch so that jobs targeting
 
 from __future__ import annotations
 
+import re
+import shutil
 import socket
 import threading
 import uuid
@@ -92,6 +94,61 @@ def _is_local_machine(machine: Optional[str]) -> bool:
     if not machine or machine.lower() in _LOCAL_MACHINE_ALIASES:
         return True
     return machine.lower() == socket.gethostname().lower()
+
+
+# ---------------------------------------------------------------------------
+# chk_files — "location size [location size...]" preflight disk-space check
+# ---------------------------------------------------------------------------
+
+_CHK_FILES_SIZE_UNITS = {"B": 1, "KB": 1024, "M": 1024 ** 2, "G": 1024 ** 3}
+_CHK_FILES_SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)\s*(B|KB|M|G)?$", re.IGNORECASE)
+
+
+def _parse_chk_files_size(token: str) -> int:
+    """
+    Parse a ``chk_files`` size token (e.g. ``500M``, ``100``, ``2G``) into
+    bytes.  No suffix defaults to KB, matching AutoSys's documented default.
+    """
+    match = _CHK_FILES_SIZE_RE.match(token.strip())
+    if not match:
+        raise ValueError(f"invalid chk_files size {token!r}")
+    value, unit = match.groups()
+    unit = (unit or "KB").upper()
+    return int(float(value) * _CHK_FILES_SIZE_UNITS[unit])
+
+
+def _check_chk_files(spec: str) -> Optional[str]:
+    """
+    Verify each ``location size`` pair in *spec* has enough free disk space.
+
+    Format: ``location size [location size...]`` — space-separated pairs,
+    e.g. ``/data 500M /tmp 100M``.
+
+    Returns ``None`` if every location has enough free space, otherwise a
+    human-readable message describing the first failing check (real AutoSys
+    retries per ``n_retrys`` then fails; here we fail the dispatch outright
+    as a documented simplification).
+    """
+    tokens = spec.split()
+    if len(tokens) % 2 != 0:
+        return f"malformed chk_files spec (expected 'location size' pairs): {spec!r}"
+
+    for i in range(0, len(tokens), 2):
+        location, size_token = tokens[i], tokens[i + 1]
+        try:
+            required_bytes = _parse_chk_files_size(size_token)
+        except ValueError as exc:
+            return str(exc)
+        try:
+            free_bytes = shutil.disk_usage(location).free
+        except OSError as exc:
+            return f"cannot stat {location!r}: {exc}"
+        if free_bytes < required_bytes:
+            return (
+                f"{location!r} has {free_bytes} bytes free, "
+                f"needs {required_bytes} bytes"
+            )
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +213,21 @@ class AgentDispatch:
 
     def _dispatch_local(self, session: Session, row: JobRow, now: datetime) -> None:
         """Fork the job locally (same machine as the scheduler)."""
+        # chk_files preflight: CMD-only attribute, checked BEFORE any run
+        # record or subprocess is created. If it fails, the job goes
+        # straight to FAILURE and never dispatches.
+        if row.chk_files and str(row.job_type).upper() == "CMD":
+            error = _check_chk_files(row.chk_files)
+            if error:
+                logger.warning(
+                    "[agent] chk_files preflight FAILED for %r — %s. "
+                    "Job set to FAILURE without dispatching.",
+                    row.job_name, error,
+                )
+                row.status   = JobStatus.FAILURE.value
+                row.last_end = now
+                return
+
         from autosys.db.repository import globs as glob_repo
         globals_dict = glob_repo.as_dict(session)
         command  = _expand_command(row, globals_dict, now)

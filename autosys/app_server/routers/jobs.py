@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
@@ -150,14 +151,21 @@ def sendevent(
     Enqueue an event for a job.
 
     Examples: STARTJOB, KILLJOB, FORCE_STARTJOB, JOB_ON_HOLD, JOB_OFF_HOLD,
-              JOB_ON_ICE, JOB_OFF_ICE, CHANGE_STATUS, SET_GLOBAL
+              JOB_ON_ICE, JOB_OFF_ICE, CHANGE_STATUS
+
+    ``SET_GLOBAL`` is not accepted here — it targets a global variable, not
+    a job, and doesn't fit this job-scoped URL; use ``PUT /globals/{name}``
+    instead.
+
+    For ``CHANGE_STATUS``, ``body.attribute`` carries the new status name
+    (e.g. ``"SUCCESS"``).
     """
     user.require_role("operator", "admin")
 
     allowed = {
         "STARTJOB", "FORCE_STARTJOB", "KILLJOB",
-        "JOB_ON_HOLD", "JOB_OFF_HOLD", "JOB_ON_ICE", "JOB_OFF_ICE",
-        "CHANGE_STATUS", "SET_GLOBAL", "CHECK_HEARTBEAT",
+        "JOB_ON_HOLD", "HOLD_JOB", "JOB_OFF_HOLD", "JOB_ON_ICE", "JOB_OFF_ICE",
+        "CHANGE_STATUS", "CHECK_HEARTBEAT",
     }
     if body.event_type.upper() not in allowed:
         raise HTTPException(
@@ -165,24 +173,35 @@ def sendevent(
             detail=f"Unknown event type '{body.event_type}'. Allowed: {sorted(allowed)}",
         )
 
-    # Validate job exists (except SET_GLOBAL which targets a variable name)
-    if body.event_type.upper() != "SET_GLOBAL":
-        row = job_repo.get_row(session, job_name)
-        if row is None:
-            raise HTTPException(status_code=404, detail=f"Job '{job_name}' not found")
+    row = job_repo.get_row(session, job_name)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_name}' not found")
 
-    ev = Event(
-        event_type = body.event_type.upper(),
-        job_name   = job_name,
-        source     = "api",
-        attribute  = body.attribute,
-    )
+    event_type = body.event_type.upper()
+    event_kwargs: dict = dict(event_type=event_type, job_name=job_name, source="api")
+    if event_type == "CHANGE_STATUS":
+        if not body.attribute:
+            raise HTTPException(
+                status_code=400,
+                detail="CHANGE_STATUS requires 'attribute' to be set to the new status name.",
+            )
+        try:
+            event_kwargs["new_status"] = JobStatus[body.attribute.upper()].value
+        except KeyError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown status {body.attribute!r}. Valid: {[s.name for s in JobStatus]}",
+            )
+
+    try:
+        ev = Event(**event_kwargs)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     event_repo.enqueue(session, ev)
 
-    from datetime import datetime
     return SendEventResponse(
         event_id   = ev.event_id,
         event_type = ev.event_type,
         job_name   = ev.job_name,
-        queued_at  = datetime.now(),
+        queued_at  = ev.created_at,  # the event's actual (UTC) enqueue time, not a fresh local one
     )

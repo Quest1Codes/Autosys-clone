@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Optional
 import uuid
 
@@ -62,6 +63,6 @@ class AgentHealthMonitor:
             job_name=machine.machine_name,
             alarm_type="AGENT_DOWN",
             message=f"Agent {machine.machine_name} at {machine.host}:{machine.port} is not responding",
-            raised_at=datetime.utcnow(),
+            raised_at=utcnow(),
         ))
         logger.warning("Agent %s is DOWN", machine.machine_name)

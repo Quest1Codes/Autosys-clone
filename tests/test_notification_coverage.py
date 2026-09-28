@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from autosys.timeutil import utcnow
 from typing import Generator
 
 import pytest
@@ -47,7 +48,7 @@ def _make_alarm(job_name="test_job", alarm_type="FAILURE", message="test"):
         job_name=job_name,
         alarm_type=alarm_type,
         message=message,
-        raised_at=datetime.utcnow(),
+        raised_at=utcnow(),
     )
 
 
