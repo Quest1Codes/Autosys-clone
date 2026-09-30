@@ -1,0 +1,124 @@
+name: autosys-clone - CI
+
+# First CI workflow for this repo (task A5 -- there was none at all before
+# this). Scoped deliberately narrow: test the Python package, scan source
+# dependencies with OSV-Scanner (task A2, Vishy named it specifically), build
+# both shipped images and scan them with Trivy (task A3/A6 -- OS/image-layer
+# CVEs OSV doesn't cover at all). No deploy job yet; this repo doesn't have
+# one to model against the way shinro's CI does.
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package (dev extras)
+        run: pip install --no-cache-dir -e ".[dev]"
+
+      - name: Run tests
+        run: pytest tests/ -q
+
+  osv_scan:
+    name: OSV-Scanner (source dependencies)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --format=table
+            --output=osv-report.txt
+            --recursive
+            .
+        continue-on-error: true
+
+      - name: Publish OSV-Scanner Report to Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "### 🔎 OSV-Scanner: source dependencies" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s "osv-report.txt" ]]; then
+            echo "<details><summary>Click to view findings</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            cat "osv-report.txt" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ No known vulnerabilities found." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  scan_images:
+    name: Build & Scan Docker Images
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: autosys-clone
+            target: runtime
+          - name: autosys-clone-web
+            target: nginx-runtime
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Image
+        run: |
+          docker build --target "${{ matrix.image.target }}" \
+            -t "${{ matrix.image.name }}:ci" .
+
+      # exit-code stays "0" (report, don't block) -- no agreed vulnerability
+      # triage/SLA policy yet (task C3, not started). Same non-blocking
+      # posture as shinro's own Trivy job; revisit once C3 lands.
+      - name: Run Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: "${{ matrix.image.name }}:ci"
+          format: "table"
+          output: "trivy-report-${{ matrix.image.name }}.txt"
+          exit-code: "0"
+          ignore-unfixed: true
+          vuln-type: "os,library"
+          severity: "MEDIUM,HIGH,CRITICAL"
+
+      - name: Publish Trivy Scan Report to Summary
+        if: always()
+        shell: bash
+        run: |
+          echo "### 🛡️ Trivy Scan: ${{ matrix.image.name }}" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -s "trivy-report-${{ matrix.image.name }}.txt" ]]; then
+            echo "<details><summary>Click to view vulnerabilities</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            cat "trivy-report-${{ matrix.image.name }}.txt" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "✅ No vulnerabilities found." >> "$GITHUB_STEP_SUMMARY"
+          fi
