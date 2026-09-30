@@ -371,6 +371,16 @@ pytest tests/ -m postgresql
 
 ### Docker Compose (recommended — matches how this ships)
 
+> [!WARNING]
+> **A bare `docker build .` with no `--target` silently builds the wrong
+> thing.** The `Dockerfile` has two named stages — `runtime` (the full
+> app: API + WCC + database access) and `nginx-runtime` (static frontend
+> only, no backend at all) — and `nginx-runtime` is the *last* stage in the
+> file, so an untargeted build produces a container that serves the UI but
+> has nothing behind it to talk to. Every compose file below passes
+> `target:` explicitly and sidesteps this; only hits you if you experiment
+> with `docker build` directly instead of compose.
+
 ```bash
 cp .env.example .env
 # Edit .env: set AUTOSYS_JWT_SECRET to a real secret, and AUTOSYS_USERS to at
@@ -390,25 +400,27 @@ Three variants exist:
 All three need the same `.env` (`AUTOSYS_JWT_SECRET`, `AUTOSYS_USERS`) — the
 `api` container refuses to start without it, regardless of which file you use.
 
+A fourth file, `docker-compose.shinro.yml`, is an optional override (not a
+standalone variant) — layer it on top of `docker-compose.yml` to join
+Shinro's Docker network. See [Running alongside Shinro](#running-alongside-shinro-fidelity-deployment)
+below.
+
 #### Running alongside Shinro (Fidelity deployment)
 
-Shinro's own `docker-compose.yml` runs the AutoSys→Astronomer assessment
-against this simulator over Docker's network, not the internet. To connect
-the two stacks:
-
-1. Start Shinro's stack first (`cd ../shinro && docker compose up -d`) — it
-   owns and creates the external `shinro` Docker network.
-2. This repo's `docker-compose.yml` already joins that network under the
-   alias `autosys-sim` (see the `api` service's `networks:` block). Just
-   `docker compose up -d` here, same as above.
-3. In Shinro's own root `.env`, set `SIMULATOR_URL=http://autosys-sim:9000`,
-   and set `SIMULATOR_AUTH_USERNAME`/`SIMULATOR_AUTH_PASSWORD` to match one
-   entry (a `viewer` or `operator` account is enough) in this repo's
-   `AUTOSYS_USERS`.
-4. Verify: `docker exec tool-execution curl -s -X POST http://autosys-sim:9000/api/v1/auth/token -H 'Content-Type: application/json' -d '{"username":"...","password":"..."}'` should return a signed JWT.
-
-If Shinro isn't in the picture, ignore this subsection entirely — plain
-`docker compose up -d` above is a complete, self-contained AutoSys clone.
+Plain `docker compose up -d` above is fully standalone — no Shinro network
+required, works with no Shinro checkout anywhere nearby. To also join
+Shinro's `shinro` Docker network (so the two stacks can reach each other by
+container-network hostname), layer `docker-compose.shinro.yml` on top
+instead:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.shinro.yml up -d
+```
+That's a separate, opt-in file rather than baked into the base compose file
+on purpose — see its own header comment for why. Full step-by-step
+instructions for wiring the two together (env vars on both sides, verify
+command, run order) live in
+[shinro/README-DEV.md's AutoSys → Astronomer section](../shinro/README-DEV.md#autosys--astronomer-this-branchs-track)
+— that's the canonical joint guide.
 
 ---
 
@@ -1884,7 +1896,10 @@ All configuration is via environment variables (12-factor app style).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AUTOSYS_DB_URL` | `sqlite:///data/autosys.db` | SQLAlchemy database URL |
+| `AUTOSYS_DB_URL` | `sqlite:///data/autosys.db` | SQLAlchemy database URL. The compose files (not the bare CLI) point this at Postgres instead by default -- see the three vars below. |
+| `AUTOSYS_DB_USER` | `autosys` | Postgres username. Only read when `AUTOSYS_DB_URL` is a `postgresql://` URL built from these three vars, as the compose files do -- irrelevant for the bare-CLI/SQLite path. |
+| `AUTOSYS_DB_PASSWORD` | `autosys` | Postgres password, same scope as above. |
+| `AUTOSYS_DB_NAME` | `autosys` | Postgres database name, same scope as above. |
 | `AUTOSYS_AGENT_PORT` | `7520` | Port for the System Agent TCP server |
 | `AUTOSYS_AGENT_NAME` | hostname | Logical name of this agent |
 | `AUTOSYS_SSA_PORT` | `9000` | Port for the App Server REST API |
@@ -1898,6 +1913,9 @@ All configuration is via environment variables (12-factor app style).
 | `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL (Phase 10) |
 | `PD_ROUTING_KEY` | — | PagerDuty Events API routing key (Phase 10) |
 | `AUTOSYS_SQL_ECHO` | `false` | Set to `true` to log all SQL statements |
+| `FRP_SERVER` | — | Advanced/optional: remote tunnel relay host, for `docker run <image>` single-container mode only (`docker-entrypoint.sh`). **Not** how this repo connects to a local Shinro -- that's the `shinro` Docker network (see [Running alongside Shinro](#running-alongside-shinro-fidelity-deployment)). Leave unset unless the simulator needs to run on a machine Shinro can't reach directly (behind NAT, no public IP). |
+| `FRP_TOKEN` | — | Auth token for the FRP relay above. |
+| `FRP_STCP_KEY` | — | Shared secret for the FRP relay's STCP proxy. |
 
 For testing, `monkeypatch.setenv("AUTOSYS_DB_URL", ...)` is sufficient to
 isolate each test in its own SQLite file. The engine cache is keyed by URL, so
@@ -1906,6 +1924,10 @@ different test processes and threads never share a connection pool.
 ---
 
 ## Testing Strategy
+
+> For generating and verifying large synthetic JIL workloads (load-testing
+> the scheduler/parser at scale, not unit-test coverage), see
+> [`scripts/jil_stress/README.md`](scripts/jil_stress/README.md).
 
 ### Principles
 

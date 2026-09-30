@@ -1,0 +1,35 @@
+# Optional override: joins the `api` service to Shinro's external `shinro`
+# Docker network, so the two stacks can reach each other by container-
+# network hostname. Layer this on top of docker-compose.yml rather than
+# editing it directly:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.shinro.yml up -d
+#
+# This has to be a separate file, not baked into docker-compose.yml itself:
+# naming an external network anywhere in a compose file -- even on just one
+# service -- makes Compose require that network to exist before ANY service
+# in the file can start, with no way to make it conditional in-line.
+# Verified this the hard way: `api` alone referencing `shinro:` (even
+# alongside `default:`) still failed the WHOLE `docker compose up -d` with
+# "network shinro ... could not be found" the moment the network was
+# genuinely absent, even though only `api` needed it.
+#
+# Start Shinro's own stack first -- it owns and creates the `shinro`
+# network (see shinro/README-DEV.md's AutoSys → Astronomer section for the
+# full joint walkthrough) -- then bring this repo up with both files. The
+# api service (port 9000) becomes reachable as `autosys-sim` on that shared
+# network (kept distinct from Shinro's own `api` service name to avoid a
+# DNS alias collision); Shinro's SIMULATOR_URL should point at
+# http://autosys-sim:9000.
+services:
+  api:
+    networks:
+      default:
+      shinro:
+        aliases:
+          - autosys-sim
+
+networks:
+  shinro:
+    external: true
+    name: shinro

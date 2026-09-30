@@ -20,14 +20,18 @@
 #                                  one-line `docker run`); this compose file's
 #                                  api/wcc point at the postgres service below.
 #
-# Joined to Shinro's `shinro` Docker network (see Shinro's own
-# docker-compose.yml, bottom of the api service / networks section) so the
-# two stacks can reach each other by container-network hostname. Start
-# Shinro's stack first -- it owns and creates the `shinro` network -- then
-# bring this one up. The api service (port 9000) is additionally reachable
-# as `autosys-sim` on that shared network (kept distinct from Shinro's own
-# `api` service name to avoid a DNS alias collision); point Shinro's
-# SIMULATOR_URL at http://autosys-sim:9000.
+# This file alone is fully standalone -- no external network required, works
+# with no Shinro checkout anywhere nearby. To also join Shinro's `shinro`
+# Docker network (so the two stacks can reach each other by container-
+# network hostname), layer docker-compose.shinro.yml on top instead of
+# editing this file:
+#   docker compose -f docker-compose.yml -f docker-compose.shinro.yml up -d
+# See that file for why this needs to be a separate, opt-in override rather
+# than baked in here: naming an external network in a compose file, even on
+# just one service, makes Compose require that network to exist before ANY
+# service in the file can start -- there's no way to make it optional
+# in-line. See docker-compose.shinro.yml for the actual join + full
+# instructions; shinro/README-DEV.md has the canonical joint walkthrough.
 services:
   postgres:
     image: postgres:16
@@ -43,8 +47,6 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
-    networks:
-      - shinro
 
   api:
     build:
@@ -76,17 +78,6 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
-    # Joins Shinro's external "shinro" network (owned by shinro's own
-    # docker-compose.yml -- start that stack, or `docker network create
-    # shinro`, first) under the alias autosys-sim, so Shinro's SIMULATOR_URL
-    # can reach this container without it needing a public tunnel. Still
-    # also on this project's own default network so wcc/web below keep
-    # reaching it by its plain service name.
-    networks:
-      default:
-      shinro:
-        aliases:
-          - autosys-sim
 
   wcc:
     build:
@@ -104,8 +95,6 @@ services:
       api:
         condition: service_started
     restart: unless-stopped
-    networks:
-      - shinro
 
   web:
     build:
@@ -118,17 +107,7 @@ services:
       - api
       - wcc
     restart: unless-stopped
-    networks:
-      - shinro
 
 volumes:
   autosys-data:
   autosys-pgdata:
-
-networks:
-  # Owned by Shinro's own docker-compose.yml (`name: shinro`, driver: bridge).
-  # Start that stack (or `docker network create shinro`) before this one --
-  # `external: true` means compose will not create it, only attach to it.
-  shinro:
-    external: true
-    name: shinro
