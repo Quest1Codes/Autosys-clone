@@ -54,6 +54,14 @@ WORKDIR /app
 # switch this to installing a built wheel.
 COPY pyproject.toml README.md ./
 COPY autosys ./autosys
+# The base image bundles its own outdated (CVE'd) pip and setuptools, both
+# installed and as ensurepip bootstrap wheels -- upgrade and drop the cached
+# wheels so neither carries forward. setuptools vendors its own copies of
+# jaraco.context/wheel internally (setuptools/_vendor/...), which is why
+# upgrading setuptools alone clears those two as well.
+RUN pip install --no-cache-dir --upgrade pip setuptools && \
+    rm -f /usr/local/lib/python3.11/ensurepip/_bundled/pip-*.whl \
+          /usr/local/lib/python3.11/ensurepip/_bundled/setuptools-*.whl
 # [pg] pulls in psycopg2-binary/asyncpg — the compose files point
 # AUTOSYS_DB_URL at a PostgreSQL container, not the SQLite default.
 RUN pip install --no-cache-dir -e .[pg]
@@ -69,7 +77,13 @@ RUN pip install --no-cache-dir -e .[pg]
 # and SQLite's single-writer model cannot take 300k+ files' worth of
 # concurrent writes. Only that mode uses it; the multi-container compose
 # files run their own separate `postgres` service instead.
+# upgrade first: the base image's own published snapshot lags Debian's
+# security repo by however long it's been since that snapshot was built,
+# same as any floating tag -- apply what's already patched upstream before
+# installing anything else, so nginx/postgresql land on top of current
+# packages rather than whatever shipped with the base image.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends nginx postgresql \
     && rm -rf /var/lib/apt/lists/*
 
@@ -117,6 +131,10 @@ CMD []
 # process would break login the moment a real browser (not curl hitting a
 # port directly) loads it.
 FROM nginx:1.27-alpine AS nginx-runtime
+
+# Same reasoning as the runtime stage's apt-get upgrade: apply whatever
+# Alpine has already patched since this tag's snapshot was published.
+RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
 
 COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
