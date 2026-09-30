@@ -64,7 +64,16 @@ RUN pip install --no-cache-dir --upgrade pip setuptools && \
           /usr/local/lib/python3.11/ensurepip/_bundled/setuptools-*.whl
 # [pg] pulls in psycopg2-binary/asyncpg — the compose files point
 # AUTOSYS_DB_URL at a PostgreSQL container, not the SQLite default.
-RUN pip install --no-cache-dir -e .[pg]
+#
+# The second setuptools upgrade, after -e ., is deliberate and not redundant:
+# `pip install -e .` resolves its own PEP 517 build-isolation environment
+# against [build-system] requires ("setuptools >= 68.0"), which is satisfied
+# by -- and so pip is happy to leave in place -- whatever older setuptools
+# was already cached, undoing the upgrade above. Verified via Trivy: without
+# this second line, the shipped image still carried setuptools 70.3.0 with a
+# known CVE despite the upgrade three lines up.
+RUN pip install --no-cache-dir -e .[pg] \
+    && pip install --no-cache-dir --upgrade setuptools
 
 # nginx is the single origin the browser talks to: WCC's own SPA fallback
 # 404s anything under /api/v1/ (login, JIL import), which lives in the API

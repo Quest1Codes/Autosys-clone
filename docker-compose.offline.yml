@@ -8,7 +8,11 @@
 #   docker tag autosys-clone-web:<arch> autosys-clone-web:latest
 #   docker compose -f docker-compose.offline.yml up -d
 #
-# Then open http://localhost:8080  (login: admin / admin)
+#   Put real values in a .env file next to this compose file first --
+#   AUTOSYS_JWT_SECRET and AUTOSYS_USERS -- see .env.example. The api
+#   container refuses to start without them.
+#
+# Then open http://localhost:8080 and log in with a user from AUTOSYS_USERS.
 #
 # api/wcc now talk to the postgres service below rather than SQLite. This
 # needs psycopg2/asyncpg inside the image (Dockerfile installs the [pg]
@@ -40,13 +44,18 @@ services:
       - autosys-data:/app/data
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
-      # The app refuses to start (cli/scheduler_cmd.py's _require_real_auth)
-      # if this is still the well-known default, or if AUTOSYS_USERS is unset --
-      # both are real requirements now, not just docs. Override via a .env file
-      # or exported env vars for anything beyond local dev.
-      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-autosys-clone-local-dev-secret-not-for-prod}
+      # No working default for either of these two -- `autosys scheduler serve`
+      # (startup_check_errors() in app_server/auth.py) refuses to start
+      # without a real secret and at least one user. The JWT secret default
+      # below must stay exactly in sync with auth.py's _INSECURE_DEFAULT_SECRET
+      # constant -- that's the literal string the startup check rejects; any
+      # other placeholder string would silently pass as "real". AUTOSYS_USERS
+      # has no default at all on purpose: startup_check_errors() only checks
+      # it's non-empty, not that it's non-default, so a baked-in admin/admin
+      # map here would actually boot successfully instead of being rejected.
+      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
-      AUTOSYS_USERS: ${AUTOSYS_USERS:-{"admin":{"password":"admin","role":"admin"},"operator":{"password":"operator","role":"operator"},"viewer":{"password":"viewer","role":"viewer"}}}
+      AUTOSYS_USERS: ${AUTOSYS_USERS:-}
     depends_on:
       postgres:
         condition: service_healthy

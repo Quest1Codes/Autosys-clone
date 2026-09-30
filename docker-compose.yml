@@ -58,18 +58,32 @@ services:
       - autosys-data:/app/data
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
-      # The app refuses to start (cli/scheduler_cmd.py's _require_real_auth)
-      # if this is still the well-known default, or if AUTOSYS_USERS is unset --
-      # both are real requirements now, not just docs. Override via a .env file
-      # or exported env vars for anything beyond local dev.
-      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-autosys-clone-local-dev-secret-not-for-prod}
+      # No working default for either of these two -- `autosys scheduler serve`
+      # (startup_check_errors() in app_server/auth.py) refuses to start
+      # without a real secret and at least one user. The JWT secret default
+      # below must stay exactly in sync with auth.py's _INSECURE_DEFAULT_SECRET
+      # constant -- that's the literal string the startup check rejects; any
+      # other placeholder string would silently pass as "real". AUTOSYS_USERS
+      # has no default at all on purpose (not even an obviously-fake one):
+      # startup_check_errors() only checks it's non-empty, not that it's
+      # non-default, so a baked-in admin/admin-style map here would actually
+      # boot successfully instead of being rejected. Put real values in a
+      # `.env` file next to this compose file; see .env.example.
+      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
-      AUTOSYS_USERS: ${AUTOSYS_USERS:-{"admin":{"password":"admin","role":"admin"},"operator":{"password":"operator","role":"operator"},"viewer":{"password":"viewer","role":"viewer"}}}
+      AUTOSYS_USERS: ${AUTOSYS_USERS:-}
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+    # Joins Shinro's external "shinro" network (owned by shinro's own
+    # docker-compose.yml -- start that stack, or `docker network create
+    # shinro`, first) under the alias autosys-sim, so Shinro's SIMULATOR_URL
+    # can reach this container without it needing a public tunnel. Still
+    # also on this project's own default network so wcc/web below keep
+    # reaching it by its plain service name.
     networks:
+      default:
       shinro:
         aliases:
           - autosys-sim

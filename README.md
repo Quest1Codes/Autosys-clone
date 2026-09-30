@@ -272,8 +272,14 @@ pytest tests/ -k "box"              # filter by name
 
 ### Start the scheduler + API server
 
+`autosys scheduler serve` is the real network-facing entrypoint, and it
+refuses to start unless real auth is configured — no baked-in accounts, no
+default secret (see [Configuration Reference](#configuration-reference)):
+
 ```bash
-# Terminal 1 — start the scheduler + REST API server
+# Terminal 1 — set real auth, then start the scheduler + REST API server
+export AUTOSYS_JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export AUTOSYS_USERS='{"admin":{"password":"change-me","role":"admin"}}'
 autosys scheduler serve --port 8000 --host 127.0.0.1
 #   → API at http://localhost:8000
 #   → Docs at http://localhost:8000/docs
@@ -362,6 +368,47 @@ createdb autosys
 export AUTOSYS_DB_URL="postgresql://user:pass@localhost:5432/autosys"
 pytest tests/ -m postgresql
 ```
+
+### Docker Compose (recommended — matches how this ships)
+
+```bash
+cp .env.example .env
+# Edit .env: set AUTOSYS_JWT_SECRET to a real secret, and AUTOSYS_USERS to at
+# least one account. See .env.example's own comments for the exact format.
+
+docker compose build
+docker compose up -d
+#   → WCC dashboard: http://localhost:8080  (log in with a user from AUTOSYS_USERS)
+#   → REST API:      http://localhost:9000
+```
+
+Three variants exist:
+- `docker-compose.yml` — builds from this source tree. Use this for local dev.
+- `docker-compose.dist.yml` — pulls a pre-built image from the registry (`docker compose -f docker-compose.dist.yml pull && up -d`). No source tree needed.
+- `docker-compose.offline.yml` — same, but from a `docker load`-ed tarball, no registry needed.
+
+All three need the same `.env` (`AUTOSYS_JWT_SECRET`, `AUTOSYS_USERS`) — the
+`api` container refuses to start without it, regardless of which file you use.
+
+#### Running alongside Shinro (Fidelity deployment)
+
+Shinro's own `docker-compose.yml` runs the AutoSys→Astronomer assessment
+against this simulator over Docker's network, not the internet. To connect
+the two stacks:
+
+1. Start Shinro's stack first (`cd ../shinro && docker compose up -d`) — it
+   owns and creates the external `shinro` Docker network.
+2. This repo's `docker-compose.yml` already joins that network under the
+   alias `autosys-sim` (see the `api` service's `networks:` block). Just
+   `docker compose up -d` here, same as above.
+3. In Shinro's own root `.env`, set `SIMULATOR_URL=http://autosys-sim:9000`,
+   and set `SIMULATOR_AUTH_USERNAME`/`SIMULATOR_AUTH_PASSWORD` to match one
+   entry (a `viewer` or `operator` account is enough) in this repo's
+   `AUTOSYS_USERS`.
+4. Verify: `docker exec tool-execution curl -s -X POST http://autosys-sim:9000/api/v1/auth/token -H 'Content-Type: application/json' -d '{"username":"...","password":"..."}'` should return a signed JWT.
+
+If Shinro isn't in the picture, ignore this subsection entirely — plain
+`docker compose up -d` above is a complete, self-contained AutoSys clone.
 
 ---
 
@@ -1843,7 +1890,9 @@ All configuration is via environment variables (12-factor app style).
 | `AUTOSYS_SSA_PORT` | `9000` | Port for the App Server REST API |
 | `AUTOSYS_WCC_PORT` | `8080` | Port for the WCC web dashboard |
 | `AUTOSYS_POLL_INTERVAL` | `1.0` | EPS tick interval in seconds |
-| `AUTOSYS_JWT_SECRET` | — | Secret key for JWT signing (Phase 8) |
+| `AUTOSYS_AUTH_ENABLED` | `true` | Real auth is on by default. `autosys scheduler serve` refuses to start with it off — see [Quick Start](#quick-start) |
+| `AUTOSYS_JWT_SECRET` | — (required) | Secret key for JWT signing (Phase 8). Must be set, and must not be the well-known placeholder value `dev-secret-change-in-production` — `serve` checks for and rejects that exact string |
+| `AUTOSYS_USERS` | — (required) | JSON map of `username -> {password, role}`, role is `viewer`/`operator`/`admin`. No accounts are baked in; `serve` refuses to start with none configured. Example: `{"admin":{"password":"...","role":"admin"}}` |
 | `AUTOSYS_JWT_TTL` | `3600` | JWT expiry in seconds |
 | `NSM_WEBHOOK_URL` | — | NSM webhook endpoint for alarms (Phase 10) |
 | `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL (Phase 10) |
