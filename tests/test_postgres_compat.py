@@ -260,6 +260,8 @@ class TestPostgreSQLIntegration:
                 create_all_sync(session)
             from autosys.db.migrations import list_tables_sync
             tables = list_tables_sync()
-            assert "ujo_job" in tables
         except Exception as exc:
             pytest.skip(f"PostgreSQL not available: {exc}")
+        # Outside the try: AssertionError is an Exception, so an assert inside
+        # it turned a real failure into a "PostgreSQL not available" skip.
+        assert "ujo_job" in tables

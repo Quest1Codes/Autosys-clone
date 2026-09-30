@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +26,7 @@ from typing import Optional, AsyncGenerator
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
+from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
@@ -88,12 +89,19 @@ def create_wcc_app() -> FastAPI:
         version     = "0.2.0",
     )
 
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+    # The WCC frontend is always same-origin with this API (nginx in both
+    # Docker layouts, Vite's dev proxy locally), so no CORS is needed by
+    # default. This used to be allow_origins=["*"], letting any website read
+    # the dashboard's job data. Set WCC_CORS_ORIGINS (comma-separated) only
+    # when a genuinely separate origin must call it.
+    cors_origins = [o.strip() for o in os.environ.get("WCC_CORS_ORIGINS", "").split(",") if o.strip()]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["GET"],
+            allow_headers=["*"],
+        )
 
     # ── JSON data API ─────────────────────────────────────────────────────────
 

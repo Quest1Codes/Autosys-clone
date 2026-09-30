@@ -96,6 +96,26 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nginx postgresql \
     && rm -rf /var/lib/apt/lists/*
 
+# Non-root runtime (static-analysis finding SEC-01: this image used to run
+# every process -- API, WCC, nginx, PostgreSQL -- as UID 0, which bank
+# container policies reject outright). Everything now runs as one fixed,
+# numeric UID so `runAsNonRoot` style admission checks can verify it without
+# resolving a name. Single user rather than per-process users: the old
+# design only needed root to `su postgres`, and PostgreSQL is equally happy
+# to run as any non-root user that owns its data directory.
+#
+# nginx needs three adjustments to run unprivileged: its Debian-enabled
+# default site listens on :80 (a privileged port, and unused -- ours is
+# conf.d/default.conf on :8080), its pid file lives in root-owned /run, and
+# the `user` directive only applies to a root master process (a warning
+# otherwise). Its log and temp dirs are handed to the runtime user.
+RUN groupadd --system --gid 1001 autosys \
+    && useradd --system --uid 1001 --gid 1001 --home-dir /app --no-create-home \
+         --shell /usr/sbin/nologin autosys \
+    && rm -f /etc/nginx/sites-enabled/default \
+    && sed -i -e '/^user /d' -e 's|^pid .*|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf \
+    && chown -R autosys:autosys /var/lib/nginx /var/log/nginx
+
 COPY --from=frontend-build /app/wcc-frontend/dist ./wcc-frontend/dist
 COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
 COPY --from=frp-fetch /usr/local/bin/frpc /usr/local/bin/frpc
@@ -103,14 +123,19 @@ COPY nginx.bundled.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
-RUN mkdir -p /app/data
+# /app/data is the only path the app writes to (SQLite default, bundled
+# PostgreSQL's data dir, generated DB credentials). Owned by the runtime
+# user here so a fresh named volume inherits that ownership on first mount.
+RUN mkdir -p /app/data && chown autosys:autosys /app/data
 
-# Overridden by docker-entrypoint.sh once the bundled PostgreSQL is up (client-
-# facing bundle mode); the multi-container compose files override this
-# themselves to point at their own `postgres` service. This default only
-# matters if something reads it before the entrypoint runs.
-ENV AUTOSYS_DB_URL=postgresql+psycopg2://autosys:autosys@localhost:5432/autosys
+# No AUTOSYS_DB_URL default here on purpose. There used to be one with an
+# `autosys:autosys` password baked in (static-analysis finding SEC-06, flagged
+# as a hardcoded credential). Nothing needs it: bundle mode's entrypoint
+# exports its own URL with a generated password, and every compose file sets
+# its own. Unset, the app falls back to SQLite under /app/data.
 VOLUME ["/app/data"]
+
+USER 1001:1001
 
 EXPOSE 9000 8080
 

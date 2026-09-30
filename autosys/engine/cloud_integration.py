@@ -1,6 +1,7 @@
 """Cloud & Airflow integration — submit jobs to Airflow, AWS, GCP."""
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any, Optional
 
@@ -16,7 +17,9 @@ class AirflowClient:
     base_url:
         Airflow API base URL (e.g. "http://airflow:8080/api/v1")
     username, password:
-        Basic auth credentials.
+        Basic auth credentials. No default: an ``admin``/``admin`` fallback
+        used to sit here (flagged as a hardcoded credential). Omit both for
+        an unauthenticated Airflow; pass both to send HTTP Basic auth.
     http_post_fn:
         Injectable for tests. Signature: (url, headers, body) -> dict
     """
@@ -24,8 +27,8 @@ class AirflowClient:
     def __init__(
         self,
         base_url: str,
-        username: str = "admin",
-        password: str = "admin",
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         http_post_fn: Optional[callable] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
@@ -38,12 +41,18 @@ class AirflowClient:
         url = f"{self.base_url}/dags/{dag_id}/dagRuns"
         body = json.dumps({"conf": conf or {}})
         headers = {"Content-Type": "application/json"}
+        if self.username is not None and self.password is not None:
+            token = base64.b64encode(f"{self.username}:{self.password}".encode()).decode()
+            headers["Authorization"] = f"Basic {token}"
         return self._http_post(url, headers, body)
 
 
 def _default_http_post(url: str, headers: dict, body: str) -> dict:
     """Default HTTP POST using urllib."""
     import urllib.request
+    # urlopen also accepts file:// and ftp:// -- only ever meant for HTTP APIs.
+    if not url.lower().startswith(("http://", "https://")):
+        raise ValueError(f"Refusing non-HTTP URL: {url!r}")
     req = urllib.request.Request(url, data=body.encode(), headers=headers, method="POST")
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read().decode())

@@ -85,7 +85,7 @@ if [ "$#" -eq 0 ]; then
       kill "$pid" 2>/dev/null || true
     done
     if [ -n "$PG_STARTED" ]; then
-      su postgres -c "'${PG_BIN}/pg_ctl' -D '${PGDATA}' -m fast stop" 2>/dev/null || true
+      "${PG_BIN}/pg_ctl" -D "${PGDATA}" -m fast stop 2>/dev/null || true
     fi
   }
   trap cleanup TERM INT
@@ -94,36 +94,80 @@ if [ "$#" -eq 0 ]; then
   # Bundled PostgreSQL. Data lives under the same /app/data volume every
   # other piece of state already uses, so one `docker run -v` is still
   # enough to persist everything across restarts.
+  #
+  # Runs as the image's non-root user (UID 1001, see the Dockerfile) rather
+  # than via `su postgres` from root: PostgreSQL only refuses to run as
+  # root, and whoever owns the data directory can run it. The socket goes
+  # to /tmp because /run/postgresql is root-owned.
+  #
+  # A volume created by an older image (initialized as the Debian `postgres`
+  # user, while this entrypoint still ran as root) is owned by a different
+  # UID and can't be opened -- recreate it (`docker volume rm`) or chown it
+  # to 1001 once.
   # ---------------------------------------------------------------------
   PG_BIN="$(dirname "$(find /usr/lib/postgresql -maxdepth 3 -name initdb | head -n1)")"
   PGDATA=/app/data/pgdata
-  PG_PASSWORD="${AUTOSYS_DB_PASSWORD:-autosys}"
+  PG_SOCKET_DIR=/tmp
+
+  if [ ! -w /app/data ]; then
+    echo "[entrypoint] /app/data is not writable by UID $(id -u) -- see the volume note in docker-entrypoint.sh"
+    exit 1
+  fi
+
+  # Credentials: no fixed default password (static-analysis finding SEC-06).
+  # Each one is generated once per volume, kept under /app/data with 0600
+  # permissions, and reused on every restart. AUTOSYS_DB_PASSWORD, if set,
+  # still wins for the app role.
+  gen_secret() {
+    local file="$1"
+    if [ ! -s "$file" ]; then
+      (umask 077; head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$file")
+    fi
+    cat "$file"
+  }
+  PG_SUPER_PASSWORD="$(gen_secret /app/data/.pg-superuser-password)"
+  PG_PASSWORD="${AUTOSYS_DB_PASSWORD:-$(gen_secret /app/data/.autosys-db-password)}"
+  export PGPASSWORD="$PG_SUPER_PASSWORD"
 
   mkdir -p "$PGDATA"
-  chown -R postgres:postgres /app/data
+  chmod 700 "$PGDATA"
 
   if [ ! -s "$PGDATA/PG_VERSION" ]; then
     echo "[entrypoint] initializing PostgreSQL data directory"
-    su postgres -c "'${PG_BIN}/initdb' -D '${PGDATA}' -U postgres --auth=trust" \
+    # scram-sha-256 on both local and TCP connections: the old --auth=trust
+    # let any process in the container connect as any role with no password.
+    (umask 077; printf '%s\n' "$PG_SUPER_PASSWORD" > /tmp/pg-pwfile)
+    "${PG_BIN}/initdb" -D "${PGDATA}" -U postgres --pwfile=/tmp/pg-pwfile \
+      --auth-local=scram-sha-256 --auth-host=scram-sha-256 \
       > /tmp/initdb.log 2>&1 \
-      || { echo "[entrypoint] initdb failed:"; cat /tmp/initdb.log; exit 1; }
+      || { echo "[entrypoint] initdb failed:"; cat /tmp/initdb.log; rm -f /tmp/pg-pwfile; exit 1; }
+    rm -f /tmp/pg-pwfile
   fi
 
   echo "[entrypoint] starting PostgreSQL"
-  su postgres -c "'${PG_BIN}/pg_ctl' -D '${PGDATA}' -l /tmp/postgres.log -w -o '-c listen_addresses=localhost' start"
+  "${PG_BIN}/pg_ctl" -D "${PGDATA}" -l /tmp/postgres.log -w \
+    -o "-c listen_addresses=localhost -c unix_socket_directories=${PG_SOCKET_DIR}" start
   PG_STARTED=1
 
   for i in $(seq 1 30); do
-    su postgres -c "'${PG_BIN}/pg_isready' -q" && break
+    "${PG_BIN}/pg_isready" -q -h "${PG_SOCKET_DIR}" && break
     sleep 1
   done
 
-  su postgres -c "'${PG_BIN}/psql' -U postgres -tAc \"SELECT 1 FROM pg_roles WHERE rolname='autosys'\"" \
-    | grep -q 1 \
-    || su postgres -c "'${PG_BIN}/psql' -U postgres -c \"CREATE ROLE autosys LOGIN PASSWORD '${PG_PASSWORD}'\""
-  su postgres -c "'${PG_BIN}/psql' -U postgres -tAc \"SELECT 1 FROM pg_database WHERE datname='autosys'\"" \
-    | grep -q 1 \
-    || su postgres -c "'${PG_BIN}/createdb' -U postgres -O autosys autosys"
+  pg_sql() { "${PG_BIN}/psql" -h "${PG_SOCKET_DIR}" -U postgres -v ON_ERROR_STOP=1 "$@"; }
+
+  pg_sql -tAc "SELECT 1 FROM pg_roles WHERE rolname='autosys'" | grep -q 1 \
+    || pg_sql -qc "CREATE ROLE autosys LOGIN"
+  # Re-applied on every start so the role always matches the current
+  # password (a changed AUTOSYS_DB_PASSWORD, or a volume from before
+  # passwords were generated). Passed as a psql variable, quoted by psql
+  # itself (:'pw'), rather than spliced into the SQL string.
+  pg_sql -q -v pw="$PG_PASSWORD" <<'SQL'
+ALTER ROLE autosys WITH LOGIN PASSWORD :'pw';
+SQL
+  pg_sql -tAc "SELECT 1 FROM pg_database WHERE datname='autosys'" | grep -q 1 \
+    || "${PG_BIN}/createdb" -h "${PG_SOCKET_DIR}" -U postgres -O autosys autosys
+  unset PGPASSWORD
 
   export AUTOSYS_DB_URL="postgresql+psycopg2://autosys:${PG_PASSWORD}@localhost:5432/autosys"
 

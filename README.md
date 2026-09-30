@@ -381,6 +381,14 @@ pytest tests/ -m postgresql
 > `target:` explicitly and sidesteps this; only hits you if you experiment
 > with `docker build` directly instead of compose.
 
+> [!NOTE]
+> **The `runtime` image runs as a non-root user (UID 1001).** Every process
+> in it, the bundled PostgreSQL included, runs as that user. A Docker
+> volume created by an older image, when the container still ran as root,
+> is owned by a different user: the bundle refuses to start on it, and
+> compose services can't write to it. Recreate the volume (`docker compose down -v`, or `docker volume rm
+> <name>`), or `chown -R 1001:1001` its contents once.
+
 ```bash
 cp .env.example .env
 # Edit .env: set AUTOSYS_JWT_SECRET to a real secret, and AUTOSYS_USERS to at
@@ -1898,7 +1906,7 @@ All configuration is via environment variables (12-factor app style).
 |----------|---------|-------------|
 | `AUTOSYS_DB_URL` | `sqlite:///data/autosys.db` | SQLAlchemy database URL. The compose files (not the bare CLI) point this at Postgres instead by default -- see the three vars below. |
 | `AUTOSYS_DB_USER` | `autosys` | Postgres username. Only read when `AUTOSYS_DB_URL` is a `postgresql://` URL built from these three vars, as the compose files do -- irrelevant for the bare-CLI/SQLite path. |
-| `AUTOSYS_DB_PASSWORD` | `autosys` | Postgres password, same scope as above. |
+| `AUTOSYS_DB_PASSWORD` | `autosys` (compose) / generated (bundle) | Postgres password, same scope as above. In the single-image bundle (`docker run` with no command) there is no fixed default: if unset, a random password is generated on first start and kept in `/app/data/.autosys-db-password` (mode 0600). |
 | `AUTOSYS_DB_NAME` | `autosys` | Postgres database name, same scope as above. |
 | `AUTOSYS_AGENT_PORT` | `7520` | Port for the System Agent TCP server |
 | `AUTOSYS_AGENT_NAME` | hostname | Logical name of this agent |
@@ -1906,6 +1914,7 @@ All configuration is via environment variables (12-factor app style).
 | `AUTOSYS_WCC_PORT` | `8080` | Port for the WCC web dashboard |
 | `AUTOSYS_POLL_INTERVAL` | `1.0` | EPS tick interval in seconds |
 | `AUTOSYS_AUTH_ENABLED` | `true` | Real auth is on by default. `autosys scheduler serve` refuses to start with it off — see [Quick Start](#quick-start) |
+| `WCC_CORS_ORIGINS` | *(unset)* | Comma-separated origins allowed to call the WCC API cross-origin. Unset means no CORS at all, which is correct for every layout this repo ships (nginx or the Vite dev proxy keep the browser same-origin). |
 | `AUTOSYS_JWT_SECRET` | — (required) | Secret key for JWT signing (Phase 8). Must be set, and must not be the well-known placeholder value `dev-secret-change-in-production` — `serve` checks for and rejects that exact string |
 | `AUTOSYS_USERS` | — (required) | JSON map of `username -> {password, role}`, role is `viewer`/`operator`/`admin`. No accounts are baked in; `serve` refuses to start with none configured. Example: `{"admin":{"password":"...","role":"admin"}}` |
 | `AUTOSYS_JWT_TTL` | `3600` | JWT expiry in seconds |

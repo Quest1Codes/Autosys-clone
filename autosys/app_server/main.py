@@ -167,10 +167,11 @@ def create_app(
         eps_task: Optional[asyncio.Task] = app.state.eps_task
         if eps_task is not None and not eps_task.done():
             eps_task.cancel()
-            try:
-                await eps_task
-            except asyncio.CancelledError:
-                pass
+            # gather(return_exceptions=True) absorbs the CancelledError of the
+            # task we just cancelled ourselves, but still propagates it if
+            # *this* coroutine is being cancelled -- a bare
+            # `except CancelledError: pass` swallowed both.
+            await asyncio.gather(eps_task, return_exceptions=True)
             logger.info("Event Processor background task stopped")
 
         logger.info("AutoSys App Server stopped")
