@@ -87,6 +87,7 @@ from autosys.models.event import Event
 from autosys.models.enums import JobStatus
 from autosys.scheduler.condition_evaluator import (
     is_satisfied, build_status_snapshot, build_exitcode_snapshot, build_last_times_snapshot,
+    referenced_job_names,
 )
 from autosys.scheduler.state_machine import (
     validate_transition,
@@ -530,9 +531,13 @@ class EventProcessor:
             )
             return
 
-        # Evaluate condition using the snapshot from the START of this tick
-        exitcodes = build_exitcode_snapshot(session)
-        last_times = build_last_times_snapshot(session)
+        # Evaluate condition using the snapshot from the START of this tick.
+        # Exit codes and last-end times only for the jobs this condition
+        # names (task E6): rebuilding them from the whole estate on every
+        # STARTJOB made a cycle quadratic in estate size.
+        refs = referenced_job_names(row.condition)
+        exitcodes = build_exitcode_snapshot(session, refs)
+        last_times = build_last_times_snapshot(session, refs)
         if not is_satisfied(row.condition, snapshot, job_exitcodes=exitcodes,
                              job_last_times=last_times, now=now):
             logger.info(f"STARTJOB: {ev.job_name!r} condition not satisfied — staying {row.status}")
@@ -1237,10 +1242,18 @@ class EventProcessor:
         if not children:
             return
 
-        # Build snapshot including the now-ACTIVATED box
-        snapshot  = build_status_snapshot(session)
-        exitcodes = build_exitcode_snapshot(session)
-        last_times = build_last_times_snapshot(session)
+        # Build snapshot including the now-ACTIVATED box -- for just the jobs
+        # the children's conditions reference (task E6). Every box start used
+        # to read the whole estate three times, which made a simulation cycle
+        # quadratic: 2K jobs x 20 cycles took 7 minutes. Conditions look jobs
+        # up by exact name and an unparseable one is False regardless, so the
+        # restricted snapshots evaluate identically.
+        refs: set[str] = set()
+        for child in children:
+            refs |= referenced_job_names(child.condition)
+        snapshot  = build_status_snapshot(session, refs)
+        exitcodes = build_exitcode_snapshot(session, refs)
+        last_times = build_last_times_snapshot(session, refs)
 
         for child in children:
             child_status = _ns(child.status or JobStatus.INACTIVE.value)

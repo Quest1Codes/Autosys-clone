@@ -173,7 +173,7 @@ def _ran_today(job_name: str, status: str, today_str: str) -> bool:
     return status != "INACTIVE"
 
 
-def build_status_snapshot(session) -> dict[str, str]:
+def build_status_snapshot(session, names: Optional[set[str]] = None) -> dict[str, str]:
     """
     Build a {job_name: status} snapshot of every job in the DB.
 
@@ -188,36 +188,44 @@ def build_status_snapshot(session) -> dict[str, str]:
     session:
         An open SQLAlchemy Session.
 
+    names:
+        Optional set of job names to restrict the snapshot to. Conditions look
+        jobs up by exact name, so a snapshot holding just the names a set of
+        conditions references (see ``referenced_job_names``) evaluates them
+        identically while reading a handful of rows instead of the estate.
+
     Returns
     -------
     dict[str, str]
-        Maps ``job_name → status`` for every row in the ``jobs`` table.
+        Maps ``job_name → status`` for every row in the ``jobs`` table
+        (or for *names*, when given).
     """
     from autosys.db.repository import jobs as job_repo
-    rows = job_repo.list_status_only(session)
+    rows = job_repo.list_status_only(session, names)
     return {job_name: _norm_status(status) for job_name, status in rows}
 
 
-def build_exitcode_snapshot(session) -> dict[str, Optional[int]]:
+def build_exitcode_snapshot(session, names: Optional[set[str]] = None) -> dict[str, Optional[int]]:
     """
     Build a {job_name: exit_code} snapshot from each job's most recent run.
 
     Companion to ``build_status_snapshot()`` — pass the result as
     ``job_exitcodes=`` to ``is_satisfied()`` so ``exitcode(job) = N``
-    conditions (and the ``e(job) = N`` shorthand) can resolve.
+    conditions (and the ``e(job) = N`` shorthand) can resolve. *names*
+    restricts it as in ``build_status_snapshot``.
     """
     from autosys.db.repository import runs as run_repo
-    return run_repo.latest_exit_codes(session)
+    return run_repo.latest_exit_codes(session, names)
 
 
-def build_last_times_snapshot(session) -> dict[str, Optional[datetime]]:
+def build_last_times_snapshot(session, names: Optional[set[str]] = None) -> dict[str, Optional[datetime]]:
     """
     Build a {job_name: last_end} snapshot for lookback predicates.
 
     Companion to ``build_status_snapshot()`` — pass the result as
     ``job_last_times=`` (together with ``now=``) to ``is_satisfied()`` so
-    lookback predicates like ``success(job, 12.00)`` can resolve.
+    lookback predicates like ``success(job, 12.00)`` can resolve. *names*
+    restricts it as in ``build_status_snapshot``.
     """
     from autosys.db.repository import jobs as job_repo
-    rows = job_repo.list_all(session)
-    return {row.job_name: row.last_end for row in rows}
+    return dict(job_repo.last_end_times(session, names))

@@ -61,6 +61,16 @@ from autosys.db.schema import (
 from autosys.models.job import Job, parse_job
 from autosys.models.event import Event
 
+# Keep IN (...) lists under every backend's bind-parameter limit (SQLite's
+# historical default is 999).
+_IN_CHUNK = 900
+
+
+def _chunks(names):
+    names = sorted(set(names))
+    for i in range(0, len(names), _IN_CHUNK):
+        yield names[i:i + _IN_CHUNK]
+
 
 # ===========================================================================
 # Mapping helpers
@@ -332,7 +342,9 @@ class JobRepository:
             select(JobRow).order_by(JobRow.job_name)
         ))
 
-    def list_status_only(self, session: Session) -> list[tuple[str, int]]:
+    def list_status_only(
+        self, session: Session, names: Optional[set[str]] = None,
+    ) -> list[tuple[str, int]]:
         """
         Return (job_name, status) for every job -- a two-column projection,
         not full ORM rows.
@@ -341,10 +353,37 @@ class JobRepository:
         times per EPS tick and only ever reads these two columns. Measured
         at 85,000 jobs: 0.167s vs 1.203s for the equivalent list_all() scan
         (dev/task3.../02, section 3.1).
+
+        *names* restricts the result to those jobs (task E6): callers that
+        evaluate a handful of conditions should not read the whole estate.
         """
-        return list(session.execute(
-            select(JobRow.job_name, JobRow.status)
-        ).all())
+        if names is None:
+            return list(session.execute(
+                select(JobRow.job_name, JobRow.status)
+            ).all())
+        out: list[tuple[str, int]] = []
+        for chunk in _chunks(names):
+            out.extend(session.execute(
+                select(JobRow.job_name, JobRow.status).where(JobRow.job_name.in_(chunk))
+            ).all())
+        return out
+
+    def last_end_times(
+        self, session: Session, names: Optional[set[str]] = None,
+    ) -> list[tuple[str, Optional[datetime]]]:
+        """
+        Return (job_name, last_end) -- a two-column projection for
+        build_last_times_snapshot(), which used to load every full ORM row.
+        *names* restricts the result as in list_status_only().
+        """
+        if names is None:
+            return list(session.execute(select(JobRow.job_name, JobRow.last_end)).all())
+        out: list[tuple[str, Optional[datetime]]] = []
+        for chunk in _chunks(names):
+            out.extend(session.execute(
+                select(JobRow.job_name, JobRow.last_end).where(JobRow.job_name.in_(chunk))
+            ).all())
+        return out
 
     def list_stuck_starting(self, session: Session) -> list[JobRow]:
         """
@@ -765,7 +804,9 @@ class RunRepository:
         ).first()
         return row.run_id if row else None
 
-    def latest_exit_codes(self, session: Session) -> dict[str, Optional[int]]:
+    def latest_exit_codes(
+        self, session: Session, names: Optional[set[str]] = None,
+    ) -> dict[str, Optional[int]]:
         """
         Return {job_name: exit_code} for each job's most recent run.
 
@@ -773,15 +814,23 @@ class RunRepository:
         conditions.  A job with no runs yet, or whose latest run hasn't
         finished (exit_code still NULL), is simply absent from the dict —
         ``exitcode(...)`` conditions on it are then unsatisfied.
+
+        *names* restricts the scan to those jobs' runs (task E6). Without it
+        this reads every run row ever recorded, which grows with history.
         """
         from sqlalchemy import select, desc
-        rows = session.scalars(
-            select(JobRunRow).order_by(JobRunRow.job_name, desc(JobRunRow.start_time))
+        stmts = (
+            [select(JobRunRow).order_by(JobRunRow.job_name, desc(JobRunRow.start_time))]
+            if names is None else
+            [select(JobRunRow).where(JobRunRow.job_name.in_(chunk))
+             .order_by(JobRunRow.job_name, desc(JobRunRow.start_time))
+             for chunk in _chunks(names)]
         )
         latest: dict[str, Optional[int]] = {}
-        for row in rows:
-            if row.job_name not in latest:
-                latest[row.job_name] = row.exit_code
+        for stmt in stmts:
+            for row in session.scalars(stmt):
+                if row.job_name not in latest:
+                    latest[row.job_name] = row.exit_code
         return latest
 
 
