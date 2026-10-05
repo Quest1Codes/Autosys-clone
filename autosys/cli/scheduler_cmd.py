@@ -291,7 +291,7 @@ def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool,
     import sys
     import uvicorn
     from autosys.app_server.auth import startup_check_errors
-    from autosys.app_server.main import create_app
+    from autosys.app_server.main import create_app, real_execution_error
 
     # This is the actual network-facing entrypoint -- create_app() itself
     # stays a plain factory (tests build one directly, with no real
@@ -299,6 +299,15 @@ def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool,
     # refuses to bind a port at all if auth would be a lie. See auth.py's
     # module docstring for the history of why this defaults on now.
     problems = startup_check_errors()
+
+    # Same rule for execution mode: dropping --dry-run means autosys.agent
+    # forks job commands through a shell and opens FTP connections to the
+    # machines the imported JIL names. Refuse unless opted into by name.
+    if not dry_run:
+        problem = real_execution_error()
+        if problem:
+            problems.append(problem)
+
     if problems:
         _err.print("[bold red]Refusing to start:[/bold red]")
         for p in problems:

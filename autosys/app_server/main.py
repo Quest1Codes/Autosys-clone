@@ -57,6 +57,40 @@ def get_broadcaster() -> EventBroadcaster:
 
 
 # ---------------------------------------------------------------------------
+# Real-execution opt-in
+# ---------------------------------------------------------------------------
+
+#: Env var that must be explicitly true before this process will build a
+#: dispatcher that runs anything. Deliberately has no safe-looking default.
+REAL_EXECUTION_ENV_VAR = "AUTOSYS_ALLOW_REAL_EXECUTION"
+
+
+def real_execution_allowed() -> bool:
+    """
+    True only when the operator has explicitly opted in to real execution.
+
+    Real execution means ``autosys.agent`` forks the job's ``command:`` through
+    a shell (``agent/runner.py``) and, for FTP job types, opens plaintext FTP
+    connections (``agent/runners.py``) — against whatever machines the imported
+    JIL declares. On an estate imported from a client's production export those
+    are their real hosts and their real commands, so this is gated on an
+    explicit opt-in rather than on how the process happened to be started.
+    """
+    return os.environ.get(REAL_EXECUTION_ENV_VAR, "").strip().lower() == "true"
+
+
+def real_execution_error() -> str | None:
+    """Problem string if real execution was asked for but not permitted."""
+    if real_execution_allowed():
+        return None
+    return (
+        f"{REAL_EXECUTION_ENV_VAR} must be 'true' to run without --dry-run -- "
+        "this server refuses to dispatch real commands to real machines "
+        "unless that is opted into explicitly."
+    )
+
+
+# ---------------------------------------------------------------------------
 # EPS processor construction — shared by startup and the live mode toggle
 # ---------------------------------------------------------------------------
 
@@ -66,8 +100,18 @@ def _build_eps_processor(dry_run: bool, eps_poll_interval: float):
     instant completion, failure injection + alarms) or real execution
     (``AgentDispatch``, real subprocess dispatch). Used by ``create_app``
     startup.
+
+    Raises ``RuntimeError`` if real execution is requested without the
+    ``AUTOSYS_ALLOW_REAL_EXECUTION`` opt-in. The CLI checks the same condition
+    up front (``cli/scheduler_cmd.py``) so the normal failure is a clean
+    "Refusing to start"; this is the backstop for any other caller of
+    ``create_app``.
     """
     from autosys.scheduler.event_processor import EventProcessor, _stub_dispatch
+    if not dry_run:
+        problem = real_execution_error()
+        if problem:
+            raise RuntimeError(problem)
     if dry_run:
         from autosys.notifications.alarm_manager import AlarmManager
         from autosys.scheduler.failure_injector import FailureInjector
@@ -97,7 +141,10 @@ def _build_eps_processor(dry_run: bool, eps_poll_interval: float):
 def create_app(
     start_eps: bool = False,
     eps_poll_interval: float = 1.0,
-    dry_run: bool = False,
+    # Defaults to dry-run: the unsafe mode has to be asked for by name. This
+    # also matches what routers/assessment.py already assumes when the
+    # attribute is missing (``getattr(app.state, "dry_run", True)``).
+    dry_run: bool = True,
     ha: bool = False,
     tie_breaker: bool = False,
 ) -> FastAPI:

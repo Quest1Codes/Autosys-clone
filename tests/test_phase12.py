@@ -100,6 +100,14 @@ def app_server(isolated_db, monkeypatch):
     env["AUTOSYS_AUTH_ENABLED"] = "true"
     env["AUTOSYS_JWT_SECRET"] = "test-only-secret-not-for-real-use"
     env["AUTOSYS_USERS"] = '{"admin": {"password": "admin", "role": "admin"}}'
+    # This test is the one deliberate exception to the real-execution gate:
+    # it starts `serve` without --dry-run and rewrites every JIL command: to
+    # `sleep 0.1` (below) precisely so that *real* subprocess dispatch through
+    # autosys.agent is what gets exercised. Running it under --dry-run would
+    # prove nothing -- the stub dispatcher auto-completes without forking.
+    # Every other deployment path must leave this unset; see
+    # app_server/main.py's real_execution_allowed().
+    env["AUTOSYS_ALLOW_REAL_EXECUTION"] = "true"
 
     # Find the autosys CLI binary — could be next to sys.executable, in the
     # user scripts dir, or on PATH (depending on how it was installed).
