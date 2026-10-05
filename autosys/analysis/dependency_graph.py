@@ -53,23 +53,59 @@ def dependency_wave(
     harder to migrate as parallel Airflow tasks than one where all children
     are independent, even though a stub-dispatcher tick simulation may
     resolve both in the same tick (ticks alone can't distinguish them).
+
+    Iterative on purpose (task E1). The recursive form cost two stack frames
+    per chain level — the call plus the generator inside ``max()`` — so it
+    raised ``RecursionError`` on a chain deeper than ~450 against CPython's
+    default limit of 1000. That is a crash, not a slowdown, and a real estate
+    of 85,000 jobs can easily hold a chain that long. This version is bounded
+    only by memory; it is verified against the recursive implementation in
+    ``tests/test_dependency_wave.py``, including on cyclic graphs, because the
+    numbers it produces feed the complexity score and must not move.
+
+    *memo* is shared across calls by design — callers build one dict per
+    report so a chain is costed once. *_visiting* tracks the nodes on the
+    current path for the cycle guard; it is accepted (rather than always
+    created here) so a caller mid-traversal can pass its own.
     """
     if job_name in memo:
         return memo[job_name]
-    _visiting = _visiting or set()
-    if job_name in _visiting:
+    visiting = _visiting if _visiting is not None else set()
+    if job_name in visiting:
         return 1  # dependency cycle guard — shouldn't happen, fail safe
-    _visiting.add(job_name)
 
-    deps = referenced_jobs(condition_by_name.get(job_name), scope) - {job_name}
-    if not deps:
-        memo[job_name] = 1
-    else:
-        memo[job_name] = 1 + max(
-            dependency_wave(d, condition_by_name, scope, memo, _visiting)
-            for d in deps
-        )
-    _visiting.discard(job_name)
+    # Explicit-stack DFS. Each node is pushed twice: once to expand its
+    # dependencies (expanded=False) and once to fold their results into its
+    # own wave (expanded=True), which is what the recursive version got for
+    # free from the call stack.
+    stack: list[tuple[str, bool]] = [(job_name, False)]
+    while stack:
+        node, expanded = stack.pop()
+        if node in memo:
+            # Reached twice via two parents; the first visit already scored it.
+            if expanded:
+                visiting.discard(node)
+            continue
+        deps = referenced_jobs(condition_by_name.get(node), scope) - {node}
+        if not expanded:
+            visiting.add(node)
+            stack.append((node, True))
+            # reversed() so the LIFO stack pops dependencies in the same order
+            # the recursive generator consumed them. Order is irrelevant to
+            # max() on a DAG but decides, on a cyclic graph, which branch
+            # memoises a node and which trips the cycle guard above — so it
+            # has to match or the scores would move.
+            pending = [d for d in deps if d not in memo and d not in visiting]
+            for d in reversed(pending):
+                stack.append((d, False))
+            continue
+        if not deps:
+            memo[node] = 1
+        else:
+            # A dep missing from memo is one the cycle guard rejected; it
+            # contributes 1, exactly as the recursive version's early return.
+            memo[node] = 1 + max(memo.get(d, 1) for d in deps)
+        visiting.discard(node)
     return memo[job_name]
 
 
