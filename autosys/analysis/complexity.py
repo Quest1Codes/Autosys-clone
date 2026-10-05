@@ -184,6 +184,7 @@ def score_job(
     all_rows: dict[str, "JobRow"],
     wave_depth: int = 1,
     chain_interior: bool = False,
+    child_counts: Optional[dict[str, int]] = None,
 ) -> tuple[str, list[str]]:
     """
     Assign a T-shirt size to *row* and return (size, [driver_strings]).
@@ -204,6 +205,13 @@ def score_job(
     to L, which is the coordinated-migration cost they genuinely still carry.
     Without this, a single N-box business flow manufactures N XL "projects" —
     on the reference estate that was 22 XL boxes standing for 4 real chains.
+
+    *child_counts* is {box_name: number of jobs whose box_name is that box},
+    counted over *all_rows*. build_report precomputes it once (task E6):
+    counting here by scanning all_rows made every BOX cost a full pass over
+    the estate, so the report was quadratic -- ~32s at 8K jobs, extrapolating
+    to about an hour at 85K. When omitted it is counted the old way, so a
+    one-off caller gets the same answer.
     """
     xl: list[str] = []
     l:  list[str] = []
@@ -211,6 +219,13 @@ def score_job(
     s:  list[str] = []
 
     jt = (row.job_type or "CMD").upper()
+
+    child_count = 0
+    if jt == "BOX":
+        child_count = (
+            child_counts.get(row.job_name, 0) if child_counts is not None
+            else sum(1 for r in all_rows.values() if r.box_name == row.job_name)
+        )
 
     if wave_depth >= WAVE_DEPTH_XL_THRESHOLD and not chain_interior:
         xl.append(f"dependency chain depth={wave_depth} (chain terminal)")
@@ -228,7 +243,6 @@ def score_job(
         xl.append("cross-instance dependency (^)")
 
     if jt == "BOX":
-        child_count = sum(1 for r in all_rows.values() if r.box_name == row.job_name)
         if child_count > 15:
             xl.append(f"BOX with {child_count} children (>15)")
 
@@ -299,7 +313,6 @@ def score_job(
 
     # ---- S signals --------------------------------------------------------
     if jt == "BOX":
-        child_count = sum(1 for r in all_rows.values() if r.box_name == row.job_name)
         s.append(f"BOX ({child_count} children)")
     if row.condition and not l and not m:
         s.append(f"condition: {row.condition[:70]}")
@@ -357,6 +370,16 @@ def build_report(
     # Blast radius is a global-graph property — computed once over the full,
     # unfiltered job set before any box_pattern narrowing below.
     blast_radius = fan_in_counts(all_by_name)
+    # Children per box over the full unfiltered set, indexed once (task E6).
+    # score_job's child count and the BOX risk roll-up below both used to
+    # rescan every row for every BOX, which made the report quadratic: ~32s at
+    # 8K jobs, about an hour extrapolated to 85K. Lists keep all_by_name's
+    # order, which the roll-up's max() tie-break depends on.
+    children_by_box: dict[str, list[JobRow]] = {}
+    for r in all_by_name.values():
+        if r.box_name:
+            children_by_box.setdefault(r.box_name, []).append(r)
+    child_counts = {box: len(kids) for box, kids in children_by_box.items()}
     results: list[JobAssessment] = []
 
     if box_pattern:
@@ -433,7 +456,8 @@ def build_report(
     for r in ordered:
         wave_depth = wave_depth_by_name.get(r.job_name, 1)
         size, drivers = score_job(
-            r, all_by_name, wave_depth, r.job_name in chain_interior
+            r, all_by_name, wave_depth, r.job_name in chain_interior,
+            child_counts=child_counts,
         )
         risk, risk_drivers = score_operational_risk(
             r, (run_stats or {}).get(r.job_name)
@@ -512,8 +536,8 @@ def build_report(
     for a in results:
         if a.job_type != "BOX":
             continue
-        # Look up children from all_by_name (full unfiltered set)
-        children_rows = [r for r in all_by_name.values() if r.box_name == a.job_name]
+        # Children from the full unfiltered set (see children_by_box above)
+        children_rows = children_by_box.get(a.job_name, [])
         children = [by_name[c.job_name] for c in children_rows if c.job_name in by_name]
         if not children:
             continue
