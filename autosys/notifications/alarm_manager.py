@@ -417,24 +417,34 @@ class AlarmManager:
 
         This mirrors real AutoSys behaviour where a job that fails and is later
         retried successfully will auto-clear its own alarm.
-        """
-        for job in jobs:
-            if (job.status if job.status is not None else JobStatus.INACTIVE.value) != JobStatus.SUCCESS.value:
-                continue
 
-            stmt = (
-                select(AlarmRow)
-                .where(AlarmRow.job_name == job.job_name)
-                .where(AlarmRow.alarm_type == "ALARM_IF_FAIL")
-                .where(AlarmRow.cleared_at.is_(None))
+        One query for the open ALARM_IF_FAIL alarms, matched against the jobs
+        now in SUCCESS (task E6). It used to issue one query per SUCCESS job
+        on every tick -- tens of thousands of queries per tick on a large
+        estate, almost all of them returning nothing.
+        """
+        succeeded = {
+            job.job_name for job in jobs
+            if (job.status if job.status is not None else JobStatus.INACTIVE.value)
+            == JobStatus.SUCCESS.value
+        }
+        if not succeeded:
+            return
+
+        stmt = (
+            select(AlarmRow)
+            .where(AlarmRow.alarm_type == "ALARM_IF_FAIL")
+            .where(AlarmRow.cleared_at.is_(None))
+        )
+        for alarm in session.execute(stmt).scalars().all():
+            if alarm.job_name not in succeeded:
+                continue
+            alarm.cleared_at = now
+            alarm.cleared_by = "auto"
+            logger.info(
+                "AlarmManager: auto-resolved ALARM_IF_FAIL for %r (job now SUCCESS)",
+                alarm.job_name,
             )
-            for alarm in session.execute(stmt).scalars().all():
-                alarm.cleared_at = now
-                alarm.cleared_by = "auto"
-                logger.info(
-                    "AlarmManager: auto-resolved ALARM_IF_FAIL for %r (job now SUCCESS)",
-                    job.job_name,
-                )
 
     # ------------------------------------------------------------------
     # Low-level helpers
