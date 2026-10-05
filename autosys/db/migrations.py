@@ -100,12 +100,24 @@ def _add_missing_columns_conn(conn) -> list[str]:
                     ddl += f" DEFAULT {val}"
                 elif isinstance(val, str):
                     ddl += " DEFAULT '" + val.replace("'", "''") + "'"
+            # Justified, not overlooked: every interpolated value here comes
+            # from Base.metadata (table/column names and compiled column types
+            # declared in db/schema.py), never from a request, a JIL file or
+            # any other input. DDL also cannot take bind parameters, so
+            # parameterising this is not available even in principle. The one
+            # literal that is interpolated is a scalar column default, escaped
+            # on the branch above.
+            # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
             conn.execute(text(ddl))
             if not col.nullable and not (
                 col.default is not None and getattr(col.default, "is_scalar", False)
             ):
                 # Python-callable default (e.g. utcnow): SQLite forbids a
                 # non-constant DEFAULT in ADD COLUMN, so backfill instead.
+                # Same justification as the ADD COLUMN above: table.name and
+                # col.name are Base.metadata identifiers from db/schema.py,
+                # and the only value set is the SQL CURRENT_TIMESTAMP keyword.
+                # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 conn.execute(text(
                     f'UPDATE "{table.name}" SET "{col.name}" = CURRENT_TIMESTAMP'
                 ))
