@@ -404,12 +404,24 @@ def build_report(
         if r.box_name:
             child_map.setdefault(r.box_name, []).append(r)
 
+    # Depth-first through nested boxes, so a nested box's own children follow
+    # it at every level (audit SEM-03: grandchildren used to fall through to
+    # `orphans` and be scored as chain depth 1). Iterative, and for an estate
+    # without nesting the order is exactly the old box-then-children order.
     ordered: list[JobRow] = []
-    for b in sorted(boxes, key=lambda r: r.job_name):
-        ordered.append(b)
-        for c in sorted(child_map.get(b.job_name, []), key=lambda r: r.job_name):
-            ordered.append(c)
-    seen = {r.job_name for r in ordered}
+    parents: list[JobRow] = []   # every included job with children, any depth
+    seen: set[str] = set()
+    stack = sorted(boxes, key=lambda r: r.job_name, reverse=True)
+    while stack:
+        r = stack.pop()
+        if r.job_name in seen:
+            continue
+        seen.add(r.job_name)
+        ordered.append(r)
+        kids = sorted(child_map.get(r.job_name, []), key=lambda c: c.job_name)
+        if kids:
+            parents.append(r)
+        stack.extend(reversed(kids))
     for r in rows:
         if r.job_name not in seen:
             orphans.append(r)
@@ -417,10 +429,10 @@ def build_report(
 
     # Dependency-chain depth (see dependency_graph.dependency_wave), computed
     # once per scope group rather than per-row: the root scope (top-level
-    # jobs referencing each other) and one scope per BOX (its own children).
-    # Orphans (children whose parent box fell outside a box_pattern filter)
-    # get a conservative depth of 1 — there isn't enough context to walk
-    # their chain.
+    # jobs referencing each other) and one scope per BOX at every nesting
+    # level (its own children). Orphans (children whose parent box fell
+    # outside a box_pattern filter) get a conservative depth of 1 — there
+    # isn't enough context to walk their chain.
     wave_depth_by_name: dict[str, int] = {}
     root_scope = {b.job_name for b in boxes}
     root_conditions = {name: all_by_name[name].condition for name in root_scope}
@@ -429,9 +441,8 @@ def build_report(
         wave_depth_by_name[b.job_name] = dependency_wave(
             b.job_name, root_conditions, root_scope, root_memo
         )
-        children = child_map.get(b.job_name, [])
-        if not children:
-            continue
+    for b in parents:
+        children = child_map[b.job_name]
         child_scope = {b.job_name} | {c.job_name for c in children}
         child_conditions = {name: all_by_name[name].condition for name in child_scope}
         child_memo: dict[str, int] = {}
@@ -533,7 +544,11 @@ def build_report(
     # instead of showing NO_DATA (boxes don't have their own run history).
     _risk_order = {"HIGH": 4, "MEDIUM": 3, "LOW": 2, "NONE": 1, "NO_DATA": 0}
     by_name = {a.job_name: a for a in results}
-    for a in results:
+    # Bottom-up: results are in depth-first order (a box before its nested
+    # boxes), so walking them in reverse rolls each nested box up before its
+    # parent reads it. In report order a parent could read a child box's risk
+    # before that child had inherited its own children's.
+    for a in reversed(results):
         if a.job_type != "BOX":
             continue
         # Children from the full unfiltered set (see children_by_box above)
