@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, AsyncGenerator
@@ -30,6 +29,7 @@ from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSO
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
+from autosys.analysis.condition_refs import condition_job_refs
 from autosys.db.connection import sync_session
 from autosys.db.schema import JobRow, JobRunRow, AlarmRow, JobOutputRow
 from autosys.models.job import JobStatus
@@ -50,10 +50,12 @@ def _status_name(val) -> str:
 
 
 def _extract_deps(condition: str | None) -> list[str]:
-    """Return job names referenced in a condition expression."""
-    if not condition:
-        return []
-    return re.findall(r'(?:success|failure|done|notrunning|terminated|activated|[sfdnta])\((\w+)\)', condition)
+    """Return job names referenced in a condition expression.
+
+    Same definition as the assessment (audit SEM-02), so the flow graph and
+    the report agree on what depends on what.
+    """
+    return sorted(condition_job_refs(condition))
 
 
 def _fmt_dt(dt: datetime | None) -> str:

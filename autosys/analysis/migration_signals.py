@@ -15,6 +15,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from autosys.analysis.condition_refs import condition_job_refs
 from autosys.db.schema import JobRow
 from autosys.scheduler.state_machine import _norm_status
 
@@ -205,9 +206,6 @@ def box_nesting_depth(session: Session) -> dict:
 # A5. Cross-box dependency detection
 # ---------------------------------------------------------------------------
 
-_COND_JOB_RE = re.compile(r"(?:success|failure|done|notrunning)\s*\(\s*([A-Za-z0-9_#.\-]+)\s*\)")
-
-
 def cross_box_dependencies(session: Session) -> dict:
     """
     Find jobs whose condition references jobs in a different box.
@@ -228,7 +226,8 @@ def cross_box_dependencies(session: Session) -> dict:
     for r in rows:
         if not r.condition:
             continue
-        deps = _COND_JOB_RE.findall(r.condition)
+        # Same dependency definition as the chain-depth graph (audit SEM-02).
+        deps = sorted(condition_job_refs(r.condition))
         my_box = r.box_name or ""
         cross_deps = []
         for dep_name in deps:

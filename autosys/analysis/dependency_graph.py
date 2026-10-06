@@ -18,25 +18,19 @@ Two distinct signals live here:
 
 from __future__ import annotations
 
-import re
 from typing import Optional
 
+from autosys.analysis.condition_refs import condition_job_refs
 from autosys.db.schema import JobRow
 
-# Predicates recognised by autosys.scheduler.condition_evaluator — used here
-# only to extract *which job names* a condition string references, not to
-# evaluate it.
-_CONDITION_REF_RE = re.compile(
-    r"\b(?:success|failure|terminated|done|running|notrunning)\(\s*"
-    r"([A-Za-z0-9_.:-]+)"
-)
-
-
 def referenced_jobs(condition: Optional[str], scope: set[str]) -> set[str]:
-    """Return the in-scope job names referenced by a condition expression."""
-    if not condition:
-        return set()
-    return {m for m in _CONDITION_REF_RE.findall(condition) if m in scope}
+    """Return the in-scope job names referenced by a condition expression.
+
+    Delegates to condition_refs.condition_job_refs, the single definition of
+    a dependency (audit SEM-01: the regex this replaced only matched the long
+    form ``success(job)``, but autorep writes ``s(job)``).
+    """
+    return set(condition_job_refs(condition) & scope)
 
 
 def dependency_wave(
