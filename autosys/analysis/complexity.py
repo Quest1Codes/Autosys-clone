@@ -383,7 +383,12 @@ def build_report(
     results: list[JobAssessment] = []
 
     if box_pattern:
-        pat = box_pattern.replace("%", ".*").lower()
+        # A SQL LIKE pattern, not a regex: escape everything, then turn the
+        # % wildcard into .*. Unescaped, a request such as ?box=(%%)*! made
+        # the regex engine backtrack catastrophically and froze the whole API
+        # process, and ?box=( raised a 500 (audit SEC-02). Matching stays
+        # case-insensitive and "_" stays literal, as before.
+        pat = re.escape(box_pattern.lower()).replace("%", ".*")
         box_names = {
             r.job_name
             for r in rows

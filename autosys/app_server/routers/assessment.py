@@ -183,7 +183,7 @@ def _ai_token_budget_response(ai_budget) -> AITokenBudgetResponse:
 @router.get("/report", response_model=AssessmentReportResponse)
 def get_report(
     request:  Request,
-    box:      str | None = Query(None, description="SQL LIKE pattern to restrict to matching BOX jobs and their children, e.g. '%risk%'."),
+    box:      str | None = Query(None, max_length=255, description="SQL LIKE pattern to restrict to matching BOX jobs and their children, e.g. '%risk%'."),
     simulate: bool       = Query(True, description="Fill in risk for jobs with no run history from a dry-run simulation (dry-run mode only)."),
     session:  Session     = Depends(get_session),
     _user:    CurrentUser = Depends(get_current_user),
