@@ -376,13 +376,24 @@ class TestTimeTrigger:
         now = datetime(2026, 6, 27, 6, 0)   # Saturday
         assert is_triggered(row, now) is True
 
-    def test_does_not_fire_if_already_ran_today(self):
+    def test_does_not_fire_twice_in_the_same_minute(self):
         row = self._make_row(
             start_times="06:00", days_of_week=None,
-            last_run_date="2026-06-24",
+            last_run_date="2026-06-24", last_start=datetime(2026, 6, 24, 6, 0, 5),
         )
-        now = datetime(2026, 6, 24, 6, 0)
+        now = datetime(2026, 6, 24, 6, 0, 40)
         assert is_triggered(row, now) is False
+
+    def test_every_listed_start_time_fires_on_the_same_day(self):   # audit SEM-05
+        row = self._make_row(
+            start_times="10:00, 14:00", days_of_week=None,
+            last_run_date="2026-06-24", last_start=datetime(2026, 6, 24, 10, 0, 5),
+        )
+        assert is_triggered(row, datetime(2026, 6, 24, 14, 0)) is True
+
+    def test_unpadded_start_time_matches(self):
+        row = self._make_row(start_times="6:00", days_of_week=None)
+        assert is_triggered(row, datetime(2026, 6, 24, 6, 0)) is True
 
     def test_fires_again_next_day(self):
         row = self._make_row(

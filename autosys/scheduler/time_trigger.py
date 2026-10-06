@@ -167,7 +167,13 @@ def _get_matching_start_times(row, now: datetime) -> list[str]:
 
     current_hhmm = now.strftime(_HHMM_FMT)
     times = [t.strip().strip('"') for t in raw.split(",") if t.strip()]
-    return [t for t in times if t == current_hhmm]
+    return [t for t in times if _zero_pad(t) == current_hhmm]
+
+
+def _zero_pad(hhmm: str) -> str:
+    """"6:00" -> "06:00" (JIL allows both; strftime gives the padded form)."""
+    h, sep, m = hhmm.partition(":")
+    return f"{h.zfill(2)}:{m}" if sep and h.isdigit() else hhmm
 
 
 def is_triggered(row: 'JobRow', now: datetime, calendars: Optional[dict[str, 'Calendar']] = None) -> bool:
@@ -231,17 +237,13 @@ def is_triggered(row: 'JobRow', now: datetime, calendars: Optional[dict[str, 'Ca
     matching_times = _get_matching_start_times(row, now) if has_start_times else []
     matching_mins  = _get_matching_start_mins(row, now) if has_start_mins else []
 
-    if matching_times:
-        # Once-per-day guard — a start_times job is expected to fire once
-        # per listed time, tracked at day granularity via last_run_date.
-        if _already_ran_today(row, today):
-            return False
-    elif matching_mins:
-        # start_mins jobs fire repeatedly through the day; only guard
-        # against re-firing within the same minute.
-        if _already_fired_this_minute(row, now):
-            return False
-    else:
+    if not matching_times and not matching_mins:
+        return False
+    # Guard per time slot, not per day: start_times "10:00, 14:00" fires at
+    # both (audit SEM-05 -- a per-day guard let only the first fire), and
+    # start_mins fires every listed minute. Only a second tick inside the
+    # same minute is suppressed.
+    if _already_fired_this_minute(row, now):
         return False
 
     logger.debug(

@@ -149,18 +149,23 @@ class NotNode(ConditionNode):
 
 from autosys.models.enums import JobStatus
 
+# ON_ICE (audit SEM-07): AutoSys runs the dependents of an ON_ICE job as if it
+# had succeeded, so success() and done() are satisfied by it; failure() and
+# terminated() are not, and notrunning() already is.
 _FUNC_CHECKS: dict[str, callable] = {
     # Full names
-    "success":    lambda s: s == JobStatus.SUCCESS,
+    "success":    lambda s: s in (JobStatus.SUCCESS, JobStatus.ON_ICE),
     "failure":    lambda s: s == JobStatus.FAILURE,
-    "done":       lambda s: s in (JobStatus.SUCCESS, JobStatus.FAILURE, JobStatus.TERMINATED),
+    "done":       lambda s: s in (JobStatus.SUCCESS, JobStatus.FAILURE, JobStatus.TERMINATED,
+                                  JobStatus.ON_ICE),
     "notrunning": lambda s: s not in (JobStatus.STARTING, JobStatus.RUNNING, JobStatus.RESTART),
     "terminated": lambda s: s == JobStatus.TERMINATED,
     "activated":  lambda s: s == JobStatus.ACTIVATED,
     # Real AutoSys single-letter shorthands (used in JIL condition: attributes)
-    "s":  lambda s: s == JobStatus.SUCCESS,
+    "s":  lambda s: s in (JobStatus.SUCCESS, JobStatus.ON_ICE),
     "f":  lambda s: s == JobStatus.FAILURE,
-    "d":  lambda s: s in (JobStatus.SUCCESS, JobStatus.FAILURE, JobStatus.TERMINATED),
+    "d":  lambda s: s in (JobStatus.SUCCESS, JobStatus.FAILURE, JobStatus.TERMINATED,
+                          JobStatus.ON_ICE),
     "n":  lambda s: s not in (JobStatus.STARTING, JobStatus.RUNNING, JobStatus.RESTART),
     "t":  lambda s: s == JobStatus.TERMINATED,
 }

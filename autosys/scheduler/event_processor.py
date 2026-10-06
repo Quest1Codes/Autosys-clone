@@ -209,6 +209,18 @@ class EventProcessor:
         self._alarm_manager    = alarm_manager
         self._dispatcher       = dispatcher
         self._bad_calendars: set[str] = set()   # unreadable calendars already reported
+        # SEM-04: the last status snapshot seen, to find what changed since,
+        # and top-level timed jobs whose start time came while their
+        # condition was unmet ({job_name: "YYYY-MM-DD"}); they start when it
+        # is met later that day.
+        self._prev_snapshot: Optional[dict[str, str]] = None
+        self._waiting: dict[str, str] = {}
+
+    def mark_waiting(self, names, day: str) -> None:
+        """Treat *names* as due today but waiting for their condition (used by
+        the simulation, which has no wall-clock start times)."""
+        for name in names:
+            self._waiting[name] = day
 
     # ------------------------------------------------------------------
     # WebSocket broadcast helper
@@ -275,6 +287,7 @@ class EventProcessor:
         # Build a status snapshot once for the entire tick so all condition
         # evaluations see a consistent view of the world.
         snapshot = build_status_snapshot(session)
+        first_snapshot = snapshot
 
         # 1. Process queued events (FIFO)
         pending = event_repo.dequeue_pending(session)
@@ -333,6 +346,14 @@ class EventProcessor:
             logger.error(f"term_run_time sweep raised: {exc}")
         snapshot = build_status_snapshot(session)
 
+        # 2.7 Start top-level jobs whose condition a status change just met.
+        try:
+            before = self._prev_snapshot if self._prev_snapshot is not None else first_snapshot
+            self._start_ready_dependents(session, before, snapshot, now)
+        except Exception as exc:
+            logger.error(f"dependent re-evaluation raised: {exc}")
+        self._prev_snapshot = snapshot
+
         # 3. Check time triggers (enqueue STARTJOB events for next tick)
         rows = job_repo.list_schedulable(session)
         cal_rows = calendar_repo.list_all(session)
@@ -376,6 +397,58 @@ class EventProcessor:
                 logger.error("AlarmManager.evaluate error: %s", exc)
 
         return n
+
+    def _start_ready_dependents(
+        self,
+        session: Session,
+        before: dict[str, str],
+        after: dict[str, str],
+        now: datetime,
+    ) -> int:
+        """
+        Queue STARTJOB for top-level jobs whose condition a change just met
+        (audit SEM-04).
+
+        Nothing re-evaluated a condition when the job it names finished, so a
+        top-level job started only by its condition (no start time) never
+        ran, and a timed job whose condition was unmet at its start time lost
+        that run. Only jobs that reference a job whose status changed since
+        the last tick are evaluated. Box children are handled by BoxManager.
+        """
+        from sqlalchemy import select
+        from autosys.db.schema import JobRow as JR
+
+        changed = {n for n, s in after.items() if before.get(n) != s}
+        if not changed:
+            return 0
+        today = now.strftime("%Y-%m-%d")
+        from autosys.db.schema import EventQueueRow as EQ
+        already = set(session.scalars(select(EQ.job_name).where(
+            EQ.processed == False, EQ.event_type.in_(("STARTJOB", "FORCE_STARTJOB")))))  # noqa: E712
+        queued = 0
+        for name, cond, status, dated in session.execute(
+                select(JR.job_name, JR.condition, JR.status, JR.date_conditions)
+                .where(JR.box_name.is_(None), JR.condition.isnot(None))):
+            if name in already:
+                continue
+            if dated and self._waiting.get(name) != today:
+                continue                        # timed job: only once its start time has come
+            if not (is_startable(status) or status == JobStatus.ON_NOEXEC.value):
+                continue
+            refs = referenced_job_names(cond)
+            if not refs & changed:
+                continue
+            if not is_satisfied(cond, after,
+                                job_exitcodes=build_exitcode_snapshot(session, refs),
+                                job_last_times=build_last_times_snapshot(session, refs),
+                                now=now):
+                continue
+            event_repo.enqueue(session, Event(event_type="STARTJOB", job_name=name,
+                                              source="internal"))   # not "scheduler": that marks a time trigger
+            queued += 1
+        if queued:
+            logger.info(f"Condition met: queued STARTJOB for {queued} job(s)")
+        return queued
 
     def _handle_comment(
         self,
@@ -548,7 +621,12 @@ class EventProcessor:
         if not is_satisfied(row.condition, snapshot, job_exitcodes=exitcodes,
                              job_last_times=last_times, now=now):
             logger.info(f"STARTJOB: {ev.job_name!r} condition not satisfied — staying {row.status}")
+            if getattr(ev, "source", None) == "scheduler" and not row.box_name:
+                # Its start time came; it starts when the condition is met
+                # later today instead of the run being dropped (SEM-04).
+                self._waiting[row.job_name] = now.strftime("%Y-%m-%d")
             return
+        self._waiting.pop(row.job_name, None)
 
         if is_noexec:
             # Real AutoSys: once a NOEXEC job's start conditions are met,
@@ -691,7 +769,10 @@ class EventProcessor:
         """
         from autosys.scheduler.state_machine import _norm_status as _ns
 
-        for row in job_repo.list_all(session):
+        from sqlalchemy import select
+        from autosys.db.schema import JobRow as JR
+        for row in session.scalars(select(JR).where(
+                JR.status == JobStatus.RUNNING.value, JR.term_run_time > 0)):
             if _ns(row.status) != "RUNNING":
                 continue
             term_limit = row.term_run_time
@@ -1276,6 +1357,12 @@ class EventProcessor:
                     child.status     = JobStatus.SUCCESS.value
                     child.last_start = now
                     child.last_end   = now
+                elif (child.job_type or "").upper() == "BOX":
+                    # Nested box: open it and cascade into its own children
+                    # (audit SEM-06: it was dispatched like a command, so its
+                    # children never ran while it "succeeded").
+                    logger.info(f"BOX cascade: activating nested box {child.job_name!r} of {box_name!r}")
+                    self._activate_box(session, child, now)
                 else:
                     logger.info(f"BOX cascade: starting child {child.job_name!r} of {box_name!r}")
                     self._activate_cmd(session, child, now)
@@ -1314,7 +1401,7 @@ class EventProcessor:
         vals     = list(statuses.values())
         old      = _ns(box_row.status) if box_row.status else "ACTIVATED"
 
-        if any(s == "RUNNING" or s == "STARTING" for s in vals):
+        if any(s in ("RUNNING", "STARTING", "ACTIVATED") for s in vals):
             if box_row.status == JobStatus.ACTIVATED.value:
                 box_row.status = JobStatus.RUNNING.value
                 self._emit_status_change(box_row.job_name, old, "RUNNING")
@@ -1323,7 +1410,7 @@ class EventProcessor:
             box_row.last_end = now
             logger.info(f"BOX {box_row.job_name!r} → FAILURE (child failed)")
             self._emit_status_change(box_row.job_name, old, "FAILURE")
-        elif all(s == "SUCCESS" for s in vals):
+        elif all(s in ("SUCCESS", "ON_ICE") for s in vals):      # ON_ICE: audit SEM-07
             box_row.status = JobStatus.SUCCESS.value
             box_row.last_end = now
             logger.info(f"BOX {box_row.job_name!r} → SUCCESS (all children succeeded)")

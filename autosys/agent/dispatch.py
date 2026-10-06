@@ -95,6 +95,24 @@ def _finish_run_with_retry(run_id: str, status, exit_code: Optional[int], pid: O
     )
 
 
+_RUN_VISIBLE_TIMEOUT_SECONDS = 5.0
+
+
+def _wait_for_run(run_id: str) -> bool:
+    """Wait (fresh session per look) until the run record is committed."""
+    from autosys.db.schema import JobRunRow
+    deadline = time.monotonic() + _RUN_VISIBLE_TIMEOUT_SECONDS
+    while True:
+        with sync_session() as session:
+            if session.get(JobRunRow, run_id) is not None:
+                return True
+        if time.monotonic() >= deadline:
+            logger.warning("[agent] run %r not committed after %.0fs; starting anyway",
+                           run_id[:8], _RUN_VISIBLE_TIMEOUT_SECONDS)
+            return False
+        time.sleep(0.02)
+
+
 def _exit_code_to_status(exit_code: int, max_exit_success: Optional[int]) -> str:
     """
     Map a subprocess exit code to 'SUCCESS' or 'FAILURE'.
@@ -205,6 +223,9 @@ class AgentDispatch:
         self.local_only  = local_only
         # Maps job_name → (LocalJobRunner, run_id) for LOCAL active executions
         self._active: dict[str, tuple[LocalJobRunner, str]] = {}
+        # run_id → job_name for every run still being executed or finished;
+        # outlives _active so late output lines still know their job.
+        self._run_jobs: dict[str, str] = {}
         self._lock   = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -289,6 +310,7 @@ class AgentDispatch:
         )
         with self._lock:
             self._active[row.job_name] = (runner, run_id)
+            self._run_jobs[run_id] = row.job_name
 
         # Capture retry config before session closes
         n_retrys        = row.n_retrys or 0
@@ -379,6 +401,11 @@ class AgentDispatch:
         """
         was_killed  = False
         retry_count = 0
+        # Do not start the process until its run record is committed: a fast
+        # job (echo) used to write output before the dispatching tick had
+        # committed the run, failing the output's foreign key -- the output
+        # was lost and the job could miss SUCCESS (audit ING-20).
+        _wait_for_run(run_id)
 
         while True:
             try:
@@ -435,6 +462,7 @@ class AgentDispatch:
                         )
                 with self._lock:
                     self._active[job_name] = (runner, run_id)
+                    self._run_jobs[run_id] = job_name
 
                 with sync_session() as session:
                     job_row = job_repo.get_row(session, job_name)
@@ -463,6 +491,10 @@ class AgentDispatch:
             _finish_run_with_retry(run_id, status, exit_code, runner.pid)
             break
 
+        with self._lock:
+            for rid in [r for r, j in self._run_jobs.items() if j == job_name]:
+                self._run_jobs.pop(rid, None)
+
         logger.info(
             "[agent] %r completed  status=%s  exit_code=%d  retries=%d%s",
             job_name, status, exit_code, retry_count,
@@ -489,13 +521,8 @@ class AgentDispatch:
         Phase 6 optimisation: batch writes (e.g. every 100 lines or 500 ms)
         to reduce per-line round-trip overhead.
         """
-        # Retrieve job_name from the active runners dict
-        job_name = None
         with self._lock:
-            for jn, (runner, rid) in self._active.items():
-                if rid == run_id:
-                    job_name = jn
-                    break
+            job_name = self._run_jobs.get(run_id)
 
         with sync_session() as session:
             output_repo.append(

@@ -83,6 +83,10 @@ _TERMINAL_FAIL = frozenset({"FAILURE", "TERMINATED"})
 # Jobs that are still executing (prevent premature box completion)
 _ACTIVE = frozenset({"STARTING", "RUNNING"})
 
+# An ON_ICE child does not run this cycle and does not hold its box open;
+# its box completes from the other children (audit SEM-07).
+_SETTLED = _TERMINAL | {"ON_ICE"}
+
 
 def _stub_dispatch(session: Session, row: JobRow) -> None:
     """Stub dispatcher — immediately marks CMD children SUCCESS (no subprocess)."""
@@ -217,6 +221,19 @@ class BoxManager:
                 changes += 1
                 continue
 
+            if (child.job_type or "").upper() == "BOX":
+                # A nested box is opened, not dispatched like a command
+                # (audit SEM-06): it becomes ACTIVATED and the next tick
+                # processes it as a running box, starting its own children.
+                logger.info("BOX %r: activating nested box %r → ACTIVATED",
+                            box.job_name, child.job_name)
+                child.status        = JobStatus.ACTIVATED.value
+                child.last_start    = now
+                child.last_run_date = now.strftime("%Y-%m-%d")
+                snapshot[child.job_name] = "ACTIVATED"
+                changes += 1
+                continue
+
             logger.info(
                 "BOX %r: activating child %r → STARTING",
                 box.job_name, child.job_name,
@@ -297,7 +314,7 @@ class BoxManager:
         # effectively done (still INACTIVE, correctly, just not "pending").
         non_terminal = [
             c for c in children
-            if _norm_status(c.status) not in _TERMINAL
+            if _norm_status(c.status) not in _SETTLED
             and not self._is_unreachable(c, snapshot)
         ]
         if non_terminal:
@@ -485,7 +502,7 @@ class BoxManager:
             return False
 
         if any(
-            name in snapshot and _norm_status(snapshot[name]) not in _TERMINAL
+            name in snapshot and _norm_status(snapshot[name]) not in _SETTLED
             for name in refs
         ):
             return False  # a referenced job can still change state

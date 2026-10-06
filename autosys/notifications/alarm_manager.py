@@ -25,7 +25,7 @@ from autosys.timeutil import utcnow
 from typing import Optional
 
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import AlarmRow, JobRow, JobRunRow, MachineRow
@@ -98,7 +98,13 @@ class AlarmManager:
             now = self._now_fn()
 
         new_alarms: list[AlarmRow] = []
-        jobs = session.execute(select(JobRow)).scalars().all()
+        # Only jobs _check_job can raise for. Loading every job on every tick
+        # was a third of a simulation's time; at 85K jobs it dominates.
+        jobs = session.execute(select(JobRow).where(or_(
+            and_(JobRow.status == JobStatus.FAILURE.value, JobRow.alarm_if_fail.is_(True)),
+            and_(JobRow.status == JobStatus.TERMINATED.value, JobRow.alarm_if_terminated.is_(True)),
+            and_(JobRow.status == JobStatus.RUNNING.value, JobRow.max_run_alarm.is_not(None)),
+        ))).scalars().all()
 
         for job in jobs:
             new_alarms.extend(self._check_job(session, job, now))
@@ -108,7 +114,7 @@ class AlarmManager:
         new_alarms.extend(self._check_must_start(session, now))
         new_alarms.extend(self._check_must_complete(session, now))
 
-        self._auto_resolve(session, jobs, now)
+        self._auto_resolve(session, now)
 
         for alarm in new_alarms:
             logger.info(
@@ -191,6 +197,8 @@ class AlarmManager:
 
         recent_runs = session.execute(
             select(JobRunRow)
+            .join(JobRow, JobRow.job_name == JobRunRow.job_name)
+            .where(JobRow.min_run_alarm.is_not(None), JobRow.min_run_alarm > 0)
             .where(JobRunRow.end_time.is_not(None))
             .where(JobRunRow.end_time >= cutoff)
         ).scalars().all()
@@ -409,7 +417,6 @@ class AlarmManager:
     def _auto_resolve(
         self,
         session: Session,
-        jobs: list[JobRow],
         now: datetime,
     ) -> None:
         """
@@ -423,22 +430,14 @@ class AlarmManager:
         on every tick -- tens of thousands of queries per tick on a large
         estate, almost all of them returning nothing.
         """
-        succeeded = {
-            job.job_name for job in jobs
-            if (job.status if job.status is not None else JobStatus.INACTIVE.value)
-            == JobStatus.SUCCESS.value
-        }
-        if not succeeded:
-            return
-
         stmt = (
             select(AlarmRow)
+            .join(JobRow, JobRow.job_name == AlarmRow.job_name)
             .where(AlarmRow.alarm_type == "ALARM_IF_FAIL")
             .where(AlarmRow.cleared_at.is_(None))
+            .where(JobRow.status == JobStatus.SUCCESS.value)
         )
         for alarm in session.execute(stmt).scalars().all():
-            if alarm.job_name not in succeeded:
-                continue
             alarm.cleared_at = now
             alarm.cleared_by = "auto"
             logger.info(
