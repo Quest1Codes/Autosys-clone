@@ -127,10 +127,53 @@ def _add_missing_columns_conn(conn) -> list[str]:
 
 
 def add_missing_columns(engine=None) -> list[str]:
-    """Add columns present in the models but missing from existing tables."""
+    """Add columns present in the models but missing from existing tables,
+    then widen any column an older release created narrower than the model."""
     engine = engine or get_sync_engine()
     with engine.begin() as conn:
-        return _add_missing_columns_conn(conn)
+        added = _add_missing_columns_conn(conn)
+        return added + _widen_columns_conn(conn)
+
+
+def _widen_columns_conn(conn) -> list[str]:
+    """ALTER COLUMN ... TYPE for columns the model now declares wider.
+
+    PostgreSQL only: SQLite does not enforce VARCHAR lengths or integer widths,
+    so there is nothing to widen there. Only two conversions are made, both
+    lossless -- VARCHAR(n) to TEXT and INTEGER to BIGINT -- so existing data is
+    kept and nothing is ever narrowed (audit ING-01: databases created before
+    the JIL text columns became Text still reject long values).
+    """
+    if conn.dialect.name != "postgresql":
+        return []
+    from sqlalchemy import BigInteger, Integer, String, Text as SAText
+    insp = inspect(conn)
+    existing_tables = set(insp.get_table_names())
+    widened: list[str] = []
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        have = {c["name"]: c["type"] for c in insp.get_columns(table.name)}
+        for col in table.columns:
+            db_type = have.get(col.name)
+            if db_type is None:
+                continue
+            target = None
+            if isinstance(col.type, SAText) and isinstance(db_type, String) \
+                    and not isinstance(db_type, SAText) and db_type.length is not None:
+                target = "TEXT"
+            elif isinstance(col.type, BigInteger) and isinstance(db_type, Integer) \
+                    and not isinstance(db_type, BigInteger):
+                target = "BIGINT"
+            if target is None:
+                continue
+            # Identifiers come from Base.metadata and the type is one of two
+            # literals above -- no input reaches this DDL (see ADD COLUMN).
+            # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+            conn.execute(text(f'ALTER TABLE "{table.name}" ALTER COLUMN "{col.name}" TYPE {target}'))
+            logger.info("Migrated schema: widened %s.%s to %s", table.name, col.name, target)
+            widened.append(f"{table.name}.{col.name}")
+    return widened
 
 
 def _seed_defaults_sync() -> None:
@@ -216,6 +259,7 @@ async def create_all_async(drop_first: bool = False) -> None:
             else:
                 raise
         await conn.run_sync(_add_missing_columns_conn)
+        await conn.run_sync(_widen_columns_conn)
 
     logger.info("AutoSys schema ensured (async) on %s", engine.url)
     await _seed_defaults_async()

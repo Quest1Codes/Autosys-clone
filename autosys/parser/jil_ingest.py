@@ -303,7 +303,8 @@ def ingest_text(
             rows.append({
                 "file_id": file_id, "seq": seq, "start_line": op.start_line,
                 "end_line": op.end_line,
-                "directive": _directive_of(op), "object_name": _name_of(op, result),
+                "directive": _label(_directive_of(op), 64),
+                "object_name": _label(_name_of(op, result), 255),
                 "disposition": disposition, "raw_text": escape_nul(op.raw_text)[0],
                 "raw_escaped": escape_nul(op.raw_text)[1],
                 "issues_json": json.dumps(issues) if issues else None,
@@ -327,6 +328,31 @@ def ingest_text(
         report.status = worst
     report.n_issues = n_issues
     return report
+
+
+def _label(value: Optional[str], limit: int) -> Optional[str]:
+    """Clip an archive lookup label to its column width (audit ING-02).
+
+    directive/object_name are index keys, not data: the stanza's full text is
+    always kept in raw_text. Unclipped, one over-long name (an unknown
+    sub-command, a corrupted line) failed the file's single bulk archive
+    insert on PostgreSQL and rolled back every job in the file -- and an
+    `autorep -J ALL -q` export is one file.
+    """
+    if value is None or len(value) <= limit:
+        return value
+    return value[:limit - 1] + "…"
+
+
+def _error_text(exc: BaseException) -> str:
+    """First line of a database error only (audit ING-19).
+
+    SQLAlchemy appends the full statement and its bound parameters -- the
+    job's command, envvars, auth_string -- which would otherwise be stored in
+    ujo_jil_stanza.issues_json.
+    """
+    first = str(exc).splitlines()[0] if str(exc) else ""
+    return f"{type(exc).__name__}: {first}"
 
 
 def _directive_of(op: JILOperation) -> Optional[str]:
@@ -399,7 +425,7 @@ def _apply_one(session, op, issues, report, seen, file_id, path, *,
                 seen.setdefault(op.job.job_name, (path, op.start_line))
             return WARN, result
         issues.append({"severity": "error", "code": "apply_failed", "line": op.start_line,
-                       "message": f"{type(exc).__name__}: {exc}"})
+                       "message": _error_text(exc)})
         return ARCHIVE, ApplyResult("SKIPPED", getattr(getattr(op, "job", None), "job_name", "?") or "?",
                                     "could not be stored (archived)", persisted=False)
 
@@ -492,7 +518,7 @@ def ingest_file(
     except OSError as exc:                      # unreadable file is an issue, not a crash
         r = FileReport(path=path_str, status="ERROR_RECOVERED")
         r.issues.append({"severity": "error", "code": "unreadable_file", "line": 0,
-                         "message": f"{type(exc).__name__}: {exc}"})
+                         "message": _error_text(exc)})
         r.n_issues = 1
         return r
     text, encoding, enc_issues = decode_bytes(data)
@@ -632,7 +658,7 @@ def _archive_whole_file(session: Session, path, exc: Exception) -> FileReport:
     path_str = str(p.resolve())
     rep = FileReport(path=path_str, status="ERROR_RECOVERED", n_stanzas=1)
     issue = {"severity": "error", "code": "file_failed", "line": 0,
-             "message": f"{type(exc).__name__}: {exc}"}
+             "message": _error_text(exc)}
     rep.issues.append(issue)
     rep.n_issues = 1
     rep.dispositions[QUARANTINED] = 1

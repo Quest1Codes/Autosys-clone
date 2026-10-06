@@ -42,6 +42,57 @@ jobs:
       - name: Run tests
         run: pytest tests/ -q
 
+  # SQLite (used by every other test) ignores VARCHAR lengths; PostgreSQL --
+  # what the client bundle runs -- enforces them. Real JIL values overflowed
+  # fixed-size columns there and jobs silently went missing, or a whole
+  # single-file export was rolled back (simulator audit ING-01/ING-02), and
+  # no SQLite test could see it. This job runs the PostgreSQL tests against a
+  # real server, as a non-superuser that owns its database (as
+  # docker-entrypoint.sh sets up the bundle).
+  test_postgres:
+    name: Test (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      AUTOSYS_TEST_PG_URL: postgresql://autosys:ci-only-password@localhost:5432/autosys
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Create the application role and database
+        env:
+          PGPASSWORD: ci-only-password
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE autosys LOGIN PASSWORD 'ci-only-password'"
+          psql -h localhost -U postgres -c "CREATE DATABASE autosys OWNER autosys"
+
+      - name: Install package (dev + PostgreSQL extras)
+        run: pip install --no-cache-dir -e ".[dev,pg]"
+
+      - name: Run PostgreSQL tests
+        # -rs lists skips; the grep fails the job if the tests were skipped
+        # instead of run (e.g. the URL variable went missing).
+        shell: bash
+        run: |
+          pytest tests/test_postgres_limits.py -q -rs | tee pg-tests.txt
+          ! grep -q "skipped" pg-tests.txt
+
   osv_scan:
     name: OSV-Scanner (source dependencies)
     runs-on: ubuntu-latest

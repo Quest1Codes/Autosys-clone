@@ -41,6 +41,7 @@ from autosys.timeutil import utcnow
 from typing import Optional
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -79,52 +80,58 @@ class JobRow(Base):
     snapshot of the whole workload.
     """
     __tablename__ = "ujo_job"
+    # Free-text JIL attributes are Text, not String(n): SQLite ignores VARCHAR
+    # lengths but PostgreSQL enforces them, and real values exceed any fixed
+    # size (a 15-minute start_times list, a multi-host machine list, a long
+    # box_success). An over-long value used to drop the whole job on the
+    # client's PostgreSQL (audit ING-01). migrations.widen_columns() converts
+    # databases created by older releases.
 
     # --- Identity ---
     job_name        = Column(String(255), primary_key=True)
     job_type        = Column(String(16),  nullable=False, index=True)
     description     = Column(Text)
-    owner           = Column(String(128))
-    permission      = Column(String(64))
-    group           = Column(String(128), index=True)
+    owner           = Column(Text)
+    permission      = Column(Text)
+    group           = Column(Text, index=True)
 
     # --- Execution (CMD) ---
     command         = Column(Text)
     # No FK on machine — AutoSys validates machine reachability at dispatch
     # time, not at JIL import time.  Unknown machines are legal in a JIL file.
-    machine         = Column(String(255), index=True)
-    run_window      = Column(String(32))
+    machine         = Column(Text, index=True)
+    run_window      = Column(Text)
     profile         = Column(Text)
     std_out_file    = Column(Text)
     std_err_file    = Column(Text)
     std_in_file     = Column(Text)
     envvars         = Column(Text)
     chk_files       = Column(Text)
-    ulimit          = Column(String(128))
+    ulimit          = Column(Text)
 
     # --- BOX container ---
     box_name        = Column(String(255), ForeignKey("ujo_job.job_name"), index=True)
-    box_success     = Column(String(255))
-    box_failure     = Column(String(255))
+    box_success     = Column(Text)
+    box_failure     = Column(Text)
     box_terminator  = Column(Boolean, default=False, nullable=False)
     job_terminator  = Column(Boolean, default=False, nullable=False)
 
     # --- Scheduling ---
     # Stored as comma-separated strings to keep the schema flat (mirrors
     # how AutoSys itself serialises them in its Oracle schema).
-    start_times          = Column(String(256))   # "06:00,18:00"
-    start_mins           = Column(String(128))   # "0,15,30,45"
-    days_of_week         = Column(String(64))    # "mo,tu,we,th,fr"
+    start_times          = Column(Text)   # "06:00,18:00"
+    start_mins           = Column(Text)   # "0,15,30,45"
+    days_of_week         = Column(Text)    # "mo,tu,we,th,fr"
     # Calendars are validated at runtime, not import time, so no FK here.
-    run_calendar         = Column(String(128))
-    exclude_calendar     = Column(String(128))
+    run_calendar         = Column(Text)
+    exclude_calendar     = Column(Text)
     date_conditions      = Column(Boolean, default=False, nullable=False)
     term_run_time        = Column(Integer)       # minutes
     avg_runtime          = Column(Integer)
-    must_complete_times  = Column(String(256))
-    must_start_times     = Column(String(256))
+    must_complete_times  = Column(Text)
+    must_start_times     = Column(Text)
     priority             = Column(Integer)
-    timezone             = Column(String(64))
+    timezone             = Column(Text)
 
     # --- Dependencies ---
     condition            = Column(Text)
@@ -136,7 +143,7 @@ class JobRow(Base):
     min_run_alarm        = Column(Integer)       # minutes
     alarm_if_fail        = Column(Boolean, default=False, nullable=False)
     alarm_if_terminated  = Column(Boolean, default=False, nullable=False)
-    fail_codes           = Column(String(256))
+    fail_codes           = Column(Text)
 
     # --- Virtual resources ---
     job_load             = Column(Integer, default=1, nullable=False)
@@ -146,8 +153,8 @@ class JobRow(Base):
 
     # --- Extended attributes (Phase 4) ---
     auto_delete          = Column(Boolean, default=False, nullable=False)
-    application          = Column(String(255))
-    sub_application      = Column(String(255))
+    application          = Column(Text)
+    sub_application      = Column(Text)
     command_timeout      = Column(Integer)
     continuous           = Column(Boolean, default=False, nullable=False)
     cpu_usage            = Column(String(8))     # FREE | USED
@@ -163,15 +170,15 @@ class JobRow(Base):
     send_report               = Column(Boolean, default=False, nullable=False)
 
     # --- FTP-specific ---
-    ftp_server    = Column(String(255))
-    ftp_user      = Column(String(128))
+    ftp_server    = Column(Text)
+    ftp_user      = Column(Text)
     ftp_type      = Column(String(8))       # GET | PUT | DEL
     ftp_src       = Column(Text)
     ftp_dest      = Column(Text)
 
     # --- FILEWATCH-specific ---
     watch_file          = Column(Text)
-    watch_file_min_size = Column(Integer, default=0, nullable=False)
+    watch_file_min_size = Column(BigInteger, default=0, nullable=False)
     watch_interval      = Column(Integer, default=60, nullable=False)
 
     # --- Attributes with no dedicated column (JSON object, insertion-ordered) ---
