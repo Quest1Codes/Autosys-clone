@@ -116,8 +116,20 @@ class TestTolerance:
         assert s.files == 1
 
     def test_suspect_continuation_flagged(self):
-        ops = JILParser().parse_text("insert_job: a job_type: CMD\ncommand: d\nmachine: m\n\nprose\n",
+        ops = JILParser().parse_text("insert_job: a job_type: CMD\nmachine: m\ncommand: d\n\nprose\n",
                                      tolerant=True)
+        assert any(i["code"] == "suspect_continuation" for i in ops[0].issues)
+
+    def test_stray_line_after_single_value_attribute_is_not_glued_on(self):   # PARSER-08
+        ops = JILParser().parse_text("insert_job: a job_type: CMD\ncommand: d\nmachine: m1\n"
+                                     "sendevent -E STARTJOB -J a\n", tolerant=True)
+        assert ops[0].job.machine == "m1"
+        assert any(i["code"] == "stray_line" for i in ops[0].issues)
+
+    def test_wrapped_condition_is_flagged_every_time(self):                 # PARSER-08
+        ops = JILParser().parse_text("insert_job: a job_type: CMD\ncommand: d\nmachine: m\n"
+                                     "condition: s(x)\n & s(y)\n", tolerant=True)
+        assert ops[0].job.condition == "s(x) & s(y)"
         assert any(i["code"] == "suspect_continuation" for i in ops[0].issues)
 
 

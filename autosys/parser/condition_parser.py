@@ -106,7 +106,7 @@ class ExitCodeCondNode(ConditionNode):
         condition: exitcode(extract_sales) = 0
     """
     job_name: str
-    op: str            # "=" or "!="
+    op: str            # "=", "!=", "<", ">", "<=" or ">="
     expected: int
 
 
@@ -119,7 +119,7 @@ class ValueCondNode(ConditionNode):
         condition: value(BATCH_DATE) = "20260625"
     """
     global_name: str   # UPPERCASE by convention
-    op: str            # "=" or "!="
+    op: str            # "=", "!=", "<", ">", "<=" or ">="
     expected: str      # the literal string (already stripped of quotes)
 
 
@@ -182,7 +182,11 @@ class _CondTokenKind:
     OR      = "OR"        # | or the keyword OR
     NOT     = "NOT"       # ! (reserved)
     EQ      = "EQ"        # =
-    NEQ     = "NEQ"       # !=
+    NEQ     = "NEQ"       # != (or <>)
+    LT      = "LT"        # <
+    GT      = "GT"        # >
+    LE      = "LE"        # <=
+    GE      = "GE"        # >=
     QSTRING = "QSTRING"   # "literal" (quotes stripped in .value)
     NUMBER  = "NUMBER"    # integer or decimal literal (e.g. 0, 12, 12.00)
     IDENT   = "IDENT"     # job_name or global_name
@@ -200,7 +204,11 @@ class _CondToken:
 # Master regex — order matters (longer/more-specific patterns first)
 _COND_RE = re.compile(
     r'(?P<WS>\s+)'
-    r'|(?P<NEQ>!=)'
+    r'|(?P<NEQ>!=|<>)'
+    r'|(?P<LE><=)'
+    r'|(?P<GE>>=)'
+    r'|(?P<LT><)'
+    r'|(?P<GT>>)'
     r'|(?P<EQ>=)'
     r'|(?P<AND>&)'
     r'|(?P<OR>\|)'
@@ -208,10 +216,17 @@ _COND_RE = re.compile(
     r'|(?P<RPAREN>\))'
     r'|(?P<NOT>!)'
     r'|(?P<QSTRING>"(?:[^"\\]|\\.)*")'
-    r'|(?P<NUMBER>-?\d+(?:\.\d+)?)'
+    # A number only when no name character follows, so a job named
+    # "100_load" is one IDENT, not NUMBER "100" + IDENT "_load".
+    r'|(?P<NUMBER>-?\d+(?:\.\d+)?(?![A-Za-z0-9_.:%^#-]))'
     r'|(?P<COMMA>,)'
-    r'|(?P<IDENT>[A-Za-z0-9_][A-Za-z0-9_.:%^-]*)'
+    r'|(?P<IDENT>[A-Za-z0-9_#][A-Za-z0-9_.:%^#-]*)'
 )
+
+# Token kinds that can stand for a job or global name inside "( ... )": a job
+# may be named like a keyword ("d", "value", "OR") -- audit SEM-08.
+_NAME_KINDS = frozenset({"IDENT", "FUNC", "VALUE", "EXITCODE", "AND", "OR", "NUMBER"})
+_CMP_KINDS = {"EQ": "=", "NEQ": "!=", "LT": "<", "GT": ">", "LE": "<=", "GE": ">="}
 
 
 def _tokenize_condition(expr: str) -> list[_CondToken]:
@@ -240,15 +255,18 @@ def _tokenize_condition(expr: str) -> list[_CondToken]:
         if kind == "IDENT":
             val = raw
             val_upper = val.upper()
+            # A predicate keyword only when "(" follows; otherwise it is a
+            # name (a job called "d" or "value").
+            called = expr[pos:].lstrip().startswith("(")
             if val_upper == "AND":
                 kind = _CondTokenKind.AND
             elif val_upper == "OR":
                 kind = _CondTokenKind.OR
-            elif val in _VALID_FUNCS:
+            elif called and val in _VALID_FUNCS:
                 kind = _CondTokenKind.FUNC
-            elif val in ("value", "v"):
+            elif called and val in ("value", "v"):
                 kind = _CondTokenKind.VALUE
-            elif val in ("exitcode", "e"):
+            elif called and val in ("exitcode", "e"):
                 kind = _CondTokenKind.EXITCODE
         elif kind == "QSTRING":
             raw = raw[1:-1]   # strip surrounding double-quotes from the token value
@@ -308,6 +326,25 @@ class _CondParser:
 
     def _at_end(self) -> bool:
         return self._peek().kind == _CondTokenKind.EOF
+
+    def _consume_name(self) -> _CondToken:
+        """A job or global name: any word, including one spelled like a keyword."""
+        tok = self._peek()
+        if tok.kind not in _NAME_KINDS:
+            raise ConditionSyntaxError(
+                f"Expected a name but got {tok.kind!r} ({tok.value!r})", self._expr, tok.pos)
+        self._pos += 1
+        return tok
+
+    def _consume_cmp(self, after: str) -> str:
+        tok = self._peek()
+        op = _CMP_KINDS.get(tok.kind)
+        if op is None:
+            raise ConditionSyntaxError(
+                f"Expected a comparison (= != < > <= >=) after {after}(...), got {tok.value!r}",
+                self._expr, tok.pos)
+        self._pos += 1
+        return op
 
     # ------------------------------------------------------------------
     # Grammar productions
@@ -382,7 +419,7 @@ class _CondParser:
         """
         func_tok = self._consume(_CondTokenKind.FUNC)
         self._consume(_CondTokenKind.LPAREN)
-        name_tok = self._consume(_CondTokenKind.IDENT)
+        name_tok = self._consume_name()
         
         # parse instance if present in IDENT
         job_name = name_tok.value
@@ -407,23 +444,16 @@ class _CondParser:
         """
         self._consume(_CondTokenKind.VALUE)
         self._consume(_CondTokenKind.LPAREN)
-        name_tok = self._consume(_CondTokenKind.IDENT)
+        name_tok = self._consume_name()
         self._consume(_CondTokenKind.RPAREN)
-
-        op_tok = self._peek()
-        if op_tok.kind == _CondTokenKind.EQ:
-            self._consume(_CondTokenKind.EQ)
-            op = "="
-        elif op_tok.kind == _CondTokenKind.NEQ:
-            self._consume(_CondTokenKind.NEQ)
-            op = "!="
-        else:
+        op = self._consume_cmp("value")
+        # quoted, or a bare word/number: v(X) = Y, v(X) > 5
+        val_tok = self._peek()
+        if val_tok.kind != _CondTokenKind.QSTRING and val_tok.kind not in _NAME_KINDS:
             raise ConditionSyntaxError(
-                f"Expected '=' or '!=' after value(...), got {op_tok.value!r}",
-                self._expr, op_tok.pos,
-            )
-
-        val_tok = self._consume(_CondTokenKind.QSTRING)
+                f"Expected a value after value(...) {op}, got {val_tok.value!r}",
+                self._expr, val_tok.pos)
+        self._pos += 1
         return ValueCondNode(
             global_name=name_tok.value.upper(),
             op=op,
@@ -438,27 +468,14 @@ class _CondParser:
         """
         self._consume(_CondTokenKind.EXITCODE)
         self._consume(_CondTokenKind.LPAREN)
-        name_tok = self._consume(_CondTokenKind.IDENT)
+        name_tok = self._consume_name()
         self._consume(_CondTokenKind.RPAREN)
-
-        op_tok = self._peek()
-        if op_tok.kind == _CondTokenKind.EQ:
-            self._consume(_CondTokenKind.EQ)
-            op = "="
-        elif op_tok.kind == _CondTokenKind.NEQ:
-            self._consume(_CondTokenKind.NEQ)
-            op = "!="
-        else:
-            raise ConditionSyntaxError(
-                f"Expected '=' or '!=' after exitcode(...), got {op_tok.value!r}",
-                self._expr, op_tok.pos,
-            )
-
+        op = self._consume_cmp("exitcode")
         val_tok = self._consume(_CondTokenKind.NUMBER)
         return ExitCodeCondNode(
             job_name=name_tok.value,
             op=op,
-            expected=int(val_tok.value),
+            expected=int(float(val_tok.value)),
         )
 
     def _parse_not(self) -> NotNode:
@@ -497,6 +514,29 @@ def parse_condition(expr: str) -> ConditionNode:
     """
     tokens = _tokenize_condition(expr.strip())
     return _CondParser(tokens, expr).parse()
+
+
+def _compare(actual, op: str, expected) -> bool:
+    """Apply a condition comparison. = and != compare as text (as before);
+    the ordering operators compare numbers numerically when both sides are
+    numbers (so v(COUNT) > 5 is 10 > 5, not "10" > "5"), otherwise as text."""
+    if op == "=":
+        return str(actual) == str(expected)
+    if op == "!=":
+        return str(actual) != str(expected)
+    try:
+        a, b = float(actual), float(expected)
+    except (TypeError, ValueError):
+        a, b = str(actual), str(expected)
+    if op == "<":
+        return a < b
+    if op == ">":
+        return a > b
+    if op == "<=":
+        return a <= b
+    if op == ">=":
+        return a >= b
+    raise ValueError(f"Unknown comparison operator: {op!r}")
 
 
 def evaluate(
@@ -597,14 +637,13 @@ def evaluate(
             return True
 
         if isinstance(n, ValueCondNode):
-            actual = _global_vars.get(n.global_name, "")
-            return (actual == n.expected) if n.op == "=" else (actual != n.expected)
+            return _compare(_global_vars.get(n.global_name, ""), n.op, n.expected)
 
         if isinstance(n, ExitCodeCondNode):
             actual_code = (job_exitcodes or {}).get(n.job_name)
             if actual_code is None:
                 return False
-            return (actual_code == n.expected) if n.op == "=" else (actual_code != n.expected)
+            return _compare(actual_code, n.op, n.expected)
 
         if isinstance(n, AndNode):
             # Short-circuit: if left is False, don't evaluate right

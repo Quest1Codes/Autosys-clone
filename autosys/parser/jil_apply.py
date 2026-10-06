@@ -14,6 +14,8 @@ endpoint so the two behave identically:
 
 from __future__ import annotations
 
+import re
+
 import json
 from typing import Any, Optional
 
@@ -189,6 +191,68 @@ UNSTORED_OPS = frozenset({
 })
 
 
+def _check_conditions(attrs: dict, issues: list, line: int) -> None:
+    """
+    Parse condition / box_success / box_failure at import (audit SEM-08).
+
+    They used to be parsed only when the simulator evaluated them, so a
+    condition it cannot read loaded as LOADED and the job then waited
+    forever. Now it loads with a ``condition_unparsed`` warning.
+    """
+    from autosys.parser.condition_parser import ConditionSyntaxError, parse_condition
+    for key in ("condition", "box_success", "box_failure"):
+        value = attrs.get(key)
+        if not value or not str(value).strip():
+            continue
+        try:
+            parse_condition(str(value))
+        except (ConditionSyntaxError, RecursionError) as exc:
+            first = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+            issues.append({"severity": "warning", "code": "condition_unparsed", "line": line,
+                           "message": f"{key} could not be parsed ({first}); the simulator "
+                                      "cannot evaluate it, so the job would never start"})
+
+
+_HHMM_RE = re.compile(r"^(\d{1,2}):(\d{2})$")
+
+
+def _valid_hhmm(text: str) -> bool:
+    m = _HHMM_RE.match(text.strip())
+    return bool(m) and int(m.group(1)) < 24 and int(m.group(2)) < 60
+
+
+def _check_values(attrs: dict, issues: list, line: int) -> None:
+    """
+    Flag schedule values AutoSys would reject (audit PARSER-18).
+
+    ``start_times: "25:00"``, ``run_window: "bogus"`` and ``n_retrys: 25``
+    loaded silently; the simulator then never fired the job, or retried it
+    more often than AutoSys allows. The value is kept as written; the
+    warning says what is wrong.
+    """
+    def bad(key: str, why: str) -> None:
+        issues.append({"severity": "warning", "code": "invalid_value", "line": line,
+                       "message": f"{key}: {attrs[key]!r} -- {why}"})
+
+    def items(key: str) -> list[str]:
+        return [x for x in str(attrs[key]).strip().strip('"').split(",") if x.strip()]
+
+    if attrs.get("start_times"):
+        if not all(_valid_hhmm(t) for t in items("start_times")):
+            bad("start_times", "each time must be HH:MM, 00:00 to 23:59")
+    if attrs.get("start_mins"):
+        if not all(t.strip().isdigit() and int(t) < 60 for t in items("start_mins")):
+            bad("start_mins", "each value must be a minute, 0 to 59")
+    if attrs.get("run_window"):
+        parts = str(attrs["run_window"]).strip().strip('"').split("-")
+        if len(parts) != 2 or not all(_valid_hhmm(x) for x in parts):
+            bad("run_window", 'must be "HH:MM-HH:MM"')
+    if attrs.get("n_retrys") not in (None, ""):
+        v = str(attrs["n_retrys"]).strip()
+        if not v.isdigit() or int(v) > 20:
+            bad("n_retrys", "must be 0 to 20")
+
+
 BLOB_FILE_MAX_BYTES = 16 * 1024 * 1024
 
 
@@ -262,6 +326,9 @@ def apply_operation(
         name = op.job.job_name
         count = 0 if dry_run else job_repo.delete_box(session, name)
         return R("DELETED", name, f"box ({count} jobs)", counter="deleted", count=count)
+    if o in ("insert", "update", "override") and op.job is not None:
+        _check_conditions(attrs, issues, line)
+        _check_values(attrs, issues, line)
     if o in ("override", "update"):
         name = op.job.job_name
         if dry_run:

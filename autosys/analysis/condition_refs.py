@@ -31,7 +31,7 @@ from typing import Optional
 
 from autosys.parser.condition_parser import (
     AndNode, ConditionSyntaxError, ExitCodeCondNode, JobCondNode, NotNode, OrNode,
-    _CondTokenKind, _tokenize_condition, parse_condition,
+    _CondTokenKind, _NAME_KINDS, _tokenize_condition, parse_condition,
 )
 
 # Every predicate spelling, long and short, followed by "(name". Used only
@@ -92,7 +92,7 @@ def rename_job_refs(condition: Optional[str], old: str, new: str) -> Optional[st
         for i in range(len(toks) - 2):
             if (toks[i].kind in (_CondTokenKind.FUNC, _CondTokenKind.EXITCODE)
                     and toks[i + 1].kind == _CondTokenKind.LPAREN
-                    and toks[i + 2].kind == _CondTokenKind.IDENT
+                    and toks[i + 2].kind in _NAME_KINDS
                     and toks[i + 2].value == old):
                 spans.append(toks[i + 2].pos)
     else:   # unparseable: rename a name that is a predicate's whole argument

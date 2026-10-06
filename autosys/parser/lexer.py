@@ -164,6 +164,14 @@ _ATTR_START_RE = re.compile(r'^\s*(' + _KEY + r')\s*:')
 # A statement start in the middle of a line (after whitespace was skipped).
 _KEYCOLON_RE   = re.compile(r'(' + _KEY + r')\s*:')
 _BARE_KEY_RE   = re.compile(r'^' + _KEY + r'$')
+
+# Attributes whose value is free text and may have been wrapped onto the next
+# line by whatever produced the file. Any other attribute takes one value, so
+# a following non-attribute line is stray text, not a continuation.
+_FREE_TEXT_ATTRS = frozenset({
+    "command", "description", "condition", "box_success", "box_failure",
+    "notification_msg", "resources",
+})
 _LOWER_KEY_RE  = re.compile(r'[a-z][a-z_0-9]*$')
 
 # Common English words that are also attribute names.  Mid-line they are far
@@ -617,10 +625,23 @@ class Lexer:
                                "Line is not an attribute; kept in the stanza's "
                                "raw text only", s)
                     continue
-                if tol and lineno >= 2 and not lines[lineno - 2].strip():
+                key, _, so_far = prev.text.partition(":")
+                key = key.strip().lower()
+                if so_far.strip() and key not in _FREE_TEXT_ATTRS:
+                    # machine, owner, box_name, ... hold one token: a stray
+                    # line (a pasted `sendevent ...`) glued on silently became
+                    # machine "m1 sendevent ..." (audit PARSER-08). Real jil
+                    # rejects the line; keep it in the raw text only.
+                    if not tol:
+                        raise LexError("Cannot tokenise line", lineno, s)
+                    self._diag(lineno, "stray_line",
+                               f"Line is not an attribute and {key!r} takes a single "
+                               "value; not applied (kept in the stanza's raw text)", s)
+                    continue
+                if tol and so_far.strip():
                     self._diag(lineno, "suspect_continuation",
-                               "Text after a blank line was appended to the previous "
-                               "attribute's value; verify it is not stray text", s)
+                               f"Line appended to the previous {key!r} value; verify it "
+                               "is a wrapped value, not stray text", s)
                 prev.text += " " + s
                 entry = prev
 
