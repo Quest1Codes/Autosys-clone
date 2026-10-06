@@ -93,6 +93,13 @@ def scheduler_start(poll_interval: float, dry_run: bool, auto_complete: bool) ->
         )
         mode_label = "[bold yellow][DRY-RUN][/bold yellow] "
     else:
+        from autosys.safety import real_execution_error
+        problem = real_execution_error()
+        if problem:
+            # Same rule as `serve` (audit SEC-01): this used to start a real
+            # dispatcher with no opt-in at all.
+            _console.print(f"[bold red]Refusing to start:[/bold red] {problem}")
+            raise SystemExit(1)
         from autosys.agent.dispatch import AgentDispatch
         agent = AgentDispatch(local_only=False)
         processor = EventProcessor(

@@ -60,34 +60,11 @@ def get_broadcaster() -> EventBroadcaster:
 # Real-execution opt-in
 # ---------------------------------------------------------------------------
 
-#: Env var that must be explicitly true before this process will build a
-#: dispatcher that runs anything. Deliberately has no safe-looking default.
-REAL_EXECUTION_ENV_VAR = "AUTOSYS_ALLOW_REAL_EXECUTION"
-
-
-def real_execution_allowed() -> bool:
-    """
-    True only when the operator has explicitly opted in to real execution.
-
-    Real execution means ``autosys.agent`` forks the job's ``command:`` through
-    a shell (``agent/runner.py``) and, for FTP job types, opens plaintext FTP
-    connections (``agent/runners.py``) — against whatever machines the imported
-    JIL declares. On an estate imported from a client's production export those
-    are their real hosts and their real commands, so this is gated on an
-    explicit opt-in rather than on how the process happened to be started.
-    """
-    return os.environ.get(REAL_EXECUTION_ENV_VAR, "").strip().lower() == "true"
-
-
-def real_execution_error() -> str | None:
-    """Problem string if real execution was asked for but not permitted."""
-    if real_execution_allowed():
-        return None
-    return (
-        f"{REAL_EXECUTION_ENV_VAR} must be 'true' to run without --dry-run -- "
-        "this server refuses to dispatch real commands to real machines "
-        "unless that is opted into explicitly."
-    )
+# Defined in autosys.safety, which the agent runners also enforce; re-exported
+# here because cli/scheduler_cmd.py and existing callers import them from main.
+from autosys.safety import (  # noqa: E402, F401  (re-exported)
+    REAL_EXECUTION_ENV_VAR, real_execution_allowed, real_execution_error,
+)
 
 
 # ---------------------------------------------------------------------------

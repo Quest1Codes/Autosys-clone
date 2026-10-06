@@ -506,6 +506,11 @@ def create_runner(
     """
     jt = str(row.job_type).upper()
     job_name = row.job_name
+    if jt not in _STUB_TYPES:
+        # Every non-stub runner executes something real: a shell command, an
+        # FTP/SSH/HTTP connection, a WOL packet, a file watch (audit SEC-01).
+        from autosys.safety import require_real_execution
+        require_real_execution(f"{jt} job {job_name!r}")
 
     if jt == "CMD":
         return LocalJobRunner(

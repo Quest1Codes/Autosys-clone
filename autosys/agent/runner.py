@@ -251,6 +251,8 @@ class LocalJobRunner:
     # ------------------------------------------------------------------
 
     def run(self) -> int:
+        from autosys.safety import require_real_execution
+        require_real_execution(f"run command for job {self.job_name!r}")
         """
         Start the subprocess and block until it exits.
 

@@ -97,6 +97,10 @@ class AgentServer:
         port:         int   = 7520,
         db_url:       Optional[str] = None,
     ) -> None:
+        # An unauthenticated listener that runs any command it is sent: never
+        # start one without the real-execution opt-in (audit SEC-01).
+        from autosys.safety import require_real_execution
+        require_real_execution("AgentServer")
         self.machine_name = machine_name
         self.host         = host
         self.port         = port

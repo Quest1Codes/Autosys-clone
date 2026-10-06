@@ -88,6 +88,9 @@ class RemoteDispatch:
         """
         Send a DISPATCH request to the remote agent.
 
+        Refused without the real-execution opt-in (audit SEC-01): it hands a
+        command to another machine to run.
+
         Parameters
         ----------
         session:
@@ -103,6 +106,8 @@ class RemoteDispatch:
         bool
             True if the agent accepted the dispatch, False otherwise.
         """
+        from autosys.safety import require_real_execution
+        require_real_execution("RemoteDispatch")
         now    = _now()
         run_id = str(uuid.uuid4())
 

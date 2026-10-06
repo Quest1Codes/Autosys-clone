@@ -57,10 +57,20 @@ from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo, runs as run_repo, output as output_repo
 from autosys.agent.dispatch import AgentDispatch
 from autosys.agent.server import AgentServer
+from autosys.safety import real_execution_error
+
 from autosys.scheduler.event_processor import EventProcessor
 
 _console = Console()
 _err     = Console(stderr=True)
+
+
+def _refuse_without_opt_in() -> None:
+    """Every agent command executes real commands (audit SEC-01)."""
+    problem = real_execution_error()
+    if problem:
+        _console.print(f"[bold red]Refusing to start:[/bold red] {problem}")
+        raise SystemExit(1)
 
 
 # ===========================================================================
@@ -102,6 +112,7 @@ def agent_start(poll_interval: float, machine: Optional[str]) -> None:
     import socket
     local_name = machine or socket.gethostname()
 
+    _refuse_without_opt_in()
     agent     = AgentDispatch(local_only=True)
     processor = EventProcessor(
         dispatch_fn   = agent.dispatch,
@@ -157,6 +168,7 @@ def agent_serve(machine: str, host: str, port: int) -> None:
         $ autosys machine check etl-server-01
         UP  etl-server-01  0.0.0.0:7520  active_jobs=[]  uptime=1.2s
     """
+    _refuse_without_opt_in()
     server = AgentServer(machine_name=machine, host=host, port=port)
 
     _console.print(
@@ -194,6 +206,7 @@ def agent_run_once(quiet: bool, wait: int) -> None:
     """
     import time
 
+    _refuse_without_opt_in()
     agent     = AgentDispatch(local_only=True)
     processor = EventProcessor(
         dispatch_fn   = agent.dispatch,

@@ -198,6 +198,10 @@ class AgentDispatch:
     """
 
     def __init__(self, local_only: bool = True) -> None:
+        # Refuse at construction, so `scheduler start` / `agent start` /
+        # `agent run-once` fail up front instead of per job (audit SEC-01).
+        from autosys.safety import require_real_execution
+        require_real_execution("AgentDispatch")
         self.local_only  = local_only
         # Maps job_name → (LocalJobRunner, run_id) for LOCAL active executions
         self._active: dict[str, tuple[LocalJobRunner, str]] = {}
