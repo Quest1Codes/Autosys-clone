@@ -655,7 +655,8 @@ def astronomer_mapping(a: JobAssessment) -> str:
     if a.job_type == "BOX":
         child_count = a.drivers.count("children") if "children" in a.drivers else 0
         if a.has_cross_box_dep:
-            return "DAG with ExternalTaskSensor for cross-box dependencies"
+            return ("DAG scheduled on Assets for cross-box dependencies "
+                    "(deferrable ExternalTaskSensor where one specific run must be awaited)")
         return "TaskGroup (nested DAG)"
     parts = []
     if a.command_dialect == "python":
@@ -667,13 +668,13 @@ def astronomer_mapping(a: JobAssessment) -> str:
     else:
         parts.append("BashOperator (generic)")
     if a.has_cross_box_dep:
-        parts.append("ExternalTaskSensor for cross-box dep")
+        parts.append("Asset-based schedule for cross-box dep")
     if a.has_notifications:
         parts.append("on_failure_callback / SlackNotifier")
     if a.has_hardcoded_logs:
         parts.append("remap log paths to S3/GCS")
     if a.timezone:
-        parts.append(f"timezone-aware schedule ({a.timezone} → UTC)")
+        parts.append(f"timezone-aware schedule in {a.timezone} (not a fixed UTC cron)")
     if a.schedule_burst_count > 10:
         parts.append("stagger start times to avoid worker saturation")
     return " + ".join(parts)
@@ -693,9 +694,9 @@ def risk_mitigation(a: JobAssessment) -> str:
     if a.risk == "HIGH":
         actions.append("PRIORITY: migrate early with extra testing")
     if "failure rate" in (a.risk_drivers or "").lower():
-        actions.append("add Airflow retries + retry_delay_exponential")
+        actions.append("add Airflow retries + retry_exponential_backoff")
     if "retry rate" in (a.risk_drivers or "").lower():
-        actions.append("tune retry_count and retry_delay in Airflow")
+        actions.append("tune retries and retry_delay in Airflow")
     if "active alarms" in (a.risk_drivers or "").lower():
         actions.append("set up Airflow alerts + PagerDuty integration")
     if "termination" in (a.risk_drivers or "").lower():
@@ -703,9 +704,11 @@ def risk_mitigation(a: JobAssessment) -> str:
     if a.has_hardcoded_logs:
         actions.append("replace hardcoded paths with Airflow templates / XCom")
     if a.timezone:
-        actions.append(f"convert {a.timezone} schedule to UTC")
+        actions.append(f"keep the schedule in {a.timezone} with a timezone-aware DAG; "
+                       "a cron converted to UTC is an hour off after each DST change")
     if a.has_cross_box_dep:
-        actions.append("use ExternalTaskSensor with poke_interval tuning")
+        actions.append("replace cross-box conditions with Asset-based scheduling "
+                       "(or a deferrable ExternalTaskSensor)")
     if not actions:
         actions.append("standard migration — no special handling needed")
     return "; ".join(actions)
