@@ -231,11 +231,26 @@ def delete_calendar(name: str):
 @click.argument("file_path", type=click.Path(exists=True))
 @click.option("--name", "-n", default=None, help="Calendar name (defaults to filename stem).")
 def import_calendar(file_path: str, name: str | None):
-    """Import calendar dates from a .cal file."""
+    """Import calendar dates from a .cal file or an ``autocal_asc`` export."""
     from pathlib import Path
     from autosys.models.calendar import Calendar
+    from autosys.parser import export_formats
 
     p = Path(file_path)
+    text = p.read_text(encoding="utf-8", errors="replace")
+    if export_formats.detect(text) == "autocal":
+        # The real export: many calendars per file, MM/DD/YYYY dates, and
+        # extended calendars (audit SEM-09). Same loader as `jil import-dir`.
+        from autosys.parser.jil_ingest import ingest_text
+        with sync_session() as session:
+            rep = ingest_text(session, text, str(p.resolve()))
+            session.commit()
+        for action, cal_name, kind in rep.results:
+            _console.print(f"  [green]{action:<9}[/green] {cal_name}  {kind}")
+        _console.print(f"[green]Imported[/green] {rep.counters.get('calendars', 0)} calendar(s) "
+                       f"from {p.name}" + (f" — {rep.n_issues} warning(s), e.g. extended "
+                                          "calendars are stored but not simulated" if rep.n_issues else ""))
+        return
     cal_name = name or p.stem
     cal = Calendar.load_from_file(file_path)
     cal.calendar_name = cal_name

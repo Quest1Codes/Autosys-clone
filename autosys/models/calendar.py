@@ -265,7 +265,9 @@ class Calendar(BaseModel):
                 # token; everything after the first whitespace is an inline comment.
                 token = segment.split()[0]
                 raw_tokens.append(token)
-            return [date.fromisoformat(t) for t in raw_tokens]
+            from autosys.parser.export_formats import parse_calendar_date
+            return [parse_calendar_date(t) for t in raw_tokens
+                    if not t.lower().rstrip(":").endswith("calendar")]   # autocal header line
 
         if isinstance(v, list):
             result: list[date] = []
@@ -274,7 +276,8 @@ class Calendar(BaseModel):
                     # Already a date object — pass through as-is.
                     result.append(item)
                 elif isinstance(item, str):
-                    result.append(date.fromisoformat(item.strip()))
+                    from autosys.parser.export_formats import parse_calendar_date
+                    result.append(parse_calendar_date(item))
                 else:
                     raise ValueError(
                         f"Each element of 'dates' must be a date object or a "

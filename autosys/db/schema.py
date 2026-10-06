@@ -445,9 +445,13 @@ class VirtualResourceRow(Base):
     __tablename__ = "ujo_resource"
 
     resource_name = Column(String(255), primary_key=True)
-    max_load      = Column(Integer, nullable=False)
+    max_load      = Column(Integer, nullable=False)    # JIL `amount`
     current_load  = Column(Integer, default=0, nullable=False)
     description   = Column(Text)
+    # JIL res_type: R (renewable), D (depletable), T (threshold); machine the
+    # resource is scoped to, if any (audit PARSER-05).
+    res_type      = Column(String(8))
+    machine       = Column(String(255))
     created_at    = Column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:
@@ -480,6 +484,12 @@ class MachineRow(Base):
     # Virtual machine / pool members: JSON list of
     # {"machine": str, "max_load": int|None, "factor": float|None}
     members_json    = Column(Text, nullable=True)
+    # Machine definition as written in JIL (audit PARSER-06); host above is
+    # node_name when one is given.
+    machine_type    = Column(String(16))
+    opsys           = Column(String(64))
+    max_load        = Column(Integer)
+    factor          = Column(Float)
     created_at      = Column(DateTime, default=utcnow, nullable=False)
 
     # --- Relationships ---

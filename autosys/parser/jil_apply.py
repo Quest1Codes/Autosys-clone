@@ -191,6 +191,50 @@ UNSTORED_OPS = frozenset({
 })
 
 
+def _store_machine(session, m, attrs: dict, *, partial: bool, issues: list, line: int) -> None:
+    """
+    Store a machine definition (audit PARSER-06).
+
+    ``node_name`` (the real host), ``type``, ``opsys``, ``max_load`` and
+    ``factor`` were dropped, and ``update_machine`` reset the stored host and
+    port to defaults. ``insert_machine`` stores everything given;
+    ``update_machine`` changes only the attributes it names.
+    """
+    import json as _json
+    from autosys.db.schema import MachineRow
+    row = session.get(MachineRow, m.machine_name)
+    if row is None:
+        row = MachineRow(machine_name=m.machine_name, host=m.machine_name, port=7520,
+                         status="UNKNOWN")
+        session.add(row)
+        partial = False                      # update of an unknown machine: take what is given
+    if not partial:
+        row.host = attrs.get("node_name") or m.host or m.machine_name
+        row.port = m.port
+        row.machine_type = attrs.get("type") or "a"
+    else:
+        if attrs.get("node_name") or attrs.get("host"):         # host: older simulator files
+            row.host = attrs.get("node_name") or attrs["host"]
+        if "port" in attrs:
+            row.port = m.port
+        if attrs.get("type"):
+            row.machine_type = attrs["type"]
+    for key in ("opsys", "description"):
+        if key in attrs or not partial:
+            setattr(row, key, attrs.get(key) or None)
+    if "max_load" in attrs or not partial:
+        row.max_load = (_int(attrs["max_load"], None, issues, "max_load", line)
+                        if attrs.get("max_load") else None)
+    if "factor" in attrs or not partial:
+        try:
+            row.factor = float(attrs["factor"]) if attrs.get("factor") else None
+        except ValueError:
+            issues.append({"severity": "warning", "code": "invalid_value", "line": line,
+                           "message": f"factor: {attrs['factor']!r} is not a number"})
+    if getattr(m, "members", None):
+        row.members_json = _json.dumps(m.members)
+
+
 def _check_conditions(attrs: dict, issues: list, line: int) -> None:
     """
     Parse condition / box_success / box_failure at import (audit SEM-08).
@@ -299,11 +343,7 @@ def apply_operation(
     if o in ("insert_machine", "update_machine"):
         m = op.machine
         if not dry_run:
-            members_json = _json.dumps(m.members) if getattr(m, "members", None) else None
-            kwargs = dict(machine_name=m.machine_name, host=m.host or m.machine_name, port=m.port)
-            if members_json is not None:
-                kwargs["members_json"] = members_json
-            machine_repo.register(session, **kwargs)
+            _store_machine(session, m, attrs, partial=(o == "update_machine"), issues=issues, line=line)
         return R("MACHINE", m.machine_name, f"port:{m.port}" if o == "insert_machine" else "updated",
                  counter="machines")
     if o == "delete_machine":
@@ -360,10 +400,25 @@ def apply_operation(
     # ---- resources ----------------------------------------------------------
     if o in ("insert_resource", "update_resource"):
         name = attrs.get("resource_name", "")
-        max_load = _int(attrs.get("max_load", "1"), 1, issues, "max_load", line)
+        # JIL says `amount`; `max_load` is accepted for older simulator files
+        # (audit PARSER-05: amount was ignored and every resource got 1).
+        amount_raw = attrs.get("amount", attrs.get("max_load"))
+        amount = _int(amount_raw, 1, issues, "amount", line) if amount_raw is not None else None
         if not dry_run:
-            resource_repo.upsert(session, name, max_load=max_load, description=attrs.get("description"))
-        return R("RESOURCE", name, f"max_load:{max_load}", counter="resources")
+            from autosys.db.schema import VirtualResourceRow
+            row = session.get(VirtualResourceRow, name)
+            if row is None:
+                row = VirtualResourceRow(resource_name=name, max_load=amount if amount is not None else 1)
+                session.add(row)
+            elif amount is not None:
+                row.max_load = amount
+            # update_resource changes only what it names
+            for key, col in (("description", "description"), ("res_type", "res_type"),
+                             ("machine", "machine")):
+                if key in attrs:
+                    setattr(row, col, attrs[key] or None)
+        shown = amount if amount is not None else "unchanged"
+        return R("RESOURCE", name, f"amount:{shown}", counter="resources")
     if o == "delete_resource":
         name = attrs.get("resource_name", "")
         if not dry_run:
@@ -483,7 +538,16 @@ def apply_operation(
             dates_raw = attrs.get("dates", "")
             existing = session.get(CalendarRow, name)
             if dates_raw:
-                dates_list = [d.strip() for d in dates_raw.split(",") if d.strip()]
+                from autosys.parser.export_formats import parse_calendar_date
+                dates_list = []
+                for d in (x.strip() for x in dates_raw.split(",")):
+                    if not d:
+                        continue
+                    try:
+                        dates_list.append(parse_calendar_date(d).isoformat())
+                    except ValueError:
+                        issues.append({"severity": "warning", "code": "invalid_calendar_date",
+                                       "line": line, "message": f"not a date: {d!r} (skipped)"})
             elif o == "update_calendar" and existing is not None:
                 dates_list = _json.loads(existing.dates_json or "[]")   # unspecified: keep
             else:

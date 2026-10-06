@@ -208,6 +208,7 @@ class EventProcessor:
         )
         self._alarm_manager    = alarm_manager
         self._dispatcher       = dispatcher
+        self._bad_calendars: set[str] = set()   # unreadable calendars already reported
 
     # ------------------------------------------------------------------
     # WebSocket broadcast helper
@@ -337,15 +338,21 @@ class EventProcessor:
         cal_rows = calendar_repo.list_all(session)
         calendars = {}
         for r in cal_rows:
+            # One unreadable calendar used to raise here and stop the whole
+            # tick -- time triggers and alarms for every job (audit SEM-09).
+            # It is skipped (its jobs do not fire) and reported once.
             try:
                 parsed_dates = json.loads(r.dates_json) if r.dates_json else []
-            except json.JSONDecodeError:
-                parsed_dates = []
-            calendars[r.calendar_name] = Calendar(
-                calendar_name=r.calendar_name,
-                dates=parsed_dates,
-                description=r.description,
-            )
+                calendars[r.calendar_name] = Calendar(
+                    calendar_name=r.calendar_name,
+                    dates=parsed_dates,
+                    description=r.description,
+                )
+            except Exception as exc:
+                if r.calendar_name not in self._bad_calendars:
+                    self._bad_calendars.add(r.calendar_name)
+                    logger.error(f"Calendar {r.calendar_name!r} is unreadable and is skipped: "
+                                 f"{str(exc).splitlines()[0] if str(exc) else type(exc).__name__}")
         for row in get_triggered_jobs(rows, now, calendars):
             ev = Event(
                 event_type = "STARTJOB",

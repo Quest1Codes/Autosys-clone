@@ -48,6 +48,7 @@ from sqlalchemy import delete, insert, select, text
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import JilFileRow, JilStanzaRow
+from autosys.parser import export_formats
 from autosys.parser.jil_apply import ApplyResult, apply_operation
 from autosys.parser.jil_parser import JILOperation, JILParser
 
@@ -284,6 +285,11 @@ def ingest_text(
 
     has_nul = "\x00" in text
     parse_src = text.replace("\x00", "") if has_nul else text     # spans are line based
+    fmt = export_formats.detect(parse_src) if tolerant else None
+    if fmt is not None:                  # autocal_asc calendars / autorep -G globals
+        return _ingest_export(session, parse_src, fmt, report, path, encoding=encoding,
+                              sha256=sha256, size_bytes=size_bytes, dry_run=dry_run,
+                              archive=archive)
     ops = JILParser().parse_text(parse_src, tolerant=tolerant)
     if not tolerant:                     # strict parses do not carry source spans
         JILParser._attach_source(parse_src, ops, [])
@@ -362,6 +368,96 @@ def ingest_text(
                 relink_waiting_children(session)
     else:
         report.status = worst
+    report.n_issues = n_issues
+    return report
+
+
+def _ingest_export(session, text, fmt, report, path, *, encoding, sha256, size_bytes,
+                   dry_run, archive) -> FileReport:
+    """
+    Store an ``autocal_asc`` or ``autorep -G`` export (audit SEM-09, PARSER-07).
+
+    These used to be quarantined by the JIL lexer, so calendars and global
+    variables never reached the simulator. Each definition becomes one
+    archived stanza (directive ``calendar`` / ``extended_calendar`` /
+    ``set_global``), stored in its own savepoint like a JIL stanza.
+    """
+    import json as _json
+    from autosys.db.repository import calendars as cal_repo, globs as glob_repo
+    from autosys.db.schema import CalendarRow, GlobalVariableRow
+
+    blocks = (export_formats.parse_autocal(text) if fmt == "autocal"
+              else export_formats.parse_globals(text))
+    report.n_stanzas = len(blocks)
+    file_id = None
+    if archive and not dry_run:
+        old = session.execute(select(JilFileRow.file_id).where(JilFileRow.path == path)).scalar()
+        if old is not None:
+            session.execute(delete(JilStanzaRow).where(JilStanzaRow.file_id == old))
+            session.execute(delete(JilFileRow).where(JilFileRow.file_id == old))
+            session.flush()
+        frow = JilFileRow(path=path, sha256=sha256, size_bytes=size_bytes, encoding=encoding,
+                          n_stanzas=len(blocks), n_issues=0, status="OK")
+        session.add(frow)
+        session.flush()
+        file_id = frow.file_id
+
+    def store(b):
+        if b.kind == "calendar":
+            cal_repo.upsert(session, CalendarRow(calendar_name=b.name, dates_json=_json.dumps(b.dates)))
+            return "calendars"
+        if b.kind == "extended_calendar":
+            rules = "; ".join(f"{k}={v}" for k, v in b.attrs.items() if v)
+            cal_repo.upsert(session, CalendarRow(
+                calendar_name=b.name, dates_json="[]",
+                description=f"extended calendar (rules not simulated): {rules}"[:4000]))
+            return "calendars"
+        if b.value is not None and b.value.upper() == "DELETE":     # AutoSys: NAME=DELETE removes it
+            row = session.get(GlobalVariableRow, b.name.upper())
+            if row is not None:
+                session.delete(row)
+        else:
+            glob_repo.set(session, b.name, b.value or "")
+        return "globals"
+
+    rows, n_issues, worst = [], 0, "OK"
+    for seq, b in enumerate(blocks):
+        issues = list(b.issues)
+        if b.kind == "other":
+            disposition = ARCHIVE
+        else:
+            disposition = WARN if _worst(issues) == "warning" else LOADED
+            try:
+                if dry_run:
+                    counter = "calendars" if "calendar" in b.kind else "globals"
+                else:
+                    with session.begin_nested():
+                        counter = store(b)
+                        session.flush()
+                report.bump(counter)
+                report.results.append(("CALENDAR" if "calendar" in b.kind else "GLOBAL",
+                                       b.name, b.kind))
+            except Exception as exc:
+                issues.append({"severity": "error", "code": "apply_failed", "line": b.start_line,
+                               "message": _error_text(exc)})
+                report.bump("failed")
+                disposition = ARCHIVE
+        report.dispositions[disposition] = report.dispositions.get(disposition, 0) + 1
+        n_issues += sum(1 for i in issues if i.get("severity") != "info")
+        if issues and _worst(issues) == "warning" and worst == "OK":
+            worst = "WARN"
+        if file_id is not None:
+            rows.append({"file_id": file_id, "seq": seq, "start_line": b.start_line,
+                         "end_line": b.end_line, "directive": b.kind if b.kind != "other" else None,
+                         "object_name": _label(b.name, 255), "disposition": disposition,
+                         "raw_text": escape_nul(b.raw_text)[0], "raw_escaped": escape_nul(b.raw_text)[1],
+                         "issues_json": json.dumps(issues) if issues else None})
+    if file_id is not None:
+        if rows:
+            session.execute(insert(JilStanzaRow), rows)
+        frow.n_issues = n_issues
+        frow.status = worst
+    report.status = worst
     report.n_issues = n_issues
     return report
 
