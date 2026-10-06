@@ -1,0 +1,13 @@
+insert_job: ST_01   job_type: CMD
+command: /x
+machine: m1
+condition: s(ST_00)
+s(ST_99)
+insert_job: ST_02   job_type: CMD
+command: /x
+machine: m1
+sendevent -E FORCE_STARTJOB -J ST_02
+insert_job: ST_03   job_type: CMD
+command: /x
+machine: m1
+Job Name                                                         Last Start           Last End             ST Run/Ntry Pri/Xit

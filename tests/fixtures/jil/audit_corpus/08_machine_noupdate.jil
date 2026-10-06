@@ -1,0 +1,4 @@
+insert_machine: winhost01
+type: a
+node_name: 10.1.2.3
+port: 7600

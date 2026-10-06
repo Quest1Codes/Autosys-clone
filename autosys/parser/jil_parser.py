@@ -218,6 +218,27 @@ _INITIAL_STATUSES = frozenset({
 _MACHINE_INT_ATTRS: frozenset[str] = frozenset({"port", "max_load"})
 
 
+_TRUE_TOKENS = frozenset({"1", "y", "yes", "t", "true"})
+_FALSE_TOKENS = frozenset({"0", "n", "no", "f", "false"})
+
+
+def _bool_token_ok(raw: str) -> bool:
+    return raw.strip().lower() in _TRUE_TOKENS | _FALSE_TOKENS
+
+
+# Attributes JIL allows more than once, each occurrence adding a value
+# (another variable, argument or step). The separator is what the consumer
+# reads: envvars is parsed as a comma list (agent.runner.parse_envvars); the
+# rest are kept one value per line and written back one line each.
+_REPEATABLE_ATTRS: dict[str, str] = {
+    "envvars": ", ",
+    "sp_arg": "\n",
+    "sap_step_parms": "\n",
+    "ws_parameter": "\n",
+    "j2ee_parameter": "\n",
+}
+
+
 def _coerce(attr: str, raw: str) -> Any:
     """
     Convert a raw JIL attribute value string to the right Python type.
@@ -233,7 +254,11 @@ def _coerce(attr: str, raw: str) -> Any:
     values like ``start_times`` and ``days_of_week``.
     """
     if attr in _BOOL_ATTRS:
-        return raw.strip().lower() in ("1", "true", "yes")
+        # JIL documents y|n|1|0; hand-maintained JIL often uses y/n. Only the
+        # long forms used to count as true, so "date_conditions: y" switched a
+        # job's whole schedule off (audit SEM-13). Unknown tokens stay False
+        # and are flagged by the parse loop (_bool_token_ok).
+        return raw.strip().lower() in _TRUE_TOKENS
 
     if attr in _INT_ATTRS:
         try:
@@ -449,7 +474,22 @@ class JILParser:
         raw_attrs: dict[str, str] = {name_key: name_tok.value}
         coerced:   dict[str, Any] = {name_key: name_tok.value}
         null_attrs: list[str]     = []
+        seen_attrs: set[str]      = set()
         for attr, value in pairs:
+            repeated = attr in seen_attrs
+            seen_attrs.add(attr)
+            if (repeated and attr in _REPEATABLE_ATTRS and attr in coerced
+                    and value.strip().upper() != "NULL"):
+                # Each occurrence adds a value; keeping only the last one
+                # silently dropped every earlier envvar (audit PARSER-01).
+                sep = _REPEATABLE_ATTRS[attr]
+                raw_attrs[attr] = f"{raw_attrs[attr]}{sep}{value}"
+                coerced[attr] = f"{coerced[attr]}{sep}{value}"
+                continue
+            if repeated and tol and attr not in _REPEATABLE_ATTRS:
+                issues.append({"severity": "warning", "code": "repeated_attribute",
+                               "message": f"{attr!r} given more than once; the last value is used",
+                               "line": source_line})
             raw_attrs[attr] = value                 # last one wins here;
             #                                        attr_pairs keeps them all
             if op_code in ("insert", "update", "override") and value.strip().upper() == "NULL":
@@ -468,6 +508,10 @@ class JILParser:
                                    "message": str(exc), "line": source_line})
                 continue
             coerced[attr] = _coerce(attr, value)
+            if tol and attr in _BOOL_ATTRS and not _bool_token_ok(value):
+                issues.append({"severity": "warning", "code": "invalid_boolean",
+                               "message": f"{attr}: {value!r} is not y/n/1/0; read as false",
+                               "line": source_line})
         if null_attrs:
             for attr in null_attrs:
                 coerced.pop(attr, None)

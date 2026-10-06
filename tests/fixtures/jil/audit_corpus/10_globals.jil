@@ -1,0 +1,2 @@
+sendevent -E SET_GLOBAL -G "GL_READY=Y"
+sendevent -E SET_GLOBAL -G "PROC_DATE=20250101"

@@ -1,0 +1,65 @@
+# hash comment line
+/* multi
+   line comment */
+insert_job: LX_01   job_type: c
+command: echo hello   machine: m1   owner: u1
+description: "has /* not a comment */ inside"
+	
+insert_job: LX_02 job_type: CMD
+COMMAND: /bin/ls /tmp/*/x
+Machine: m1
+DATE_CONDITIONS: 1
+Days_Of_Week: MO,TU
+Start_Times: 10:00
+insert_job: LX_03   job_type: b
+start_times: "10:00","11:30"
+days_of_week: mo, we, fr
+date_conditions: 1
+insert_job: LX_04   job_type: f
+watch_file: /tmp/x.dat
+machine: m1
+insert_job: LX_05   job_type: CMD
+command: curl http://host:8080/api?x=1
+machine: m1
+insert_job: LX_06   job_type: CMD
+command: "curl http://host:8080/api?x=1"
+machine: m1
+insert_job: LX_07   job_type: CMD
+command: echo a   # trailing hash is not a comment
+machine: m1   
+insert_job: LX_08   job_type: CMD
+command: /bin/run.sh owner: x
+machine: m1
+insert_job: LX_09   job_type: CMD
+command: myscript.sh --status: ok --type: full
+machine: m1
+insert_job: LX_10   job_type: CMD
+command: myscript.sh --condition:x
+machine: m1
+insert_job: LX_11   job_type: CMD
+command: sqlplus -s user/pw@db @/sql/x.sql
+machine: m1
+condition: s(LX_01) &
+  s(LX_02)
+insert_job: LX_12   job_type: CMD
+command: echo "start
+middle"
+machine: m1
+insert_job: LX_13   job_type: CMD
+command: /x.sh
+machine: m1
+std_out_file: "C:\logs\out.txt"
+std_err_file: C:\logs\err.txt
+insert_job: LX_14   job_type: CMD
+command: /x.sh
+machine: m1
+start_times: 10\:00
+run_window: 22:00-02:00
+insert_job: LX_15   job_type: CMD
+command: /x.sh
+machine: m1
+description: Server type: web tier
+insert_job: LX_16   job_type: CMD
+command: /x.sh
+machine: m1
+description: see machine: m2 for details

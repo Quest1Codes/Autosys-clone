@@ -1,0 +1,164 @@
+insert_job: JT_FT   job_type: FT
+machine: m1
+watch_file: /data/trigger.dat
+watch_file_type: CREATE
+continuous: 1
+insert_job: JT_FTP   job_type: FTP
+machine: m1
+owner: ftpuser@m1
+ftp_server_name: ftp.bank.com
+ftp_server_port: 21
+ftp_transfer_direction: UPLOAD
+ftp_transfer_type: A
+ftp_remote_name: /in/file.txt
+ftp_local_name: /out/file.txt
+ftp_use_SSL: Y
+insert_job: JT_SCP   job_type: SCP
+machine: m1
+scp_protocol: SFTP
+scp_server_name: sftp.bank.com
+scp_remote_dir: /in
+scp_remote_name: file.txt
+scp_local_name: /out/file.txt
+scp_transfer_direction: PUT
+insert_job: JT_SFTP   job_type: SFTP
+machine: m1
+command: x
+insert_job: JT_SQL   job_type: SQL
+machine: m1
+connect_string: "jdbc:oracle:thin:@dbhost:1521:ORCL"
+sql_command: "SELECT count(*) FROM t WHERE d = 'x'"
+destination_file: /tmp/out.txt
+success_criteria: count > 0
+user_role: dbuser
+insert_job: JT_DBTRIG   job_type: DBTRIG
+machine: m1
+dbtype: Oracle
+tablename: GL_POST
+trigger_type: INSERT
+trigger_cond: "amount > 1000"
+connect_string: "jdbc:oracle:thin:@dbhost:1521:ORCL"
+insert_job: JT_DBMON   job_type: DBMON
+machine: m1
+monitor_type: INCREASE
+tablename: GL_POST
+insert_job: JT_HTTP   job_type: HTTP
+machine: m1
+provider_url: "https://api.bank.com/v1/run"
+method_name: POST
+invocation_type: REST
+insert_job: JT_WS   job_type: WBSVC
+machine: m1
+WSDL_URL: "http://ws.bank.com/svc?wsdl"
+service_name: GLService
+port_name: GLPort
+wsdl_operation: post
+insert_job: JT_I5   job_type: I5
+machine: as400
+i5_name: GLPGM
+i5_lib: GLLIB
+i5_action: CALL_PROGRAM
+insert_job: JT_SAP   job_type: SAP
+machine: sapagent
+sap_job_name: ZGL_POST
+sap_client: 100
+sap_step_parms: abap_name=ZGL,variant=V1
+insert_job: JT_PS   job_type: PS
+machine: psagent
+ps_process_name: GLPOST
+ps_process_type: "Application Engine"
+ps_run_cntrl_id: RC1
+insert_job: JT_OMCPU   job_type: OMCPU
+machine: m1
+cpu_usage: USED
+inside_range: 1
+lower_boundary: 0
+upper_boundary: 90
+insert_job: JT_OMP   job_type: OMP
+machine: m1
+process_name: java
+process_status: RUNNING
+insert_job: JT_OMD   job_type: OMD
+machine: m1
+disk_drive: /data
+disk_space: FREE
+disk_format: GB
+lower_boundary: 10
+insert_job: JT_OMS   job_type: OMS
+machine: winhost
+win_service_name: Spooler
+win_service_status: RUNNING
+insert_job: JT_POJO   job_type: POJO
+machine: m1
+class_name: com.bank.Job
+method_name: run
+insert_job: JT_JMX   job_type: JMXMOP
+machine: m1
+mbean_name: "com.bank:type=X"
+mbean_operation: reset
+insert_job: JT_JMSPUB   job_type: JMSPUB
+machine: m1
+destination_name: Q1
+insert_job: JT_INFA   job_type: INFORMATICA
+machine: m1
+informatica_folder_name: GL
+informatica_workflow_name: wf_post
+insert_job: JT_HADOOP   job_type: OOZIE
+machine: m1
+oozie_job_props: x=y
+insert_job: JT_HIVE   job_type: HIVE
+machine: m1
+insert_job: JT_ZOS   job_type: ZOS
+machine: mf
+zos_jobname: GLJOB
+jcl_library: GL.JCL
+jcl_member: GLPOST
+insert_job: JT_OACOPY   job_type: OASINGLE
+machine: m1
+oracle_appl_name: SQLGL
+oracle_program: GLPOST
+insert_job: JT_UDEF   job_type: MYCUSTOM
+machine: m1
+command: x
+insert_job: JT_PROXY   job_type: PROXY
+machine: m1
+insert_job: JT_SQLAGENT   job_type: SQLAGENT
+machine: m1
+sqlagent_jobname: NightlyBackup
+insert_job: JT_CMDLOWER   job_type: cmd
+command: x
+machine: m1
+insert_job: JT_FWLOWER   job_type: fw
+watch_file: /x
+machine: m1
+insert_job: JT_WOL   job_type: WOL
+machine: m1
+mac_address: 00:11:22:33:44:55
+insert_job: JT_SNMP   job_type: SNMPGET
+machine: m1
+snmp_host: router1
+snmp_oid: 1.3.6.1.2.1.1.1.0
+insert_job: JT_OMTF   job_type: OMTF
+machine: m1
+text_file_name: /var/log/app.log
+text_file_filter: ERROR
+text_file_mode: CONTINUOUS
+insert_job: JT_OMEL   job_type: OMEL
+machine: winhost
+win_log_name: Application
+win_event_type: ERROR
+insert_job: JT_OMIP   job_type: OMIP
+machine: m1
+ip_host: dbhost
+ip_port: 1521
+insert_job: JT_DBPROC   job_type: DBPROC
+machine: m1
+sp_name: GL.POST_PROC
+sp_arg: name=p1,argtype=IN,datatype=VARCHAR,value=X
+insert_job: JT_SAPBW   job_type: SAPBWPC
+machine: sapagent
+sap_chain_id: ZCHAIN
+insert_job: JT_PAPROC   job_type: PAPROC
+machine: m1
+insert_job: JT_MF   job_type: MICROFOCUS
+machine: m1

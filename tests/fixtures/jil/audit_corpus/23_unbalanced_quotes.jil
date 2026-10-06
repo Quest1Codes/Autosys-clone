@@ -1,0 +1,15 @@
+insert_job: UQ_01   job_type: CMD
+description: "Loads the 12" monitor feed
+command: /x
+machine: m1
+condition: s(UQ_00)
+alarm_if_fail: 1
+insert_job: UQ_02   job_type: CMD
+command: echo "abc
+machine: m1
+insert_job: UQ_03   job_type: CMD
+command: "C:\Program Files\App\run.exe" -x
+machine: m1
+insert_job: UQ_04   job_type: CMD
+command: "/apps/my script.sh"
+machine: m1

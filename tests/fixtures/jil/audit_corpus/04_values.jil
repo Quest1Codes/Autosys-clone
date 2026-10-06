@@ -1,0 +1,48 @@
+insert_job: VB_01   job_type: CMD
+command: /x.sh
+machine: m1
+date_conditions: y
+alarm_if_fail: y
+alarm_if_terminated: Y
+box_terminator: y
+job_terminator: y
+auto_hold: y
+insert_job: VB_02   job_type: CMD
+command: /x.sh
+machine: m1
+date_conditions: n
+alarm_if_fail: 0
+auto_hold: 1
+auto_delete: 0
+insert_job: VB_03   job_type: CMD
+command: /x.sh
+machine: m1
+permission:
+description: ""
+n_retrys: 
+max_run_alarm: 0
+term_run_time: 0
+job_load: 0
+priority: 0
+insert_job: VB_04   job_type: CMD
+command: /x.sh
+machine: m1
+n_retrys: 25
+max_run_alarm: 1.5
+watch_interval: 0
+job_load: -1
+priority: high
+auto_delete: 48
+insert_job: VB_05   job_type: CMD
+command: /x.sh
+machine: m1
+start_times: "25:00"
+days_of_week: mon,tue
+run_window: "bogus"
+insert_job: VB_06   job_type: CMD
+command: /x.sh
+machine: m1
+timezone: "Europe/London"
+must_start_times: "02:15, 03:15"
+must_complete_times: "04:00"
+max_exit_success: 2

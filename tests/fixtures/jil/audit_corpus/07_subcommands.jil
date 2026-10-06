@@ -1,0 +1,95 @@
+insert_machine: prdhost01
+type: a
+node_name: prdhost01.bank.com
+port: 7520
+max_load: 80
+factor: 1.5
+opsys: aix
+agent_name: WA_AGENT
+heartbeat_attempts: 5
+description: "Prod GL host"
+
+insert_machine: winhost01
+type: a
+opsys: windows
+node_name: 10.1.2.3
+port: 7600
+
+insert_machine: VPOOL
+type: v
+machine: prdhost01
+max_load: 40
+factor: 1
+machine: winhost01
+max_load: 20
+
+update_machine: winhost01
+max_load: 30
+
+insert_machine: legacy_r4
+type: r
+
+insert_machine: winlegacy
+type: n
+
+insert_resource: GL_DB
+res_type: R
+amount: 5
+description: "GL DB connections"
+
+insert_resource: LIC_POOL
+res_type: D
+amount: 10
+machine: prdhost01
+
+insert_resource: THRESH
+res_type: T
+amount: 100
+
+update_resource: GL_DB
+description: "only desc changed"
+
+insert_xinst: PRD_INST2
+xtype: a
+xmachine: autosys2.bank.com
+xport: 9000
+xmanager: ACE
+xcrypt_type: AES
+
+insert_job_type: MYTYPE
+description: "custom"
+command: /opt/plugins/mytype.sh
+
+insert_job: SUB_J1   job_type: CMD
+command: /x.sh
+machine: prdhost01
+owner: svc@prdhost01
+
+update_job: SUB_J1
+command: /y.sh
+n_retrys: 2
+description: NULL
+
+override_job: SUB_J1
+machine: winhost01
+
+insert_job: SUB_J2   job_type: CMD
+command: /x.sh
+machine: prdhost01
+
+delete_job: SUB_J2
+
+insert_job: SUB_BOX   job_type: BOX
+insert_job: SUB_C1   job_type: CMD
+box_name: SUB_BOX
+command: /x
+machine: prdhost01
+delete_box: SUB_BOX
+
+insert_job: SUB_J3   job_type: CMD
+command: /x
+machine: prdhost01
+update_job: SUB_J3   job_type: BOX
+
+rename_job: SUB_J1
+new_name: SUB_J1_NEW

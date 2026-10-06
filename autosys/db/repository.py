@@ -78,7 +78,10 @@ def _chunks(names):
 
 # Pydantic fields that are list[str] in memory but stored as comma-separated
 # strings in the DB (mirrors how real AutoSys stores them in Oracle).
-_LIST_ATTRS = frozenset({"days_of_week", "start_times", "start_mins"})
+# start_mins is NOT one of them: Job.start_mins is already the string
+# "0,15,30,45", and joining a string joins its characters -- it was stored as
+# "0,,,1,5,,,3,0,,,4,5" (audit PARSER-02).
+_LIST_ATTRS = frozenset({"days_of_week", "start_times"})
 
 # Columns that exist on JobRow but are runtime state (not JIL definitions)
 # — we never overwrite these during an import.
@@ -107,7 +110,8 @@ def _job_to_row_kwargs(job: Job) -> dict:
     for key in _LIST_ATTRS:
         if key in data:
             lst = data[key]
-            data[key] = ",".join(lst) if lst else None
+            if isinstance(lst, (list, tuple)):
+                data[key] = ",".join(lst) if lst else None
 
     # Remove runtime state fields — they default in the DB and must not be
     # overwritten by an import.

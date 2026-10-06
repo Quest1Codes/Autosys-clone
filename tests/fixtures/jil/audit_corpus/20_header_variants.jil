@@ -1,0 +1,19 @@
+insert_job: HV_BOX job_type: b
+insert_job: HV_01 job_type: c box_name: HV_BOX machine: m1, m2 command: /x.sh -a
+insert_job: HV_02   job_type: CMD   owner: u1   status: ON_ICE
+command: /x
+machine: m1
+insert_job: HV_03   job_type: CMD
+command: /x
+machine: m1   status: ON_HOLD
+insert_job: HV_04   job_type: CMD
+command: /x
+machine: m1
+owner: u2   permission: gx,wx   group: G1
+insert_job:HV_05 job_type:CMD
+command:/x
+machine:m1
+insert_job: HV_06   job_type: CMD
+command: /x
+machine: m1
+start_times: "10:00"   days_of_week: mo

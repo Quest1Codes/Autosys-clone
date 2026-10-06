@@ -1,0 +1,40 @@
+insert_job: RP_ENV   job_type: CMD
+command: /x.sh
+machine: m1
+envvars: A=1
+envvars: B=2
+envvars: C=3
+insert_job: RP_SP   job_type: DBPROC
+machine: m1
+sp_name: GL.P
+sp_arg: name=p1,argtype=IN,datatype=VARCHAR,value=X
+sp_arg: name=p2,argtype=OUT,datatype=INTEGER
+insert_job: RP_WS   job_type: WSDOC
+machine: m1
+ws_parameter: xpath=/a,value=1
+ws_parameter: xpath=/b,value=2
+insert_job: RP_SAP   job_type: SAP
+machine: m1
+sap_job_name: Z
+sap_step_parms: abap_name=ZA,variant=V1
+sap_step_parms: abap_name=ZB,variant=V2
+insert_job: RP_COND   job_type: CMD
+command: /x.sh
+machine: m1
+condition: s(A)
+condition: s(B)
+insert_job: RP_RES   job_type: CMD
+command: /x.sh
+machine: m1
+resources: (R1,QUANTITY=1,FREE=Y)
+resources: (R2,QUANTITY=3,FREE=N)
+insert_job: RP_POJO   job_type: POJO
+machine: m1
+class_name: X
+j2ee_parameter: String="a"
+j2ee_parameter: Integer="2"
+insert_job: RP_NOTIF   job_type: CMD
+command: /x.sh
+machine: m1
+notification_emailaddress: a@bank.com
+notification_emailaddress: b@bank.com

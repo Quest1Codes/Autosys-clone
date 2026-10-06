@@ -1,0 +1,4 @@
+insert_job: ENC_U8   job_type: CMD
+command: echo "Zürich Größe – €"
+machine: m1
+description: "Société Générale – 東京 job"

@@ -1,0 +1,4 @@
+insert_calendar: CAL_A
+dates: 2025-01-01,2025-07-04
+insert_glob: GLOB_A
+global_value: Y

@@ -1,0 +1,4 @@
+insert_job: LX_CRLF   job_type: CMD
+command: /x.sh  
+machine: m1	
+days_of_week: all

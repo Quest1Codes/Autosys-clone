@@ -1,0 +1,93 @@
+
+
+/* ----------------- PRD_BOX_01 ----------------- */ 
+
+insert_job: PRD_BOX_01   job_type: BOX 
+owner: svcbatch@prdhost01
+permission: gx,ge,wx
+date_conditions: 1
+days_of_week: all
+start_times: "02:00, 14:30"
+run_calendar: BUS_DAYS
+exclude_calendar: US_HOLIDAYS
+description: "Nightly \"core\" box: GL # posting"
+box_success: s(PRD_CMD_01) & s(PRD_CMD_02)
+box_failure: f(PRD_CMD_01) | t(PRD_CMD_02)
+alarm_if_fail: 1
+alarm_if_terminated: 1
+timezone: US/Eastern
+application: GL
+group: FINANCE
+must_start_times: "02:15"
+must_complete_times: "+120"
+run_window: "01:00-05:00"
+max_run_alarm: 300
+min_run_alarm: 5
+auto_hold: 0
+send_notification: 1
+notification_emailaddress: ops@bank.com
+notification_msg: "Box failed"
+notification_alarm_types: MAXRUN,MINRUN
+
+
+/* ----------------- PRD_CMD_01 ----------------- */ 
+
+insert_job: PRD_CMD_01   job_type: CMD 
+box_name: PRD_BOX_01
+command: /apps/gl/bin/post.sh -d $$PROC_DATE -m "a b"
+machine: prdhost01, prdhost02
+owner: svcbatch@prdhost01
+permission: gx,ge
+date_conditions: 0
+condition: s(PRD_UPSTREAM) & v(GL_READY) = "Y" & e(PRD_X) < 4
+std_in_file: /dev/null
+std_out_file: >>/logs/gl/post.out
+std_err_file: ">>/logs/gl/post.err"
+profile: /apps/gl/.profile
+envvars: GL_HOME=/apps/gl
+envvars: GL_MODE=batch
+envvars: "PATH=/usr/bin:/bin"
+resources: (GL_DB, QUANTITY=2, FREE=Y) AND (LICENSE_POOL, QUANTITY=1, FREE=A)
+job_load: 25
+priority: 10
+n_retrys: 3
+term_run_time: 600
+max_exit_success: 4
+success_codes: 0-4,8
+fail_codes: 5,6,7
+box_terminator: 1
+job_terminator: 1
+auto_delete: -1
+interactive: 0
+ulimit: c=unlimited,n=4096
+chk_files: /apps 1000 /logs 500
+heartbeat_interval: 10
+alarm_if_fail: 1
+alarm_if_terminated: 1
+elevated: 1
+
+
+/* ----------------- PRD_CMD_02 ----------------- */ 
+
+insert_job: PRD_CMD_02   job_type: CMD 
+box_name: PRD_BOX_01
+command: C\:\apps\run.bat "D\:\data\in" 
+machine: winhost01
+owner: svcwin@BANKDOM
+start_mins: 0,15,30,45
+days_of_week: mo,tu,we,th,fr
+date_conditions: 1
+condition: s(PRD_CMD_01, 02.00) | n(PRD_Z)
+
+
+/* ----------------- PRD_FW_01 ----------------- */ 
+
+insert_job: PRD_FW_01   job_type: FW 
+machine: prdhost01
+owner: svcbatch@prdhost01
+watch_file: /data/in/gl_*.dat
+watch_interval: 30
+watch_file_min_size: 1024
+watch_no_change: 2
+term_run_time: 120
+

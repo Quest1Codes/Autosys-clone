@@ -1,0 +1,19 @@
+insert_job: D_A   job_type: CMD
+command: /x
+machine: m1
+insert_job: D_B_SHORT   job_type: CMD
+command: /x
+machine: m1
+condition: s(D_A)
+insert_job: D_C_SHORT   job_type: CMD
+command: /x
+machine: m1
+condition: s(D_B_SHORT)
+insert_job: D_B_LONG   job_type: CMD
+command: /x
+machine: m1
+condition: success(D_A)
+insert_job: D_C_LONG   job_type: CMD
+command: /x
+machine: m1
+condition: success(D_B_LONG)

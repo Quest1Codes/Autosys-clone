@@ -1,0 +1,12 @@
+calendar: US_HOLIDAYS
+01/01/2025 00:00
+07/04/2025 00:00
+12/25/2025 00:00
+
+extended_calendar: BUS_DAYS
+workday: mo,tu,we,th,fr
+non_workday:
+holiday: US_HOLIDAYS
+cyccal:
+adjust: 0
+condition: WORKD

@@ -1,0 +1,4 @@
+insert_job: ENC_CP   job_type: CMD
+command: echo "Zürich Größe – €"
+machine: m1
+description: "Société Générale –  job"

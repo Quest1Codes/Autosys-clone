@@ -260,8 +260,11 @@ def job_to_jil(job: Job, op: str = "insert") -> str:
     # Extras (attributes without a dedicated field): after the known ones, in
     # insertion order, so round trips do not lose them.
     for k, v in extras.items():
-        fv = _format_value(str(v)) if v is not None else None
-        attrs.append((k, fv if fv is not None else '""'))
+        # A repeatable attribute (sp_arg, ws_parameter, ...) holds one value
+        # per line; write each back as its own line, as it was imported.
+        for part in (str(v).split("\n") if v is not None else [None]):
+            fv = _format_value(part) if part is not None else None
+            attrs.append((k, fv if fv is not None else '""'))
 
     for attr, value in attrs:
         lines.append(f"{attr}: {value}")

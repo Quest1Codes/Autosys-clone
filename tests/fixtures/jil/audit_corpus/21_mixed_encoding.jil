@@ -1,0 +1,7 @@
+insert_job: MIX_1   job_type: CMD
+command: echo Zürich
+machine: m1
+description: "Société"
+insert_job: MIX_2   job_type: CMD
+command: echo caf�
+machine: m1

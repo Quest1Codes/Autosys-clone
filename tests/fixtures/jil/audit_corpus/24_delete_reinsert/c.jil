@@ -1,0 +1,3 @@
+insert_job: DR_X   job_type: CMD
+command: /new
+machine: m2
