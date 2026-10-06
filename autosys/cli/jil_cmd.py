@@ -153,7 +153,7 @@ def jil_import(file: Path, dry_run: bool, quiet: bool, strict: bool) -> None:
                 # stanza about the same object (insert_x then update_x)
                 # sees this one.
                 session.flush()
-                result = apply_operation(session, op, dry_run=dry_run)
+                result = apply_operation(session, op, dry_run=dry_run, read_files=True)
                 results.append((result.action, result.name, result.detail))
                 if result.counter:
                     counters[result.counter] = counters.get(result.counter, 0) + result.count
@@ -166,7 +166,7 @@ def jil_import(file: Path, dry_run: bool, quiet: bool, strict: bool) -> None:
     from autosys.parser.jil_ingest import ingest_file
 
     with sync_session() as session:
-        report = ingest_file(session, file, dry_run=dry_run)
+        report = ingest_file(session, file, dry_run=dry_run, read_files=True)
 
     for issue in report.issues:            # file-level (unreadable, odd encoding, ...)
         _console.print(f"  [yellow]{issue['code']}[/yellow]: {issue['message']}")
@@ -321,11 +321,16 @@ def jil_validate(file: Path, quiet: bool, strict: bool) -> None:
               show_default=True,
               help="When a job is defined twice: keep the first (later archived as "
                    "DUPLICATE) or let the last overwrite. Both stay in the archive.")
+@click.option("--replace-estate", is_flag=True, default=False,
+              help="PATH is a new full export that replaces the estate: changed jobs take "
+                   "the new definition and jobs not in it are removed. Each removal is "
+                   "archived with its last definition. Implies --duplicates last.")
 @click.option("--commit-every", default=200, show_default=True, help="Files per commit.")
 @click.option("--report", "report_path", type=click.Path(path_type=Path), default=None,
               help="Write the JSON summary here.")
 @click.option("--quiet", "-q", is_flag=True, default=False)
-def jil_import_dir(path: Path, pattern: str, excludes: tuple, duplicates: str, commit_every: int,
+def jil_import_dir(path: Path, pattern: str, excludes: tuple, duplicates: str,
+                   replace_estate: bool, commit_every: int,
                    report_path: Path, quiet: bool) -> None:
     """
     Ingest every JIL file under PATH without losing anything.
@@ -352,13 +357,17 @@ def jil_import_dir(path: Path, pattern: str, excludes: tuple, duplicates: str, c
             _console.print(f"  {n}/{len(files)} files")
 
     summary = ingest_paths(sync_session, files, commit_every=commit_every,
-                           duplicates=duplicates, progress=_tick)
+                           duplicates=duplicates, progress=_tick,
+                           replace_estate=replace_estate)
     data = summary.as_dict()
     if report_path:
         report_path.write_text(json.dumps(data, indent=2))
     _console.print(f"[bold]{data['files']}[/bold] files, [bold]{data['stanzas']}[/bold] stanzas")
     for k, v in sorted(data["dispositions"].items()):
         _console.print(f"  {k:<22}{v}")
+    if replace_estate and not summary.aborted:
+        _console.print(f"  {'removed (not in export)':<22}{len(summary.removed_jobs)}"
+                       + ("  — archived under reconcile:<time>" if summary.removed_jobs else ""))
 
     if summary.aborted:
         _err.print(

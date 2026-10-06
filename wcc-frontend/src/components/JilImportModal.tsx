@@ -132,7 +132,7 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
     const results: FolderFileResult[] = folderFiles.map(f => ({ name: f.name, status: 'pending', detail: '' }));
     setFolderResults([...results]);
 
-    let ok = 0, failed = 0, quarantinedTotal = 0, warningsTotal = 0;
+    let ok = 0, failed = 0, quarantinedTotal = 0, warningsTotal = 0, notStoredTotal = 0;
     let anyRealSuccess = false;
     for (let i = 0; i < folderFiles.length; i++) {
       try {
@@ -143,11 +143,13 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
           if (!dryRun) anyRealSuccess = true;
           quarantinedTotal += res.n_quarantined;
           warningsTotal += res.n_warnings;
+          notStoredTotal += res.n_failed ?? 0;
           results[i] = {
             name: folderFiles[i].name,
-            status: (res.n_quarantined > 0 || res.n_warnings > 0) ? 'warn' : 'ok',
+            status: res.n_failed ? 'error' : (res.n_quarantined > 0 || res.n_warnings > 0) ? 'warn' : 'ok',
             detail: `+${res.n_inserted} ~${res.n_updated} -${res.n_deleted}`
               + `${res.n_machines ? ` 🖥${res.n_machines}` : ''}`
+              + `${res.n_failed ? ` ✗${res.n_failed} not stored` : ''}`
               + `${res.n_quarantined ? ` ⛔${res.n_quarantined} quarantined` : ''}`
               + `${res.n_warnings ? ` ⚠${res.n_warnings} warning${res.n_warnings !== 1 ? 's' : ''}` : ''}`,
           };
@@ -168,13 +170,14 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
     // ok/failed alone hides quarantined stanzas -- a file with a bad stanza
     // still reports "ok" (the request succeeded, most of the file didn't).
     const flags = [
+      notStoredTotal ? `✗ ${notStoredTotal} stanza${notStoredTotal !== 1 ? 's' : ''} not stored` : '',
       quarantinedTotal ? `⛔ ${quarantinedTotal} stanza${quarantinedTotal !== 1 ? 's' : ''} quarantined` : '',
       warningsTotal ? `⚠ ${warningsTotal} loaded with a warning` : '',
     ].filter(Boolean).join(', ');
     showToast(
       `${dryRun ? 'Dry-run' : 'Import'} complete: ${ok} ok, ${failed} failed`
         + (flags ? ` — ${flags} (see the per-file rows for which)` : ''),
-      failed || quarantinedTotal ? 'error' : warningsTotal ? 'info' : 'success'
+      failed || quarantinedTotal || notStoredTotal ? 'error' : warningsTotal ? 'info' : 'success'
     );
     if (anyRealSuccess) onImported();
   };
@@ -342,7 +345,7 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
               ) : (
                 <>
                   <div style={{ display: 'flex', gap: 16, fontSize: 11, marginBottom: 6, color: '#444' }}>
-                    <span>✅ Success</span>
+                    <span>{result.n_failed > 0 ? '⚠ Completed — some stanzas not stored' : '✅ Success'}</span>
                     {mode === 'import' && (
                       <>
                         <span style={{ color: ACTION_COLOR.INSERTED }}>+{result.n_inserted} inserted</span>
@@ -353,11 +356,12 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
                     {result.n_machines > 0 && <span style={{ color: ACTION_COLOR.MACHINE }}>🖥 {result.n_machines} machines</span>}
                     {result.n_warnings > 0 && <span style={{ color: '#B8860B' }}>⚠ {result.n_warnings} loaded with a warning</span>}
                     {result.n_quarantined > 0 && <span style={{ color: '#CC0000' }}>⛔ {result.n_quarantined} quarantined</span>}
+                    {result.n_failed > 0 && <span style={{ color: '#CC0000' }}>✗ {result.n_failed} not stored</span>}
                   </div>
                   {/* success=true only means the request didn't fail outright -- a
                       stanza can still be quarantined or loaded with a warning within
                       it, so that needs its own, separate, harder-to-miss notice. */}
-                  {(result.n_quarantined > 0 || result.n_warnings > 0) && (
+                  {(result.n_quarantined > 0 || result.n_warnings > 0 || result.n_failed > 0) && (
                     <div style={{
                       marginBottom: 6, padding: '6px 10px', borderRadius: 3,
                       background: '#FFF6E5', border: '1px solid #F0C36D', fontSize: 11, color: '#7A5B00',
@@ -366,6 +370,11 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
                         <div>⛔ {result.n_quarantined} stanza{result.n_quarantined !== 1 ? 's' : ''} could not
                           be read as JIL and {result.n_quarantined !== 1 ? 'were' : 'was'} quarantined (archived
                           verbatim, not imported) — see the row(s) below.</div>
+                      )}
+                      {result.n_failed > 0 && (
+                        <div>✗ {result.n_failed} stanza{result.n_failed !== 1 ? 's' : ''} parsed but could
+                          not be stored by the database (archived verbatim, NOT loaded) — see the
+                          SKIPPED row(s) below.</div>
                       )}
                       {result.n_warnings > 0 && (
                         <div>⚠ {result.n_warnings} stanza{result.n_warnings !== 1 ? 's' : ''} loaded with

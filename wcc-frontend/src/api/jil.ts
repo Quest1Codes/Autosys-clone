@@ -17,6 +17,8 @@ export interface JILImportResponse {
   // about these -- a "successful" import can still have quarantined stanzas.
   n_quarantined: number;
   n_warnings: number;
+  // Parsed but refused by the database: archived, NOT loaded.
+  n_failed: number;
   error?: string;
 }
 

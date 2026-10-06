@@ -35,7 +35,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, func, text
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from autosys.models.enums import JobStatus
@@ -219,8 +219,28 @@ class JobRepository:
         row: Optional[JobRow] = session.get(JobRow, job_name)
         if row is None:
             return False
+        self._clear_dependents(session, job_name)
         session.delete(row)
         return True
+
+    @staticmethod
+    def _clear_dependents(session: Session, job_name: str) -> None:
+        """
+        Remove what would block deleting *job_name* (audit ING-13).
+
+        Alarms and captured output reference the job (and its runs) with
+        NOT NULL foreign keys and no cascade, so a job that had ever raised an
+        alarm or produced output could not be deleted: the delete failed and
+        the job stayed. Monitors and blobs only point at it, so they are
+        unlinked, not deleted. Runs cascade through the ORM relationship.
+        """
+        runs = select(JobRunRow.run_id).where(JobRunRow.job_name == job_name)
+        session.execute(delete(AlarmRow).where(
+            or_(AlarmRow.job_name == job_name, AlarmRow.run_id.in_(runs))))
+        session.execute(delete(JobOutputRow).where(
+            or_(JobOutputRow.job_name == job_name, JobOutputRow.run_id.in_(runs))))
+        for model in (MonitorRow, BlobRow):
+            session.execute(update(model).where(model.job_name == job_name).values(job_name=None))
 
     def rename(self, session: Session, old_name: str, new_name: str) -> bool:
         """
@@ -247,15 +267,10 @@ class JobRepository:
 
         session.flush()
 
-        from autosys.db.connection import is_sqlite
-        _is_sqlite = is_sqlite()
-        try:
-            if _is_sqlite:
-                session.execute(text("PRAGMA foreign_keys=OFF"))
-            else:
-                session.execute(text("SET session_replication_role = 'replica'"))
-        except Exception:
-            pass    # best-effort; the insert-then-repoint order below does not need it
+        # No FK toggling: the insert-then-repoint order below is FK-safe as is.
+        # The PostgreSQL toggle (SET session_replication_role) needs superuser;
+        # under the bundle's role it failed and aborted the transaction, so
+        # every rename failed on PostgreSQL (audit ING-03).
 
         # Insert a full copy of the row under new_name.
         cols = {c.name: getattr(row, c.name) for c in JobRow.__table__.columns
@@ -282,21 +297,17 @@ class JobRepository:
         # old_name is now unreferenced -- safe to drop.
         session.execute(JobRow.__table__.delete().where(JobRow.job_name == old_name))
 
-        try:
-            if _is_sqlite:
-                session.execute(text("PRAGMA foreign_keys=ON"))
-            else:
-                session.execute(text("SET session_replication_role = 'origin'"))
-        except Exception:
-            pass
-
-        # Update condition strings (safe, no FK involved)
-        all_jobs = session.scalars(
-            select(JobRow).where(JobRow.condition.isnot(None))
-        ).all()
-        for j in all_jobs:
-            if j.condition and old_name in j.condition:
-                j.condition = j.condition.replace(old_name, new_name)
+        # Repoint references in other jobs' conditions, token by token
+        # (audit ING-04: str.replace turned s(job_ab) into s(job_xb)).
+        from autosys.analysis.condition_refs import rename_job_refs
+        cond_cols = (JobRow.condition, JobRow.box_success, JobRow.box_failure)
+        for j in session.scalars(select(JobRow).where(or_(
+                *(c.contains(old_name, autoescape=True) for c in cond_cols)))):
+            for c in cond_cols:
+                value = getattr(j, c.key)
+                renamed = rename_job_refs(value, old_name, new_name)
+                if renamed != value:
+                    setattr(j, c.key, renamed)
 
         return True
 
@@ -310,14 +321,23 @@ class JobRepository:
         if row is None:
             return 0
 
-        children = session.scalars(
-            select(JobRow).where(JobRow.box_name == box_name)
-        ).all()
-        count = 1 + len(children)  # box + children
+        # Every level of nesting, not only direct children (audit ING-13:
+        # grandchildren in a nested box were left behind).
+        levels: list[list[str]] = [[box_name]]
+        seen = {box_name}
+        while levels[-1]:
+            nxt = [n for n in session.scalars(
+                select(JobRow.job_name).where(JobRow.box_name.in_(levels[-1]))) if n not in seen]
+            seen.update(nxt)
+            levels.append(nxt)
 
-        for child in children:
-            session.delete(child)
-        session.delete(row)
+        count = 0
+        for level in reversed(levels):           # deepest first, so no FK points at a deleted box
+            for name in level:
+                self._clear_dependents(session, name)
+                session.delete(session.get(JobRow, name))
+                count += 1
+            session.flush()
         return count
 
     # ------------------------------------------------------------------

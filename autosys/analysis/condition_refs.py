@@ -30,7 +30,8 @@ from functools import lru_cache
 from typing import Optional
 
 from autosys.parser.condition_parser import (
-    AndNode, ExitCodeCondNode, JobCondNode, NotNode, OrNode, parse_condition,
+    AndNode, ConditionSyntaxError, ExitCodeCondNode, JobCondNode, NotNode, OrNode,
+    _CondTokenKind, _tokenize_condition, parse_condition,
 )
 
 # Every predicate spelling, long and short, followed by "(name". Used only
@@ -69,3 +70,34 @@ def condition_job_refs(condition: Optional[str]) -> frozenset[str]:
                 names.append(n.job_name)
             # ValueCondNode references a global variable, not a job
     return frozenset(name for name in names if "^" not in name)
+
+
+def rename_job_refs(condition: Optional[str], old: str, new: str) -> Optional[str]:
+    """
+    *condition* with every reference to job *old* renamed to *new* (audit ING-04).
+
+    Only whole job-name arguments of a predicate are touched -- ``s(old)``,
+    ``e(old) = 0``, ``s(old, 01.00)`` -- never a substring of another name
+    (``old_b``), a global in ``v(...)``, or another instance's ``old^PRD``.
+    A plain ``str.replace`` used to rewrite all of those.
+    """
+    if not condition or old not in condition:
+        return condition
+    spans: list[int] = []
+    try:
+        toks = _tokenize_condition(condition)
+    except ConditionSyntaxError:
+        toks = None
+    if toks is not None:
+        for i in range(len(toks) - 2):
+            if (toks[i].kind in (_CondTokenKind.FUNC, _CondTokenKind.EXITCODE)
+                    and toks[i + 1].kind == _CondTokenKind.LPAREN
+                    and toks[i + 2].kind == _CondTokenKind.IDENT
+                    and toks[i + 2].value == old):
+                spans.append(toks[i + 2].pos)
+    else:   # unparseable: rename a name that is a predicate's whole argument
+        spans = [m.start(1) for m in re.finditer(
+            r"\(\s*(" + re.escape(old) + r")(?=\s*[,)])", condition)]
+    for pos in reversed(spans):
+        condition = condition[:pos] + new + condition[pos + len(old):]
+    return condition

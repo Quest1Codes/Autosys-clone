@@ -68,6 +68,7 @@ def _to_response(report, **counters) -> JILImportResponse:
         success=True, jobs=jobs,
         n_quarantined=report.dispositions.get("QUARANTINED", 0),
         n_warnings=report.dispositions.get("LOADED_WITH_WARNINGS", 0),
+        n_failed=report.counters.get("failed", 0),
         **counters,
     )
 
@@ -86,7 +87,10 @@ def validate_jil(
     if err:
         return JILImportResponse(success=False, error=err)
 
-    report = ingest_text(session, body.content, _synthetic_path("validate", user), dry_run=True)
+    # read_files=False: a blob_file path names a file on THIS server, never
+    # the caller's (audit SEC-05).
+    report = ingest_text(session, body.content, _synthetic_path("validate", user),
+                         dry_run=True, read_files=False)
     return _to_response(report, n_machines=report.counters.get("machines", 0))
 
 
@@ -110,7 +114,7 @@ def import_jil(
         return JILImportResponse(success=False, error=err)
 
     report = ingest_text(session, body.content, _synthetic_path("import", user),
-                         dry_run=body.dry_run)
+                         dry_run=body.dry_run, read_files=False)
     n_inserted = report.counters.get("inserted", 0)
     n_updated  = report.counters.get("updated", 0)
     n_deleted  = report.counters.get("deleted", 0)

@@ -190,14 +190,14 @@ class TestRenameDialectAware:
             assert session.get(JobRow, "new_name") is not None
             assert session.get(JobRow, "old_name") is None
 
-    def test_rename_uses_postgres_syntax_when_not_sqlite(self, monkeypatch):
-        """Verify rename source code contains dialect-aware FK handling."""
+    def test_rename_needs_no_superuser_on_postgres(self):
+        """rename must not toggle FK checks: on PostgreSQL that needs
+        superuser, and the failed SET aborted the transaction (audit ING-03).
+        The real-PostgreSQL check is in tests/test_import_reconcile.py."""
         import autosys.db.repository as repo_mod
         import inspect
         source = inspect.getsource(repo_mod.JobRepository.rename)
-        assert "SET session_replication_role" in source
-        assert "PRAGMA foreign_keys" in source
-        assert "is_sqlite" in source
+        assert 'execute(text("SET session_replication_role' not in source
 
 
 # ===========================================================================

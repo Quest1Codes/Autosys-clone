@@ -23,6 +23,12 @@ Duplicate policy (``insert_job`` of a name defined earlier)
                 in sorted order)
     ``last``    later definitions overwrite; both stay in the archive
     ``update``  like ``last`` (the interactive ``jil import`` behaviour)
+
+Replacing the estate with a newer export (``replace_estate=True``)
+    Later definitions overwrite, and every job not in this run's files is
+    removed from the live tables. Each removal is archived first, with the
+    job's last definition, in a ``reconcile:<time>`` file, so it is visible
+    and recoverable. Skipped when the run stopped early or loaded no jobs.
 """
 
 from __future__ import annotations
@@ -32,12 +38,13 @@ import copy
 import hashlib
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Iterator, Optional
 
 from loguru import logger
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, text
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import JilFileRow, JilStanzaRow
@@ -143,6 +150,7 @@ class FileReport:
     counters:     dict = field(default_factory=dict)          # summary counters
     dispositions: dict = field(default_factory=dict)
     issues:       list = field(default_factory=list)          # file-level issues
+    defined_jobs: set = field(default_factory=set)            # every insert_job name in the file
 
     def bump(self, key: str, n: int = 1) -> None:
         self.counters[key] = self.counters.get(key, 0) + n
@@ -165,6 +173,7 @@ class IngestSummary:
     # including that many files is durably in the database; the batch since
     # the last commit was rolled back, even if a few of them are still
     # counted in `files`/`stanzas` above from before the connection died.
+    removed_jobs:    list = field(default_factory=list)   # replace_estate only
     aborted:         bool = False
     abort_reason:    str  = ""
     files_committed: int  = 0
@@ -190,6 +199,7 @@ class IngestSummary:
             "counters": self.counters, "deferred_applied": self.deferred_applied,
             "aborted": self.aborted, "abort_reason": self.abort_reason,
             "files_committed": self.files_committed, "last_path": self.last_path,
+            "removed_jobs": self.removed_jobs,
         }
 
 
@@ -222,6 +232,26 @@ def _prior_definition(session: Session, name: str, exclude_file_id: Optional[int
     return session.execute(q).first()
 
 
+# Any fixed 64-bit number; names the "a JIL import is writing" advisory lock.
+_IMPORT_LOCK_KEY = 0x4A494C5F494D5054          # "JIL_IMPT"
+
+
+def _serialise_imports(session: Session) -> None:
+    """
+    Make concurrent imports on PostgreSQL take turns (audit ING-08).
+
+    Two imports touching the same jobs locked rows in opposite orders and
+    deadlocked: 3,000 shared jobs from two threads took 1,512 s with 1,499
+    deadlocks, and every deadlock victim's stanza ended ARCHIVE_ONLY. A
+    transaction-scoped advisory lock lets one import's transaction finish
+    before the other's starts writing. It is released at commit/rollback;
+    taking it again in the same transaction is a no-op. SQLite already allows
+    only one writer at a time.
+    """
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": _IMPORT_LOCK_KEY})
+
+
 def ingest_text(
     session: Session,
     text: str,
@@ -235,7 +265,7 @@ def ingest_text(
     dry_run: bool = False,
     archive: bool = True,
     duplicates: str = "update",
-    read_files: bool = True,
+    read_files: bool = False,
     pending: Optional[list] = None,
 ) -> FileReport:
     """
@@ -250,6 +280,7 @@ def ingest_text(
     local_pending = pending is None and not dry_run
     if local_pending:
         pending = []
+        _serialise_imports(session)        # a lone call (API, `jil import`); ingest_paths takes it per file
 
     has_nul = "\x00" in text
     parse_src = text.replace("\x00", "") if has_nul else text     # spans are line based
@@ -287,6 +318,10 @@ def ingest_text(
     worst = "OK"
     for seq, op in enumerate(ops):
         issues = list(op.issues)
+        if op.op == "insert" and op.job is not None:
+            report.defined_jobs.add(op.job.job_name)
+        elif op.op == "raw" and op.raw_directive == "insert_job" and op.raw_name:
+            report.defined_jobs.add(op.raw_name)        # quarantined, but still in the export
         disposition, result = _apply_one(
             session, op, issues, report, seen, file_id, path,
             dry_run=dry_run, duplicates=duplicates, read_files=read_files, pending=pending)
@@ -324,6 +359,7 @@ def ingest_text(
             _resolve_pending_ids(session, file_id, pending)
             if local_pending:
                 _apply_pending(session, pending)
+                relink_waiting_children(session)
     else:
         report.status = worst
     report.n_issues = n_issues
@@ -426,6 +462,7 @@ def _apply_one(session, op, issues, report, seen, file_id, path, *,
             return WARN, result
         issues.append({"severity": "error", "code": "apply_failed", "line": op.start_line,
                        "message": _error_text(exc)})
+        report.bump("failed")            # surfaced as n_failed by the API (audit ING-07)
         return ARCHIVE, ApplyResult("SKIPPED", getattr(getattr(op, "job", None), "job_name", "?") or "?",
                                     "could not be stored (archived)", persisted=False)
 
@@ -482,6 +519,7 @@ def _retry_without_box(session, op, exc, issues, pending, dry_run, read_files):
     if not result.persisted:
         return None
     issues.append({"severity": "warning", "code": "box_not_yet_defined", "line": op.start_line,
+                   "box": box,
                    "message": f"box {box!r} does not exist yet; job stored unboxed and linked "
                               "if the box is ingested later"})
     p = _Pending(0, None, link_job=job.job_name, link_box=box)
@@ -577,6 +615,7 @@ def ingest_paths(
     progress: Optional[Callable[[int, FileReport], None]] = None,
     duplicates: str = "first",
     read_files: bool = False,
+    replace_estate: bool = False,
     **kwargs,
 ) -> IngestSummary:
     """
@@ -595,14 +634,23 @@ def ingest_paths(
     thousands of files. This detects that case specifically and aborts the
     whole run there instead, with ``summary.files_committed`` as the exact
     resume point (everything up to it is durably committed).
+
+    ``replace_estate=True`` treats *paths* as the whole current estate (a new
+    full export): later definitions win, and jobs not in it are removed and
+    archived -- see the module docstring (audit ING-05).
     """
     summary = IngestSummary()
     pending: list = []
+    if replace_estate:
+        duplicates = "last"
+    present: set[str] = set()
+    whole_file_failed = False
     with session_factory() as session:
         n = 0
         files_committed = 0
         for n, path in enumerate(paths, start=1):
             try:
+                _serialise_imports(session)    # outside the savepoint, so held to commit
                 with session.begin_nested():
                     rep = ingest_file(session, path, duplicates=duplicates,
                                       read_files=read_files, pending=pending, **kwargs)
@@ -622,7 +670,12 @@ def ingest_paths(
                         "resume): {}", str(path), files_committed, summary.abort_reason)
                     return summary
                 rep = _archive_whole_file(session, path, exc)
+                whole_file_failed = True
             summary.add(rep, _issue_codes(session, rep))
+            if replace_estate:
+                # every insert_job in the export, stored or not: a job the
+                # database refused is still in the estate and must not be removed
+                present.update(rep.defined_jobs)
             if progress:
                 progress(n, rep)
             if n % commit_every == 0:
@@ -632,7 +685,18 @@ def ingest_paths(
         session.commit()
         files_committed = n
         summary.deferred_applied = _apply_pending(session, pending)
+        summary.deferred_applied += relink_waiting_children(session)
         session.commit()
+        if replace_estate:
+            # Remove nothing unless every file was read: a file that failed
+            # whole would make all of its jobs look deleted.
+            if present and not whole_file_failed:
+                summary.removed_jobs = remove_jobs_not_in(session, present)
+                session.commit()
+            else:
+                logger.warning("replace-estate: {}; nothing removed",
+                               "a file could not be read" if whole_file_failed
+                               else "no jobs in these files")
     summary.files_committed = files_committed
     return summary
 
@@ -735,3 +799,112 @@ def _apply_pending(session: Session, pending: list) -> int:
                 except Exception:
                     pass
     return applied
+
+
+_BOX_IN_MESSAGE = re.compile(r"^box '([^']+)' does not exist yet")
+
+
+def relink_waiting_children(session: Session) -> int:
+    """
+    Link every job still waiting for a box that now exists (audit ING-06/ING-12).
+
+    A child whose box_name names a box not loaded yet is stored unboxed with
+    a ``box_not_yet_defined`` issue. Within one ``ingest_paths`` run the
+    pending list links it at the end, but that list lives only for the run:
+    the browser posts one file per request, and a resumed CLI run starts a
+    fresh list, so a box arriving in a later request or run left its children
+    unboxed for good -- while the warning still promised a link. The archive
+    remembers every waiting child, so each import ends by linking the ones
+    whose box exists now. A job whose box_name has been set since is left
+    alone.
+    """
+    from autosys.db.schema import JobRow
+    rows = session.execute(
+        select(JilStanzaRow)
+        .where(JilStanzaRow.issues_json.like('%"box_not_yet_defined"%'),
+               ~JilStanzaRow.issues_json.like('%"box_linked"%'))
+    ).scalars().all()
+    linked = 0
+    for st in rows:
+        try:
+            issues = json.loads(st.issues_json)
+        except (TypeError, ValueError):
+            continue
+        waiting = next((i for i in issues if i.get("code") == "box_not_yet_defined"), None)
+        if waiting is None:
+            continue
+        box = waiting.get("box")
+        if not box:                                   # archived before "box" was recorded
+            m = _BOX_IN_MESSAGE.match(waiting.get("message", ""))
+            box = m.group(1) if m else None
+        job = session.get(JobRow, st.object_name) if st.object_name else None
+        if not box or job is None or job.box_name is not None:
+            continue
+        if session.get(JobRow, box) is None:
+            continue
+        job.box_name = box
+        issues.append({"severity": "info", "code": "box_linked", "line": 0,
+                       "message": f"linked to box {box!r} once it was ingested"})
+        st.issues_json = json.dumps(issues)
+        linked += 1
+    if linked:
+        session.flush()
+    return linked
+
+
+def remove_jobs_not_in(session: Session, present: set[str]) -> list[str]:
+    """
+    Remove every job not in *present*; archive each one first (audit ING-05).
+
+    Importing a newer export used to leave jobs that had since been deleted
+    in AutoSys in the estate, so the assessment counted jobs that no longer
+    exist. Each removed job's last definition is written, as JIL, to a
+    ``reconcile:<UTC time>`` archive file with a ``removed_in_new_export``
+    issue, so the removal can be reviewed and undone by re-importing that
+    text. A job that cannot be removed stays, archived ``ARCHIVE_ONLY`` with
+    the reason. Returns the names removed.
+    """
+    from datetime import datetime, timezone
+    from autosys.db.repository import jobs as job_repo
+    from autosys.db.schema import JobRow
+    from autosys.parser.jil_writer import job_to_jil
+
+    gone = sorted(n for n in session.scalars(select(JobRow.job_name)) if n not in present)
+    if not gone:
+        return []
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    frow = JilFileRow(path=f"reconcile:{stamp}", sha256="", size_bytes=0, encoding="utf-8",
+                      n_stanzas=len(gone), n_issues=0, status="OK")
+    session.add(frow)
+    session.flush()
+
+    removed: list[str] = []
+    rows: list[dict] = []
+    for seq, name in enumerate(gone):
+        job = job_repo.get(session, name)
+        last = job_to_jil(job) if job is not None else ""
+        issue = {"severity": "info", "code": "removed_in_new_export", "line": 0,
+                 "message": f"not in the export imported at {stamp}; removed from the estate"}
+        try:
+            with session.begin_nested():
+                job_repo.delete(session, name)
+                session.flush()
+            removed.append(name)
+            disposition = LOADED
+        except Exception as exc:
+            issue = {"severity": "error", "code": "remove_failed", "line": 0,
+                     "message": f"not in the export imported at {stamp}, but could not be "
+                                f"removed: {_error_text(exc)}"}
+            disposition = ARCHIVE
+        rows.append({
+            "file_id": frow.file_id, "seq": seq, "start_line": None, "end_line": None,
+            "directive": "delete_job", "object_name": _label(name, 255),
+            "disposition": disposition,
+            "raw_text": f"/* last definition before removal */\n{last}\ndelete_job: {name}\n",
+            "raw_escaped": False, "issues_json": json.dumps([issue]),
+        })
+    session.execute(insert(JilStanzaRow), rows)
+    frow.n_issues = len(gone) - len(removed)
+    frow.status = "WARN" if frow.n_issues else "OK"
+    logger.info("replace-estate: removed {} job(s) not in the new export", len(removed))
+    return removed

@@ -189,19 +189,33 @@ UNSTORED_OPS = frozenset({
 })
 
 
+BLOB_FILE_MAX_BYTES = 16 * 1024 * 1024
+
+
+def _read_capped(path: str) -> str:
+    """Read a ``blob_file`` for the local CLI, refusing anything over
+    BLOB_FILE_MAX_BYTES (``/dev/zero`` or a huge file would exhaust memory)."""
+    with open(path, errors="replace") as fh:
+        data = fh.read(BLOB_FILE_MAX_BYTES + 1)
+    if len(data) > BLOB_FILE_MAX_BYTES:
+        raise OSError(f"larger than {BLOB_FILE_MAX_BYTES} bytes")
+    return data
+
+
 def apply_operation(
     session: Session,
     op: JILOperation,
     dry_run: bool = False,
-    read_files: bool = True,
+    read_files: bool = False,
 ) -> ApplyResult:
     """
     Persist one parsed operation and describe what happened.
 
     Content problems never raise: they become ``issues`` on the result and the
     operation is reported as not (fully) persisted, so the caller can archive
-    its raw text.  ``read_files=False`` stops ``blob_file`` / glob file
-    references from being opened.
+    its raw text.  ``blob_file`` / glob file references are opened only with
+    ``read_files=True`` -- the operator's own `jil import FILE` -- never from
+    the API, where the path would name a file on the server (audit SEC-05).
     """
     from autosys.db.repository import (
         jobs as job_repo, machines as machine_repo, resources as resource_repo,
@@ -325,8 +339,7 @@ def apply_operation(
         if not content and bfile:
             if read_files:
                 try:
-                    with open(bfile) as bf:
-                        content = bf.read()
+                    content = _read_capped(bfile)
                 except OSError as exc:
                     issues.append({"severity": "warning", "code": "blob_file_unreadable", "line": line,
                                    "message": f"blob_file {bfile!r} could not be read ({exc})"})
@@ -350,8 +363,7 @@ def apply_operation(
         if not content and gfile:
             if read_files:
                 try:
-                    with open(gfile) as gf:
-                        content = gf.read()
+                    content = _read_capped(gfile)
                 except OSError as exc:
                     issues.append({"severity": "warning", "code": "blob_file_unreadable", "line": line,
                                    "message": f"blob_file {gfile!r} could not be read ({exc})"})

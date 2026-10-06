@@ -208,6 +208,9 @@ class JILImportResponse(BaseModel):
     # success=True says nothing about these — check them separately.
     n_quarantined: int = 0
     n_warnings:    int = 0
+    # Parsed, but the database refused to store it (archived verbatim, not
+    # loaded). Not counted in n_warnings: these jobs are missing.
+    n_failed:      int = 0
     error:        Optional[str] = None
 
 
