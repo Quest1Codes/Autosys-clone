@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from autosys.db.connection import sync_session
@@ -58,19 +58,39 @@ def get_current_user(
     auth.startup_check_errors()), returns an anonymous admin user so tests
     can hit endpoints without a token.
     """
+    return user_from_token(creds.credentials if creds else None)
+
+
+def get_current_user_for_stream(
+    request: Request,
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
+) -> CurrentUser:
+    """
+    get_current_user for streaming routes, which also accept ``?token=``.
+
+    A browser EventSource cannot send an Authorization header, so the WCC
+    live-status stream passes the token in the query string. Only streams use
+    this; ordinary routes keep tokens out of URLs (audit SEC-03).
+    """
+    token = creds.credentials if creds else request.query_params.get("token")
+    return user_from_token(token)
+
+
+def user_from_token(token: Optional[str]) -> CurrentUser:
+    """Validate a raw JWT (or None) and return the user, or raise 401."""
     from autosys.app_server.auth import is_auth_enabled, decode_token
 
     if not is_auth_enabled():
         return CurrentUser(username="anon", role="admin")
 
-    if creds is None:
+    if not token:
         raise HTTPException(
             status_code = status.HTTP_401_UNAUTHORIZED,
             detail      = "Missing Authorization header",
             headers     = {"WWW-Authenticate": "Bearer"},
         )
     try:
-        payload = decode_token(creds.credentials)
+        payload = decode_token(token)
     except Exception as exc:
         raise HTTPException(
             status_code = status.HTTP_401_UNAUTHORIZED,

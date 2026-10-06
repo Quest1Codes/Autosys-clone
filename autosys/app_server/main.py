@@ -312,8 +312,19 @@ def _register_ws_routes(app: FastAPI) -> None:
 
         Connect with any WebSocket client::
 
-            wscat -c ws://localhost:9000/api/v1/ws/events
+            wscat -c "ws://localhost:9000/api/v1/ws/events?token=<JWT>"
         """
+        # Same login as the REST API (audit SEC-03): token in the query string
+        # (?token=) or an Authorization header. Rejected before accepting.
+        from fastapi import HTTPException
+        from autosys.app_server.deps import user_from_token
+        auth = ws.headers.get("authorization", "")
+        token = ws.query_params.get("token") or (auth[7:] if auth.lower().startswith("bearer ") else None)
+        try:
+            user_from_token(token)
+        except HTTPException:
+            await ws.close(code=1008)   # policy violation
+            return
         broadcaster: EventBroadcaster = app.state.broadcaster
         await broadcaster.connect(ws)
         try:

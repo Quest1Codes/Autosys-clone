@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, AsyncGenerator
 
-from fastapi import FastAPI, Query
+from fastapi import Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,8 +31,17 @@ from sqlalchemy import select
 
 from autosys.analysis.condition_refs import condition_job_refs
 from autosys.db.connection import sync_session
+from autosys.app_server.deps import get_current_user, get_current_user_for_stream
+
 from autosys.db.schema import JobRow, JobRunRow, AlarmRow, JobOutputRow
 from autosys.models.job import JobStatus
+
+# Every data and stream route needs the same login as the API (same JWT
+# secret). The static SPA -- including its login page -- stays public. These
+# routes used to be open to anyone who could reach the Ingress: every job
+# name, hostname, owner and dependency in the estate (audit SEC-03).
+_REQUIRE_LOGIN = Depends(get_current_user)
+_REQUIRE_LOGIN_STREAM = Depends(get_current_user_for_stream)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +98,10 @@ def create_wcc_app() -> FastAPI:
         title       = "AutoSys WCC API",
         description = "Workload Control Centre — JSON API + SSE for wcc-frontend",
         version     = "0.2.0",
+        # No interactive docs or schema on the client's network (audit SEC-03).
+        docs_url    = None,
+        redoc_url   = None,
+        openapi_url = None,
     )
 
     # The WCC frontend is always same-origin with this API (nginx in both
@@ -107,7 +120,7 @@ def create_wcc_app() -> FastAPI:
 
     # ── JSON data API ─────────────────────────────────────────────────────────
 
-    @app.get("/api/wcc/jobs")
+    @app.get("/api/wcc/jobs", dependencies=[_REQUIRE_LOGIN])
     def api_jobs(status: Optional[str] = Query(None)):
         with sync_session() as session:
             rows = session.execute(
@@ -118,7 +131,7 @@ def create_wcc_app() -> FastAPI:
             jobs = [j for j in jobs if j["status"] == status.upper()]
         return {"jobs": jobs, "total": len(jobs)}
 
-    @app.get("/api/wcc/jobs/{name}")
+    @app.get("/api/wcc/jobs/{name}", dependencies=[_REQUIRE_LOGIN])
     def api_job_detail(name: str):
         with sync_session() as session:
             row = session.get(JobRow, name)
@@ -154,7 +167,7 @@ def create_wcc_app() -> FastAPI:
         ]
         return job
 
-    @app.get("/api/wcc/boxes/{name}")
+    @app.get("/api/wcc/boxes/{name}", dependencies=[_REQUIRE_LOGIN])
     def api_box(name: str):
         with sync_session() as session:
             box = session.get(JobRow, name)
@@ -173,7 +186,7 @@ def create_wcc_app() -> FastAPI:
                     edges.append({"source": dep, "target": j.job_name})
         return {"nodes": nodes, "edges": edges}
 
-    @app.get("/api/wcc/runs")
+    @app.get("/api/wcc/runs", dependencies=[_REQUIRE_LOGIN])
     def api_runs(job: Optional[str] = Query(None), limit: int = Query(20, le=200)):
         with sync_session() as session:
             stmt = select(JobRunRow).order_by(JobRunRow.start_time.desc()).limit(limit)
@@ -199,7 +212,7 @@ def create_wcc_app() -> FastAPI:
 
         return {"runs": [run_dict(r) for r in rows]}
 
-    @app.get("/api/wcc/alarms")
+    @app.get("/api/wcc/alarms", dependencies=[_REQUIRE_LOGIN])
     def api_alarms(active: Optional[bool] = Query(None)):
         with sync_session() as session:
             stmt = select(AlarmRow).order_by(AlarmRow.raised_at.desc()).limit(200)
@@ -223,7 +236,7 @@ def create_wcc_app() -> FastAPI:
         alarms = [alarm_dict(r) for r in rows]
         return {"alarms": alarms, "n_active": sum(1 for a in alarms if a["active"])}
 
-    @app.get("/api/wcc/runs/{run_id}/output")
+    @app.get("/api/wcc/runs/{run_id}/output", dependencies=[_REQUIRE_LOGIN])
     def api_run_output(run_id: str, offset: int = Query(0), limit: int = Query(500, le=5000)):
         with sync_session() as session:
             rows = session.execute(
@@ -237,7 +250,7 @@ def create_wcc_app() -> FastAPI:
 
     # ── SSE live job status stream ────────────────────────────────────────────
 
-    @app.get("/api/sse/jobs")
+    @app.get("/api/sse/jobs", dependencies=[_REQUIRE_LOGIN_STREAM])
     async def sse_jobs():
         """
         Server-Sent Events endpoint.  Polls the DB every 2 seconds and pushes
