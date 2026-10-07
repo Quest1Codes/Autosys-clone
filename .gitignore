@@ -146,3 +146,6 @@ IMPROVEMENTS.md
 *.webp
 *.svg
 data/
+
+# Vulnerability scan raw output (findings.json + dashboard.html are kept)
+reports/vuln/raw/

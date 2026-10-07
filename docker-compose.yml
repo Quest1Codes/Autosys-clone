@@ -34,7 +34,9 @@
 # instructions; shinro/README-DEV.md has the canonical joint walkthrough.
 services:
   postgres:
-    image: postgres:16
+    build:
+      context: deploy/postgres
+    image: autosys-postgres:16
     environment:
       POSTGRES_USER: ${AUTOSYS_DB_USER:-autosys}
       POSTGRES_PASSWORD: ${AUTOSYS_DB_PASSWORD:-autosys}

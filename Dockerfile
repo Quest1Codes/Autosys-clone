@@ -23,7 +23,7 @@ RUN npm run build
 # a distribution split across separate containers/images would need the
 # client to run docker-compose and know which piece is which, which defeats
 # the point of a one-line `docker run`.
-FROM python:3.11-slim AS runtime
+FROM python:3.11-alpine AS runtime
 
 WORKDIR /app
 
@@ -53,7 +53,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools && \
 # this second line, the shipped image still carried setuptools 70.3.0 with a
 # known CVE despite the upgrade three lines up.
 RUN pip install --no-cache-dir -e .[pg] \
-    && pip install --no-cache-dir --upgrade setuptools
+    && pip install --no-cache-dir --upgrade setuptools \
+    # pip bundles its own (older) urllib3/msgpack/setuptools copies under
+    # pip/_vendor, which scanners report as CVEs in this image. Nothing at
+    # runtime installs packages, so drop pip once the install is done.
+    && python -m pip uninstall -y pip
 
 # nginx is the single origin the browser talks to: WCC's own SPA fallback
 # 404s anything under /api/v1/ (login, JIL import), which lives in the API
@@ -66,15 +70,16 @@ RUN pip install --no-cache-dir -e .[pg] \
 # and SQLite's single-writer model cannot take 300k+ files' worth of
 # concurrent writes. Only that mode uses it; the multi-container compose
 # files run their own separate `postgres` service instead.
-# upgrade first: the base image's own published snapshot lags Debian's
-# security repo by however long it's been since that snapshot was built,
-# same as any floating tag -- apply what's already patched upstream before
-# installing anything else, so nginx/postgresql land on top of current
-# packages rather than whatever shipped with the base image.
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && apt-get install -y --no-install-recommends nginx postgresql \
-    && rm -rf /var/lib/apt/lists/*
+# Alpine (musl) rather than Debian slim: the Debian images carry ~270 unpatched
+# OS-package CVEs (glibc, libxml2, systemd libs...) with no fix available, where
+# Alpine's far smaller package set has none outstanding. bash is needed by
+# docker-entrypoint.sh (`wait -n`, arrays).
+#
+# upgrade first: the base image's own published snapshot lags Alpine's
+# security repo by however long it's been since that snapshot was built --
+# apply what's already patched upstream before installing anything else.
+RUN apk upgrade --no-cache \
+    && apk add --no-cache bash nginx postgresql16
 
 # Non-root runtime (static-analysis finding SEC-01: this image used to run
 # every process -- API, WCC, nginx, PostgreSQL -- as UID 0, which bank
@@ -84,21 +89,21 @@ RUN apt-get update \
 # design only needed root to `su postgres`, and PostgreSQL is equally happy
 # to run as any non-root user that owns its data directory.
 #
-# nginx needs three adjustments to run unprivileged: its Debian-enabled
-# default site listens on :80 (a privileged port, and unused -- ours is
-# conf.d/default.conf on :8080), its pid file lives in root-owned /run, and
+# nginx needs adjustments to run unprivileged: Alpine's stock default site
+# (http.d/default.conf) listens on :80 -- a privileged port, and unused, ours
+# is http.d/default.conf on :8080 -- its pid file defaults to root-owned /run, and
 # the `user` directive only applies to a root master process (a warning
 # otherwise). Its log and temp dirs are handed to the runtime user.
-RUN groupadd --system --gid 1001 autosys \
-    && useradd --system --uid 1001 --gid 1001 --home-dir /app --no-create-home \
-         --shell /usr/sbin/nologin autosys \
-    && rm -f /etc/nginx/sites-enabled/default \
-    && sed -i -e '/^user /d' -e 's|^pid .*|pid /tmp/nginx.pid;|' /etc/nginx/nginx.conf \
+RUN addgroup -S -g 1001 autosys \
+    && adduser -S -u 1001 -G autosys -h /app -H -s /sbin/nologin autosys \
+    && rm -f /etc/nginx/http.d/default.conf \
+    && sed -i -e '/^user /d' -e '1i pid /tmp/nginx.pid;' /etc/nginx/nginx.conf \
+    && mkdir -p /var/lib/nginx/tmp /var/log/nginx \
     && chown -R autosys:autosys /var/lib/nginx /var/log/nginx
 
 COPY --from=frontend-build /app/wcc-frontend/dist ./wcc-frontend/dist
 COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
-COPY nginx.bundled.conf /etc/nginx/conf.d/default.conf
+COPY nginx.bundled.conf /etc/nginx/http.d/default.conf
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
@@ -123,7 +128,7 @@ EXPOSE 9000 8080
 # docker-compose*.yml files in this repo run `serve` and `wcc` as separate
 # containers -- so that multi-container layout keeps working unchanged.
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-# CMD must be explicitly empty: python:3.11-slim's own default is
+# CMD must be explicitly empty: the python base image's own default is
 # `CMD ["python3"]`, which this stage never overrode -- so a plain
 # `docker run <image>` (no trailing command) was actually passing "python3"
 # as the entrypoint's "$@", silently skipping the "no command -> bundle
@@ -151,3 +156,5 @@ COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
+# Static index only, so it doesn't depend on the api/wcc upstreams being up.
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -q --spider http://127.0.0.1/ || exit 1

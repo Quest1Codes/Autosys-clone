@@ -38,12 +38,12 @@ if [ "$#" -eq 0 ]; then
   # root, and whoever owns the data directory can run it. The socket goes
   # to /tmp because /run/postgresql is root-owned.
   #
-  # A volume created by an older image (initialized as the Debian `postgres`
+  # A volume created by an older image (initialized as the `postgres`
   # user, while this entrypoint still ran as root) is owned by a different
   # UID and can't be opened -- recreate it (`docker volume rm`) or chown it
   # to 1001 once.
   # ---------------------------------------------------------------------
-  PG_BIN="$(dirname "$(find /usr/lib/postgresql -maxdepth 3 -name initdb | head -n1)")"
+  PG_BIN="$(dirname "$(find /usr/libexec /usr/lib/postgresql -maxdepth 3 -name initdb 2>/dev/null | head -n1)")"
   PGDATA=/app/data/pgdata
   PG_SOCKET_DIR=/tmp
 

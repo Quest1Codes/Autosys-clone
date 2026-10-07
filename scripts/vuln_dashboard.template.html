@@ -1,0 +1,330 @@
+<title>Autosys Vulnerability Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: filter rail on the left, status tabs + summary + grouped list on the right; rail folds into a drawer on phones. */
+:root{
+  --bg:#f5f7f7; --panel:#ffffff; --line:#dfe5e6; --fg:#14201f; --muted:#5d6f6e; --accent:#0b6e6a; --accent-soft:#dff1ef; --hover:#eef3f3;
+  --crit:#a3123a; --high:#d4481c; --med:#c58a00; --low:#4f7fa8; --unk:#8a9695; --ok:#2a8a4a; --ok-soft:#e1f3e7; --new:#6b4bd1; --new-soft:#ece7fb;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1514; --panel:#152120; --line:#263836; --fg:#e4eeed; --muted:#93a9a7; --accent:#4cc9c0; --accent-soft:#17403d; --hover:#1b2b2a;
+  --crit:#ff5c86; --high:#ff8a5c; --med:#e8b43a; --low:#7fb0dc; --unk:#7c8d8b; --ok:#5ccf84; --ok-soft:#173a25; --new:#a994f5; --new-soft:#2a2350; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1514; --panel:#152120; --line:#263836; --fg:#e4eeed; --muted:#93a9a7; --accent:#4cc9c0; --accent-soft:#17403d; --hover:#1b2b2a;
+  --crit:#ff5c86; --high:#ff8a5c; --med:#e8b43a; --low:#7fb0dc; --unk:#7c8d8b; --ok:#5ccf84; --ok-soft:#173a25; --new:#a994f5; --new-soft:#2a2350; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--sans);padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1280px;margin:0 auto}
+h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:12.5px;margin:2px 0 0}
+.mono{font-family:var(--mono)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:20px;align-items:start}
+@media(max-width:860px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+/* rail */
+.rail{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 14px 14px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+@media(max-width:860px){.rail{position:static;max-height:none}}
+.rail summary{list-style:none;cursor:pointer;padding:10px 0;font-weight:600;display:flex;justify-content:space-between}
+@media(min-width:861px){.rail summary{pointer-events:none}.rail summary .tog{display:none}}
+.fg{padding-top:12px;border-top:1px solid var(--line);margin-top:12px}
+.fg h3{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 6px;font-weight:600}
+.opt{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:4px 6px;margin-inline:-6px;border-radius:5px;text-align:left;min-width:0}
+.opt:hover{background:var(--hover)}
+.opt .box{flex:none;width:15px;height:15px;border:1.5px solid var(--muted);border-radius:4px;display:grid;place-items:center}
+.opt[aria-pressed="true"] .box{background:var(--accent);border-color:var(--accent)}
+.opt[aria-pressed="true"] .box::after{content:"";width:8px;height:4px;border-left:2px solid var(--panel);border-bottom:2px solid var(--panel);transform:rotate(-45deg) translate(1px,-1px)}
+.opt .lbl{flex:1;min-width:0;overflow-wrap:anywhere;font-size:13px}
+.opt .n{font:12px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+.opt.zero{opacity:.45}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+.seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{flex:1;background:none;border:0;padding:5px 4px;font-size:12.5px;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.clear{background:none;border:1px solid var(--line);border-radius:6px;padding:6px 10px;width:100%;margin-top:14px}
+.clear:hover{background:var(--hover)}
+
+/* tabs + summary */
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tab{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;display:flex;gap:10px;align-items:baseline;min-width:0}
+.tab b{font:600 20px var(--mono);font-variant-numeric:tabular-nums}
+.tab span{color:var(--muted);font-size:13px}
+.tab[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--accent-soft)}
+.tab.t-fixed b{color:var(--ok)}.tab.t-new b{color:var(--new)}
+.bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line);margin:4px 0 6px}
+.bar i{display:block;height:100%}
+.barleg{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12.5px;color:var(--muted);margin-bottom:14px}
+.barleg b{color:var(--fg);font-family:var(--mono);font-weight:500}
+
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.toolbar input[type=search]{flex:1 1 240px;min-width:0;padding:7px 10px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.toolbar select{padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+.btn:hover{background:var(--hover)}
+.count{color:var(--muted);font-size:12.5px;margin:2px 0 8px}
+
+/* list */
+.list{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.gh{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;padding:8px 12px;background:var(--hover);border-bottom:1px solid var(--line);border-top:1px solid var(--line);font-size:13px}
+.gh:first-child{border-top:0}
+.gh .gt{font-weight:600;overflow-wrap:anywhere;min-width:0}
+.gh .gm{color:var(--muted);font-size:12.5px}
+.gh .gfix{margin-left:auto;font:12px var(--mono);color:var(--ok)}
+.row{border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.rh{display:grid;grid-template-columns:78px minmax(0,1fr) auto;gap:4px 12px;align-items:center;width:100%;background:none;border:0;text-align:left;padding:9px 12px}
+.rh:hover{background:var(--hover)}
+.pill{font:600 10.5px var(--mono);letter-spacing:.05em;padding:3px 0;border-radius:4px;text-align:center;color:#fff}
+.s-CRITICAL{background:var(--crit)}.s-HIGH{background:var(--high)}.s-MEDIUM{background:var(--med);color:#1b1500}.s-LOW{background:var(--low);color:#fff}.s-UNKNOWN{background:var(--unk)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .s-CRITICAL,:root:not([data-theme="light"]) .s-HIGH,:root:not([data-theme="light"]) .s-LOW,:root:not([data-theme="light"]) .s-UNKNOWN{color:#0b1110}}
+:root[data-theme="dark"] .s-CRITICAL,:root[data-theme="dark"] .s-HIGH,:root[data-theme="dark"] .s-LOW,:root[data-theme="dark"] .s-UNKNOWN{color:#0b1110}
+.main{min-width:0}
+.rt{display:flex;flex-wrap:wrap;gap:0 10px;align-items:baseline}
+.pkg{font:500 13px var(--mono);overflow-wrap:anywhere}
+.ver{font:12.5px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.ver .arrow{color:var(--ok)}
+.ttl{width:100%;color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tags{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.tag{font-size:11px;padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.fixed{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.tag.new{background:var(--new-soft);color:var(--new);border-color:transparent}
+@media(max-width:560px){.rh{grid-template-columns:70px minmax(0,1fr)}.tags{grid-column:1/-1;justify-content:flex-start}}
+.det{padding:4px 12px 14px 102px;display:grid;gap:10px;font-size:13px}
+@media(max-width:560px){.det{padding-left:12px}}
+.det p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 14px;font-size:12.5px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;overflow-wrap:anywhere}
+.kv a{color:var(--accent)}
+.more{display:block;width:100%;padding:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--accent);font-weight:500}
+.empty{padding:40px 16px;text-align:center;color:var(--muted)}
+#csv{display:none;width:100%;height:120px;margin-bottom:10px;font:12px var(--mono)}
+.note{font-size:12px;color:var(--muted);margin-top:16px}
+@media(prefers-reduced-motion:no-preference){.tab,.opt,.rh{transition:background .12s,border-color .12s}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>Autosys Vulnerability Board</h1>
+      <p class="sub" id="meta"></p>
+    </div>
+    <p class="sub" id="sources"></p>
+  </div>
+
+  <div class="layout">
+    <details class="rail" id="rail" open>
+      <summary>Filters <span class="tog" aria-hidden="true">▾</span></summary>
+      <div id="facets"></div>
+      <button class="clear" id="clear" type="button">Clear all filters</button>
+    </details>
+
+    <div class="main">
+      <div class="tabs" id="tabs"></div>
+      <div class="bar" id="bar" role="img" aria-label="Severity distribution"></div>
+      <div class="barleg" id="barleg"></div>
+
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Search package, CVE/GHSA id, title…" aria-label="Search findings">
+        <select id="group" aria-label="Group by">
+          <option value="none">No grouping</option>
+          <option value="package">Group by package</option>
+          <option value="target">Group by image / file</option>
+          <option value="category">Group by type</option>
+          <option value="severity">Group by severity</option>
+        </select>
+        <select id="sort" aria-label="Sort">
+          <option value="sev">Sort: severity</option>
+          <option value="cvss">Sort: CVSS score</option>
+          <option value="pkg">Sort: package A–Z</option>
+          <option value="id">Sort: vuln id</option>
+        </select>
+        <button class="btn" id="copycsv" type="button">Copy as CSV</button>
+      </div>
+      <textarea id="csv" readonly aria-label="CSV export"></textarea>
+      <div class="count" id="count"></div>
+      <div class="list" id="list"></div>
+      <p class="note" id="note"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA=/*__DATA__*/null;
+const SEVS=["CRITICAL","HIGH","MEDIUM","LOW","UNKNOWN"];
+const SEVCOL={CRITICAL:"--crit",HIGH:"--high",MEDIUM:"--med",LOW:"--low",UNKNOWN:"--unk"};
+const PAGE=100;
+const F=DATA.findings;
+const SCOPE_LABEL={codebase:"Codebase",image:"Docker image"};
+const TOOLS=[...new Set(F.flatMap(f=>f.tools))].sort();
+
+const defaults=()=>({tab:"open",sev:[],scope:[],target:[],category:[],tool:[],fix:"any",q:"",group:"none",sort:"sev"});
+let S=defaults(), shown=PAGE, open=new Set();
+try{const s=JSON.parse(localStorage.getItem("vulnboard")||"null");if(s&&typeof s==="object")S={...S,...s,q:""}}catch(e){}
+const save=()=>{try{localStorage.setItem("vulnboard",JSON.stringify(S))}catch(e){}};
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=n=>n.toLocaleString();
+
+function fixable(f){return !!f.fixed_version}
+function tabMatch(f,t){return t==="all"||(t==="open"?f.status!=="fixed":f.status===t)}
+const dims={sev:f=>[f.severity],scope:f=>[f.scope],target:f=>[f.target],category:f=>[f.category],tool:f=>f.tools};
+
+function match(f,skip){
+  if(skip!=="tab"&&!tabMatch(f,S.tab))return false;
+  for(const d of ["sev","scope","target","category","tool"]){
+    if(d===skip||!S[d].length)continue;
+    if(!dims[d](f).some(v=>S[d].includes(v)))return false;
+  }
+  if(skip!=="fix"){if(S.fix==="yes"&&!fixable(f))return false;if(S.fix==="no"&&fixable(f))return false}
+  if(S.q){const q=S.q.toLowerCase();
+    if(!(f.package+" "+f.vuln_id+" "+f.aliases.join(" ")+" "+f.title+" "+f.target).toLowerCase().includes(q))return false}
+  return true;
+}
+const count=(skip,pred)=>F.reduce((n,f)=>n+(match(f,skip)&&pred(f)?1:0),0);
+
+function vcmp(a,b){
+  const pa=String(a).split(/[^0-9]+/).filter(Boolean).map(Number),pb=String(b).split(/[^0-9]+/).filter(Boolean).map(Number);
+  for(let i=0;i<Math.max(pa.length,pb.length);i++){const d=(pa[i]||0)-(pb[i]||0);if(d)return d}return 0;
+}
+
+function renderFacets(){
+  const opt=(dim,val,label,n,extra="")=>`<button type="button" class="opt${n?"":" zero"}" data-dim="${dim}" data-val="${esc(val)}" aria-pressed="${S[dim].includes(val)}"><span class="box"></span>${extra}<span class="lbl">${esc(label)}</span><span class="n">${fmt(n)}</span></button>`;
+  const uniq=(fn)=>[...new Set(F.flatMap(fn))];
+  const targets=uniq(f=>[f.target]).sort();
+  const cats=uniq(f=>[f.category]).sort();
+  const scopes=uniq(f=>[f.scope]).sort();
+  const fixbtn=(v,l)=>`<button type="button" data-fix="${v}" aria-pressed="${S.fix===v}">${l}</button>`;
+  $("facets").innerHTML=`
+   <div class="fg" style="border-top:0;margin-top:0"><h3>Severity</h3>${SEVS.map(s=>opt("sev",s,s[0]+s.slice(1).toLowerCase(),count("sev",f=>f.severity===s),`<span class="dot" style="background:var(${SEVCOL[s]})"></span>`)).join("")}</div>
+   <div class="fg"><h3>Fix available</h3><div class="seg">${fixbtn("any","Any")}${fixbtn("yes","Has fix")}${fixbtn("no","No fix")}</div></div>
+   <div class="fg"><h3>Scan</h3>${scopes.map(v=>opt("scope",v,SCOPE_LABEL[v]||v,count("scope",f=>f.scope===v))).join("")}</div>
+   <div class="fg"><h3>Image / file</h3>${targets.map(v=>opt("target",v,v,count("target",f=>f.target===v))).join("")}</div>
+   <div class="fg"><h3>Type</h3>${cats.map(v=>opt("category",v,v,count("category",f=>f.category===v))).join("")}</div>
+   <div class="fg"><h3>Found by</h3>${TOOLS.map(v=>opt("tool",v,v,count("tool",f=>f.tools.includes(v)))).join("")}</div>`;
+}
+
+function renderTabs(){
+  const t=(k,l,cls="")=>`<button type="button" class="tab ${cls}" data-tab="${k}" aria-pressed="${S.tab===k}"><b>${fmt(count("tab",f=>tabMatch(f,k)))}</b><span>${l}</span></button>`;
+  $("tabs").innerHTML=t("open","Open")+t("new","New since last scan","t-new")+t("fixed","Fixed","t-fixed")+t("all","All");
+}
+
+function sortFn(){
+  const sv=f=>SEVS.indexOf(f.severity);
+  return {sev:(a,b)=>sv(a)-sv(b)||(b.cvss||0)-(a.cvss||0)||a.package.localeCompare(b.package),
+    cvss:(a,b)=>(b.cvss||0)-(a.cvss||0)||sv(a)-sv(b),
+    pkg:(a,b)=>a.package.localeCompare(b.package)||sv(a)-sv(b),
+    id:(a,b)=>a.vuln_id.localeCompare(b.vuln_id)}[S.sort];
+}
+
+function rowHtml(f){
+  const isOpen=open.has(f.id);
+  const ver=f.package&&f.installed?`<span class="ver">${esc(f.installed)}${f.fixed_version?` <span class="arrow">→ ${esc(f.fixed_version)}</span>`:""}</span>`:"";
+  const tags=[];
+  if(f.status==="fixed")tags.push(`<span class="tag fixed">Fixed</span>`);
+  if(f.status==="new")tags.push(`<span class="tag new">New</span>`);
+  if(f.status!=="fixed"&&!f.fixed_version&&f.category!=="Secret"&&f.category!=="Misconfiguration")tags.push(`<span class="tag">${esc(f.fix_note||"no fix yet")}</span>`);
+  tags.push(`<span class="tag">${esc(f.category)}</span>`);
+  let det="";
+  if(isOpen){
+    const kv=[["Where",`${f.target}${f.component&&f.component!==f.target?" › "+f.component:""}`],
+      ["Found by",f.tools.join(", ")],
+      f.cvss!=null?["CVSS",f.cvss]:null,
+      f.aliases.length?["Also known as",f.aliases.join(", ")]:null,
+      f.cwe.length?["CWE",f.cwe.join(", ")]:null,
+      f.fixed_version?["Fixed in",f.fixed_version]:null,
+      f.fix_note?[f.status==="fixed"?"What changed":"Note",f.fix_note]:null,
+      f.first_seen?["First seen",f.first_seen.slice(0,10)]:null,
+      f.url?["Advisory",`<a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.url)}</a>`]:null].filter(Boolean);
+    det=`<div class="det">${f.description?`<p>${esc(f.description)}</p>`:""}<dl class="kv">${kv.map(([k,v])=>`<dt>${k}</dt><dd>${k==="Advisory"?v:esc(v)}</dd>`).join("")}</dl></div>`;
+  }
+  return `<div class="row"><button type="button" class="rh" data-id="${f.id}" aria-expanded="${isOpen}"><span class="pill s-${f.severity}">${f.severity}</span>
+    <span class="main"><span class="rt"><span class="pkg">${esc(f.package||f.vuln_id)}</span>${ver}<span class="ver">${esc(f.vuln_id)}</span></span><span class="ttl">${esc(f.title)}</span></span>
+    <span class="tags">${tags.join("")}</span></button>${det}</div>`;
+}
+
+function groupKey(f){
+  return {package:`${f.package||f.vuln_id}${f.installed?"@"+f.installed:""}`,target:f.target,category:f.category,severity:f.severity}[S.group];
+}
+
+function renderList(){
+  const rows=F.filter(f=>match(f)).sort(sortFn());
+  const total=rows.length;
+  $("count").textContent=`${fmt(total)} finding${total===1?"":"s"}${total>shown?`, showing first ${fmt(shown)}`:""}`;
+  if(!total){$("list").innerHTML=`<div class="empty">No findings match these filters.</div>`;return}
+  const vis=rows.slice(0,shown);
+  let html="";
+  if(S.group==="none"){html=vis.map(rowHtml).join("")}
+  else{
+    const groups=new Map();
+    vis.forEach(f=>{const k=groupKey(f);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(f)});
+    let entries=[...groups];
+    if(S.group==="severity")entries.sort((a,b)=>SEVS.indexOf(a[0])-SEVS.indexOf(b[0]));
+    else if(S.group==="package")entries.sort((a,b)=>SEVS.indexOf(a[1][0].severity)-SEVS.indexOf(b[1][0].severity)||b[1].length-a[1].length);
+    else entries.sort((a,b)=>b[1].length-a[1].length);
+    for(const [k,items] of entries){
+      const worst=SEVS.find(s=>items.some(i=>i.severity===s));
+      const fx=items.map(i=>i.fixed_version).filter(Boolean).sort(vcmp).pop();
+      const allFix=items.every(i=>i.fixed_version);
+      html+=`<div class="gh"><span class="pill s-${worst}" style="padding:3px 8px">${worst}</span><span class="gt">${esc(k)}</span><span class="gm">${items.length} finding${items.length===1?"":"s"}</span>${S.group==="package"&&fx&&S.tab!=="fixed"?`<span class="gfix">${allFix?"upgrade to":"fixes up to"} ${esc(fx)}</span>`:""}</div>`+items.map(rowHtml).join("");
+    }
+  }
+  if(total>shown)html+=`<button type="button" class="more" id="more">Show ${Math.min(PAGE,total-shown)} more (${fmt(total-shown)} remaining)</button>`;
+  $("list").innerHTML=html;
+}
+
+function renderBar(){
+  const c=SEVS.map(s=>[s,count("sev",f=>f.severity===s)]);
+  const tot=c.reduce((a,[,n])=>a+n,0)||1;
+  $("bar").innerHTML=c.filter(([,n])=>n).map(([s,n])=>`<i style="width:${n/tot*100}%;background:var(${SEVCOL[s]})" title="${s}: ${n}"></i>`).join("");
+  $("barleg").innerHTML=c.map(([s,n])=>`<span><span class="dot" style="background:var(${SEVCOL[s]});display:inline-block"></span> ${s[0]+s.slice(1).toLowerCase()} <b>${fmt(n)}</b></span>`).join("");
+}
+
+function render(){
+  $("q").value!==S.q&&($("q").value=S.q);
+  $("group").value=S.group;$("sort").value=S.sort;
+  renderTabs();renderBar();renderFacets();renderList();save();
+}
+
+/* events */
+document.addEventListener("click",e=>{
+  const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.tab){S.tab=t.dataset.tab;shown=PAGE}
+  else if(t.dataset.dim){const a=S[t.dataset.dim],v=t.dataset.val,i=a.indexOf(v);i<0?a.push(v):a.splice(i,1);shown=PAGE}
+  else if(t.dataset.fix){S.fix=t.dataset.fix;shown=PAGE}
+  else if(t.id==="clear"){const k=S.tab,g=S.group,s=S.sort;S={...defaults(),tab:k,group:g,sort:s};shown=PAGE}
+  else if(t.id==="more"){shown+=PAGE}
+  else if(t.dataset.id){const id=+t.dataset.id;open.has(id)?open.delete(id):open.add(id);const y=window.scrollY;renderList();window.scrollTo(0,y);return}
+  else if(t.id==="copycsv"){copyCsv();return}
+  else return;
+  render();
+});
+$("q").addEventListener("input",e=>{S.q=e.target.value;shown=PAGE;renderTabs();renderBar();renderFacets();renderList()});
+$("group").addEventListener("change",e=>{S.group=e.target.value;shown=PAGE;render()});
+$("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
+
+function copyCsv(){
+  const q=v=>`"${String(v??"").replace(/"/g,'""')}"`;
+  const rows=F.filter(f=>match(f)).sort(sortFn());
+  const csv=[["status","severity","cvss","package","installed","fixed_version","vuln_id","title","target","type","tools"].join(","),
+    ...rows.map(f=>[f.status,f.severity,f.cvss,f.package,f.installed,f.fixed_version,f.vuln_id,f.title,f.target,f.category,f.tools.join("+")].map(q).join(","))].join("\n");
+  const btn=$("copycsv"),ta=$("csv");
+  const fallback=()=>{ta.value=csv;ta.style.display="block";ta.select();btn.textContent="Select and copy below"};
+  try{navigator.clipboard.writeText(csv).then(()=>{ta.style.display="none";btn.textContent=`Copied ${rows.length} rows`;setTimeout(()=>btn.textContent="Copy as CSV",2000)},fallback)}catch(e){fallback()}
+}
+
+/* header */
+const gen=new Date(DATA.generated);
+$("meta").textContent=`Scanned ${gen.toLocaleString([], {dateStyle:"medium",timeStyle:"short"})}`;
+$("sources").textContent=`Sources: ${TOOLS.join(" + ")} · ${[...new Set(F.map(f=>f.target))].length} targets`;
+$("note").textContent="Fixed = present in an earlier scan (or the pre-fix lockfile baseline) and gone now. Python dependencies have no lockfile, so they are covered through the built image only. Re-run scripts/vuln_scan.sh to refresh.";
+if(matchMedia("(max-width:860px)").matches)$("rail").open=false;
+if(S.tab==="open"&&!F.some(f=>f.status!=="fixed"))S.tab="fixed";
+render();
+</script>
