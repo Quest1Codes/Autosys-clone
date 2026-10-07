@@ -23,7 +23,7 @@ RUN npm run build
 # a distribution split across separate containers/images would need the
 # client to run docker-compose and know which piece is which, which defeats
 # the point of a one-line `docker run`.
-FROM python:3.11-alpine AS runtime
+FROM python:3.14-alpine AS runtime
 
 WORKDIR /app
 
