@@ -1922,9 +1922,6 @@ All configuration is via environment variables (12-factor app style).
 | `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL (Phase 10) |
 | `PD_ROUTING_KEY` | — | PagerDuty Events API routing key (Phase 10) |
 | `AUTOSYS_SQL_ECHO` | `false` | Set to `true` to log all SQL statements |
-| `FRP_SERVER` | — | Advanced/optional: remote tunnel relay host, for `docker run <image>` single-container mode only (`docker-entrypoint.sh`). **Not** how this repo connects to a local Shinro -- that's the `shinro` Docker network (see [Running alongside Shinro](#running-alongside-shinro-fidelity-deployment)). Leave unset unless the simulator needs to run on a machine Shinro can't reach directly (behind NAT, no public IP). |
-| `FRP_TOKEN` | — | Auth token for the FRP relay above. |
-| `FRP_STCP_KEY` | — | Shared secret for the FRP relay's STCP proxy. |
 
 For testing, `monkeypatch.setenv("AUTOSYS_DB_URL", ...)` is sufficient to
 isolate each test in its own SQLite file. The engine cache is keyed by URL, so
