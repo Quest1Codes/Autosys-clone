@@ -15,7 +15,7 @@ dependencies = [
     # Data validation & serialisation
     # Pinned exactly to match shinro/apps/api's pin (A1: one CVE report for
     # the two packages Shinro and this simulator both ship, not two).
-    "pydantic == 2.11.5",
+    "pydantic == 2.13.5",
     "pydantic-settings",
 
     # ORM & database
