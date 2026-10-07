@@ -1,11 +1,10 @@
 name: autosys-clone - CI
 
-# First CI workflow for this repo (task A5 -- there was none at all before
-# this). Scoped deliberately narrow: test the Python package, scan source
-# dependencies with OSV-Scanner (task A2, Vishy named it specifically), build
-# both shipped images and scan them with Trivy (task A3/A6 -- OS/image-layer
-# CVEs OSV doesn't cover at all). No deploy job yet; this repo doesn't have
-# one to model against the way shinro's CI does.
+# Tests, then a vulnerability gate: OSV-Scanner on source dependencies, Trivy on
+# the filesystem (secrets + Dockerfile misconfigurations) and on every shipped
+# image. HIGH/CRITICAL findings that have a fix available fail the build;
+# MEDIUM and up are always listed in the job summary. Also runs daily, because
+# new CVEs are published against dependencies that haven't changed.
 
 on:
   pull_request:
@@ -14,6 +13,9 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -108,7 +110,6 @@ jobs:
             --output=osv-report.txt
             --recursive
             .
-        continue-on-error: true
 
       - name: Publish OSV-Scanner Report to Summary
         if: always()
@@ -125,39 +126,101 @@ jobs:
             echo "✅ No known vulnerabilities found." >> "$GITHUB_STEP_SUMMARY"
           fi
 
+  frontend:
+    name: Frontend (type-check, build, npm audit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wcc-frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: wcc-frontend/package-lock.json
+
+      - run: npm ci
+      - name: Type-check and build
+        run: npm run build
+      - name: npm audit (fails on high or critical)
+        run: npm audit --audit-level=high
+
+  # Secrets and Dockerfile misconfigurations (e.g. running as root), plus the
+  # lockfile again via Trivy's own database as a second opinion to OSV.
+  fs_scan:
+    name: Trivy (filesystem, secrets, Dockerfiles)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          skip-dirs: wcc-frontend/node_modules,reports
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
   scan_images:
-    name: Build & Scan Docker Images
+    name: Build & Scan (${{ matrix.image.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         image:
           - name: autosys-clone
-            target: runtime
+            context: .
+            args: --target runtime
           - name: autosys-clone-web
-            target: nginx-runtime
+            context: .
+            args: --target nginx-runtime
+          - name: autosys-postgres
+            context: deploy/postgres
+            args: ""
     steps:
       - name: Checkout Code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # --pull: rebuild on the current base image so a patched base is picked
+      # up rather than a cached, stale layer.
       - name: Build Image
         run: |
-          docker build --target "${{ matrix.image.target }}" \
-            -t "${{ matrix.image.name }}:ci" .
+          docker build --pull ${{ matrix.image.args }} \
+            -t "${{ matrix.image.name }}:ci" "${{ matrix.image.context }}"
 
-      # exit-code stays "0" (report, don't block) -- no agreed vulnerability
-      # triage/SLA policy yet (task C3, not started). Same non-blocking
-      # posture as shinro's own Trivy job; revisit once C3 lands.
-      - name: Run Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+      # Full picture, never blocks: everything MEDIUM and up, in the summary.
+      - name: Trivy report (MEDIUM and above)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: "${{ matrix.image.name }}:ci"
           format: "table"
           output: "trivy-report-${{ matrix.image.name }}.txt"
           exit-code: "0"
           ignore-unfixed: true
-          vuln-type: "os,library"
+          scanners: vuln
           severity: "MEDIUM,HIGH,CRITICAL"
+
+      # The gate: a HIGH or CRITICAL with a fix available fails the build.
+      # Unfixed ones are ignored here (nothing to upgrade to) but still show
+      # up in the daily dashboard scan.
+      - name: Trivy gate (HIGH/CRITICAL with a fix)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: "${{ matrix.image.name }}:ci"
+          format: "table"
+          exit-code: "1"
+          ignore-unfixed: true
+          scanners: vuln
+          severity: "HIGH,CRITICAL"
 
       - name: Publish Trivy Scan Report to Summary
         if: always()
@@ -173,3 +236,46 @@ jobs:
           else
             echo "✅ No vulnerabilities found." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  # The images are minimal (Alpine, non-root); a change that scans clean can
+  # still fail to start. Run both and hit them the way a user would.
+  smoke:
+    name: Smoke test (images start and serve)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Build images
+        run: |
+          docker build --target runtime -t autosys-clone:ci .
+          docker build -t autosys-postgres:ci deploy/postgres
+
+      - name: Bundle mode serves the UI and issues a login token
+        shell: bash
+        run: |
+          docker run -d --name bundle -p 8080:8080 \
+            -e AUTOSYS_JWT_SECRET="$(openssl rand -hex 32)" \
+            -e AUTOSYS_USERS='{"admin":{"password":"ci-only-password","role":"admin"}}' \
+            autosys-clone:ci
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/ >/dev/null && break
+            docker inspect -f '{{.State.Running}}' bundle | grep -q true || { docker logs bundle; exit 1; }
+            sleep 2
+          done
+          curl -sf http://localhost:8080/ >/dev/null || { docker logs bundle; exit 1; }
+          curl -sf -X POST http://localhost:8080/api/v1/auth/token \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"ci-only-password"}' | grep -q access_token
+          test "$(docker exec bundle id -u)" = 1001
+
+      - name: Postgres image is healthy and non-root
+        shell: bash
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=ci-only-password autosys-postgres:ci
+          for i in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' pg)" = healthy ] && break
+            sleep 2
+          done
+          test "$(docker inspect -f '{{.State.Health.Status}}' pg)" = healthy
+          test "$(docker exec pg id -un)" = postgres

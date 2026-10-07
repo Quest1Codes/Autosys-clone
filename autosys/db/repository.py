@@ -36,6 +36,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import delete, func, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from autosys.models.enums import JobStatus
@@ -982,18 +983,30 @@ class MachineRepository:
         by ``autosys machine register`` and by the agent server on startup.
         """
         row: Optional[MachineRow] = session.get(MachineRow, machine_name)
+        _inserted = False
         if row is None:
-            row = MachineRow(
-                machine_name = machine_name,
-                host         = host,
-                port         = port,
-                status       = status,
-                description  = description,
-                members_json = members_json,
-            )
-            session.add(row)
-            session.flush()   # make it persistent so subsequent session.get() calls find it
-        else:
+            try:
+                # Savepoint, so losing an insert race rolls back only this
+                # insert and not the caller's whole transaction. The agent
+                # server registers itself on startup while the CLI/API may
+                # register the same machine at the same moment; both can see
+                # "no row" and the second insert hits the primary key.
+                with session.begin_nested():
+                    row = MachineRow(
+                        machine_name = machine_name,
+                        host         = host,
+                        port         = port,
+                        status       = status,
+                        description  = description,
+                        members_json = members_json,
+                    )
+                    session.add(row)
+                    session.flush()   # make it persistent so subsequent session.get() calls find it
+                _inserted = True
+            except IntegrityError:
+                # Someone else inserted it first -- fall through to the update.
+                row = session.get(MachineRow, machine_name)
+        if row is not None and not _inserted:
             row.host        = host
             row.port        = port
             row.status      = status

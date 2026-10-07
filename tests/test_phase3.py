@@ -660,7 +660,11 @@ class TestCLIAutorep:
 
     def _run(self, *args):
         runner = CliRunner()
-        return runner.invoke(autosys, list(args), catch_exceptions=False)
+        # CliRunner is not a terminal, so rich falls back to 80 columns, which
+        # is narrower than the report table (its columns have minimum widths)
+        # and crops the right-hand ST / Type columns. Give it a real width.
+        return runner.invoke(autosys, list(args), catch_exceptions=False,
+                             env={"COLUMNS": "200"})
 
     def test_autorep_single_job(self):
         self._run("jil", "import", str(_DEMO_JIL))

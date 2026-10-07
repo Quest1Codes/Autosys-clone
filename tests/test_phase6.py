@@ -580,3 +580,44 @@ class TestCLIMachineCommands:
         result = self._run("machine", "check", "dead-cli", "--timeout", "0.3")
         assert result.exit_code != 0
         assert "DOWN" in result.output
+
+
+# ===========================================================================
+# Registering the same machine concurrently
+# ===========================================================================
+
+class TestRegisterRace:
+    """The agent server registers itself on startup while the CLI/API may
+    register the same machine name; losing that insert race must update the
+    row, not raise a primary-key IntegrityError."""
+
+    def test_losing_the_insert_race_updates_instead_of_raising(self):
+        from autosys.db.schema import MachineRow
+        from sqlalchemy.orm import Session
+        from autosys.db.connection import get_sync_engine
+
+        # Make session.get() miss even though the row exists -- exactly what a
+        # concurrent insert between the check and the INSERT looks like.
+        with sync_session() as session:
+            machine_repo.register(session, "race-box", "10.0.0.1", 7520, status="UP")
+
+        real_get = Session.get
+        calls = {"n": 0}
+
+        def blind_first_get(self, entity, ident, *a, **kw):
+            if entity is MachineRow and ident == "race-box" and calls["n"] == 0:
+                calls["n"] += 1
+                return None
+            return real_get(self, entity, ident, *a, **kw)
+
+        Session.get = blind_first_get
+        try:
+            with sync_session() as session:
+                row = machine_repo.register(session, "race-box", "10.0.0.2", 9999, status="DOWN")
+                assert (row.host, row.port, row.status) == ("10.0.0.2", 9999, "DOWN")
+        finally:
+            Session.get = real_get
+
+        with sync_session() as session:
+            row = machine_repo.get(session, "race-box")
+            assert (row.host, row.port, row.status) == ("10.0.0.2", 9999, "DOWN")
