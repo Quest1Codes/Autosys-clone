@@ -27,7 +27,7 @@ dependencies = [
     # about the code changed. Pinned exactly rather than left as >= 2.0 to
     # match shinro/apps/api's own exact pin (A1: one CVE report for the two
     # packages Shinro and this simulator both ship, not two).
-    "sqlalchemy[asyncio] == 2.0.41",
+    "sqlalchemy[asyncio] == 2.0.54",
     "aiosqlite",           # async SQLite driver
 
     # Transitive-only, pinned explicitly to force a patched version -- found
