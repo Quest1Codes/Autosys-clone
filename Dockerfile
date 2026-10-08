@@ -75,11 +75,15 @@ RUN pip install --no-cache-dir -e .[pg] \
 # Alpine's far smaller package set has none outstanding. bash is needed by
 # docker-entrypoint.sh (`wait -n`, arrays).
 #
+# PostgreSQL 17, the same major version the Debian image shipped: PostgreSQL
+# cannot open a data directory written by a newer major version, so moving to
+# Alpine's postgresql16 made every existing /app/data volume fail to start.
+#
 # upgrade first: the base image's own published snapshot lags Alpine's
 # security repo by however long it's been since that snapshot was built --
 # apply what's already patched upstream before installing anything else.
 RUN apk upgrade --no-cache \
-    && apk add --no-cache bash nginx postgresql16
+    && apk add --no-cache bash nginx postgresql17
 
 # Non-root runtime (static-analysis finding SEC-01: this image used to run
 # every process -- API, WCC, nginx, PostgreSQL -- as UID 0, which bank
