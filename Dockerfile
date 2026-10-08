@@ -150,7 +150,7 @@ CMD []
 # is where auth/JIL-import/sendevent live, so serving the SPA from its own
 # process would break login the moment a real browser (not curl hitting a
 # port directly) loads it.
-FROM nginx:1.27-alpine AS nginx-runtime
+FROM nginx:1.31-alpine AS nginx-runtime
 
 # Same reasoning as the runtime stage's apt-get upgrade: apply whatever
 # Alpine has already patched since this tag's snapshot was published.
