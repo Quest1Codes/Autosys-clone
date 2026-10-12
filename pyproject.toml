@@ -16,7 +16,6 @@ dependencies = [
     # Pinned exactly to match shinro/apps/api's pin (A1: one CVE report for
     # the two packages Shinro and this simulator both ship, not two).
     "pydantic == 2.11.5",
-    "pydantic-settings",
 
     # ORM & database
     # The [asyncio] extra pulls in greenlet, which SQLAlchemy >= 2.1 requires
@@ -35,27 +34,20 @@ dependencies = [
     # being imported by this codebase directly.
     "msgpack >= 1.2.1",
 
-    # Async runtime
-    "anyio",
-
     # Web (used from Phase 6 onward – declared early so the venv is stable)
-    "fastapi",
-    "uvicorn[standard]",
-    "httpx",               # async HTTP client (agent callbacks)
-    "jinja2",              # WCC HTML templates (Phase 9)
-    "python-multipart",    # form data (Phase 9)
+    # Pinned exactly to match shinro/apps/api's pin (A1: one CVE report for
+    # the two packages, not two) -- both were previously left unpinned and had
+    # drifted to different resolved versions.
+    "fastapi == 0.138.0",
+    "uvicorn[standard] == 0.34.3",
 
     # CLI
-    "click",
-    "rich",
-    "tabulate",
+    # Pinned exactly to match shinro/apps/api's pin (A1), same reason as fastapi above.
+    "click == 8.3.3",
+    "rich == 14.0.0",
 
     # Logging
     "loguru",
-
-    # Utilities
-    "python-dateutil",     # calendar / time parsing helpers
-    "croniter",            # cron-style schedule evaluation
 ]
 
 [project.optional-dependencies]
@@ -65,6 +57,8 @@ dev = [
     "pytest-cov",
     "ruff",
     "black",
+    "httpx",               # async HTTP client, used by tests/test_phase12.py only --
+                           # never imported by the shipped autosys/ package (dependency audit, Oct 2026).
 ]
 pg = [
     "asyncpg",
