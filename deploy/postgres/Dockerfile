@@ -14,7 +14,7 @@
 # NOTE: an existing volume created by the Debian image cannot be reused as-is
 # (different UID and a glibc -> musl collation change that can corrupt text
 # indexes). Dump and restore, or `docker volume rm autosys-pgdata` for dev data.
-FROM postgres:16-alpine
+FROM postgres:18-alpine
 # apk upgrade: the base tag's snapshot lags Alpine's security repo (e.g. zlib
 # CVE-2026-85091 fixed in 1.3.2-r1) -- apply what is already patched upstream.
 RUN apk upgrade --no-cache && rm -f /usr/local/bin/gosu
