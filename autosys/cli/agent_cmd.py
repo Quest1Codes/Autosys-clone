@@ -55,8 +55,6 @@ from rich import box as rich_box
 
 from autosys.db.connection import sync_session
 from autosys.db.repository import jobs as job_repo, runs as run_repo, output as output_repo
-from autosys.agent.dispatch import AgentDispatch
-from autosys.agent.server import AgentServer
 from autosys.safety import real_execution_error
 
 from autosys.scheduler.event_processor import EventProcessor
@@ -113,6 +111,7 @@ def agent_start(poll_interval: float, machine: Optional[str]) -> None:
     local_name = machine or socket.gethostname()
 
     _refuse_without_opt_in()
+    from autosys.agent.dispatch import AgentDispatch
     agent     = AgentDispatch(local_only=True)
     processor = EventProcessor(
         dispatch_fn   = agent.dispatch,
@@ -169,6 +168,7 @@ def agent_serve(machine: str, host: str, port: int) -> None:
         UP  etl-server-01  0.0.0.0:7520  active_jobs=[]  uptime=1.2s
     """
     _refuse_without_opt_in()
+    from autosys.agent.server import AgentServer
     server = AgentServer(machine_name=machine, host=host, port=port)
 
     _console.print(
@@ -207,6 +207,7 @@ def agent_run_once(quiet: bool, wait: int) -> None:
     import time
 
     _refuse_without_opt_in()
+    from autosys.agent.dispatch import AgentDispatch
     agent     = AgentDispatch(local_only=True)
     processor = EventProcessor(
         dispatch_fn   = agent.dispatch,

@@ -369,6 +369,20 @@ export AUTOSYS_DB_URL="postgresql://user:pass@localhost:5432/autosys"
 pytest tests/ -m postgresql
 ```
 
+### Image variants: full vs dry-run only
+
+The `runtime` target takes a `DRY_RUN_ONLY` build arg:
+
+```bash
+# Full (default)
+docker build --target runtime -t autosys-clone:full .
+
+# Dry-run only: same sim, WCC, UI, dependency graph and assessment/complexity
+# endpoints, but the real-execution code (autosys/agent dispatch, runners,
+# server) is deleted from the image. `--dry-run` is the only mode.
+docker build --target runtime --build-arg DRY_RUN_ONLY=true -t autosys-clone:dryrun .
+```
+
 ### Docker Compose (recommended — matches how this ships)
 
 > [!WARNING]

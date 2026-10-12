@@ -1,5 +1,10 @@
 # syntax=docker/dockerfile:1
 
+# DRY_RUN_ONLY=true builds the simulator without any real-execution code
+# (agent dispatch/runners/server + unused cross-instance/cloud clients). WCC,
+# the UI, nginx, PostgreSQL and the assessment endpoints are unchanged.
+#   docker build --target runtime --build-arg DRY_RUN_ONLY=true -t autosys-clone:dryrun .
+
 # ---------------------------------------------------------------------------
 # Stage 1 — build the WCC React frontend
 # ---------------------------------------------------------------------------
@@ -25,6 +30,8 @@ RUN npm run build
 # the point of a one-line `docker run`.
 FROM python:3.11-alpine AS runtime
 
+ARG DRY_RUN_ONLY=false
+
 WORKDIR /app
 
 # autosys/wcc/app.py and autosys/db/connection.py both resolve paths
@@ -34,6 +41,12 @@ WORKDIR /app
 # switch this to installing a built wheel.
 COPY pyproject.toml README.md ./
 COPY autosys ./autosys
+RUN if [ "$DRY_RUN_ONLY" = "true" ]; then \
+      rm -f autosys/agent/dispatch.py autosys/agent/runner.py \
+            autosys/agent/runners.py autosys/agent/server.py \
+            autosys/engine/xinst_client.py autosys/engine/cloud_integration.py \
+            autosys/engine/agent_monitor.py; \
+    fi
 # The base image bundles its own outdated (CVE'd) pip and setuptools, both
 # installed and as ensurepip bootstrap wheels -- upgrade and drop the cached
 # wheels so neither carries forward. setuptools vendors its own copies of

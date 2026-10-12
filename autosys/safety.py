@@ -18,6 +18,7 @@ Kept free of heavy imports so the agent package can use it.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 #: Env var that must be explicitly true before anything executes. Deliberately
 #: has no safe-looking default.
@@ -28,8 +29,17 @@ class RealExecutionRefused(RuntimeError):
     """Raised when something tries to execute without the opt-in."""
 
 
+#: True in a DRY_RUN_ONLY image build, which deletes the real-execution
+#: modules (see the Dockerfile). Nothing can execute there, whatever the env.
+# A file check, not importlib.util.find_spec: find_spec imports the parent
+# package (autosys.agent), which imports modules that import this one.
+DRY_RUN_ONLY_BUILD = not (Path(__file__).parent / "agent" / "runner.py").exists()
+
+
 def real_execution_allowed() -> bool:
     """True only when the operator has explicitly opted in."""
+    if DRY_RUN_ONLY_BUILD:
+        return False
     return os.environ.get(REAL_EXECUTION_ENV_VAR, "").strip().lower() == "true"
 
 
@@ -37,6 +47,11 @@ def real_execution_error() -> str | None:
     """Problem string if real execution is not permitted, else None."""
     if real_execution_allowed():
         return None
+    if DRY_RUN_ONLY_BUILD:
+        return (
+            "this is a dry-run-only build: the real-execution code is not "
+            "installed, so only --dry-run is available."
+        )
     return (
         f"{REAL_EXECUTION_ENV_VAR} must be 'true' to run without --dry-run -- "
         "this process refuses to dispatch real commands to real machines "
