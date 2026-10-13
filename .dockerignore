@@ -5,6 +5,14 @@
 .sim_logs
 data
 
+# Compiled bytecode from the developer's working tree. Two reasons: it makes
+# the image contents depend on whoever ran the build (the digests we publish
+# have to be reproducible), and a DRY_RUN_ONLY build deletes .py files, so a
+# copied __pycache__ would leave the stripped modules' bytecode behind.
+__pycache__
+*.pyc
+*.pyo
+
 wcc-frontend/node_modules
 wcc-frontend/dist
 

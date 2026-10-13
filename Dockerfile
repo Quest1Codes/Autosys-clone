@@ -41,7 +41,14 @@ WORKDIR /app
 # switch this to installing a built wheel.
 COPY pyproject.toml README.md ./
 COPY autosys ./autosys
-RUN if [ "$DRY_RUN_ONLY" = "true" ]; then \
+# The __pycache__ sweep is deliberate, not tidying: .dockerignore keeps
+# compiled bytecode out of the build context, but if that entry is ever
+# dropped, deleting only the .py files would leave each stripped module's
+# .pyc behind -- still readable (`grep shell=True` finds it), which defeats
+# the point of the flag. Done unconditionally so both variants are identical
+# in this respect.
+RUN find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
+    if [ "$DRY_RUN_ONLY" = "true" ]; then \
       rm -f autosys/agent/dispatch.py autosys/agent/runner.py \
             autosys/agent/runners.py autosys/agent/server.py \
             autosys/engine/xinst_client.py autosys/engine/cloud_integration.py \
