@@ -8,7 +8,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1 — build the WCC React frontend
 # ---------------------------------------------------------------------------
-FROM node:20-slim AS frontend-build
+FROM node:26-slim AS frontend-build
 
 WORKDIR /app/wcc-frontend
 
