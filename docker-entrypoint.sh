@@ -82,9 +82,15 @@ if [ "$#" -eq 0 ]; then
     rm -f /tmp/pg-pwfile
   fi
 
+  # PostgreSQL's log goes to this container's stderr, not a file in /tmp:
+  # a container's logs belong on its stdout/stderr for the cluster's log
+  # collector to pick up, and nobody can read /tmp/postgres.log in a pod
+  # without exec access. logging_collector stays off so postgres writes
+  # straight to the stderr pg_ctl hands it rather than capturing it back
+  # into its own log directory.
   echo "[entrypoint] starting PostgreSQL"
-  "${PG_BIN}/pg_ctl" -D "${PGDATA}" -l /tmp/postgres.log -w \
-    -o "-c listen_addresses=localhost -c unix_socket_directories=${PG_SOCKET_DIR}" start
+  "${PG_BIN}/pg_ctl" -D "${PGDATA}" -l /dev/stderr -w \
+    -o "-c listen_addresses=localhost -c unix_socket_directories=${PG_SOCKET_DIR} -c logging_collector=off -c log_destination=stderr" start
   PG_STARTED=1
 
   for i in $(seq 1 30); do

@@ -104,7 +104,7 @@ def get_metrics(_user: CurrentUser = Depends(get_current_user)):
     """
     Return Prometheus-format metrics.
 
-    Requires auth (any role) -- this is Fidelity's own platform team's
+    Requires auth (any role) -- this is the client's own platform team's
     monitoring surface, not the client-facing "what does this estate look
     like" answer (that's V3's estate-overview page in WCC).
     """

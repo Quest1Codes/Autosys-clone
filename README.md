@@ -424,10 +424,10 @@ All three need the same `.env` (`AUTOSYS_JWT_SECRET`, `AUTOSYS_USERS`) — the
 
 A fourth file, `docker-compose.shinro.yml`, is an optional override (not a
 standalone variant) — layer it on top of `docker-compose.yml` to join
-Shinro's Docker network. See [Running alongside Shinro](#running-alongside-shinro-fidelity-deployment)
+Shinro's Docker network. See [Running alongside Shinro](#running-alongside-shinro-client-deployment)
 below.
 
-#### Running alongside Shinro (Fidelity deployment)
+#### Running alongside Shinro (client deployment)
 
 Plain `docker compose up -d` above is fully standalone — no Shinro network
 required, works with no Shinro checkout anywhere nearby. To also join

@@ -118,12 +118,26 @@ RUN apk upgrade --no-cache \
 # is http.d/default.conf on :8080 -- its pid file defaults to root-owned /run, and
 # the `user` directive only applies to a root master process (a warning
 # otherwise). Its log and temp dirs are handed to the runtime user.
+#
+# Logs go to stdout/stderr, not /var/log/nginx: a container's logs belong on
+# its stdout so the cluster's log collector picks them up (and the client
+# document says all components write there), and writing to files is what
+# would otherwise force a writable /var/log/nginx mount under
+# readOnlyRootFilesystem. Rewritten in the base image's nginx.conf rather
+# than our server block because access_log/error_log are set at http level
+# there, and nginx opens those paths at startup whatever a server block says.
 RUN addgroup -S -g 1001 autosys \
     && adduser -S -u 1001 -G autosys -h /app -H -s /sbin/nologin autosys \
     && rm -f /etc/nginx/http.d/default.conf \
     && sed -i -e '/^user /d' -e '1i pid /tmp/nginx.pid;' /etc/nginx/nginx.conf \
-    && mkdir -p /var/lib/nginx/tmp /var/log/nginx \
-    && chown -R autosys:autosys /var/lib/nginx /var/log/nginx
+    && sed -i -e 's#^[[:space:]]*access_log .*#    access_log /dev/stdout main;#' \
+              -e 's#^[[:space:]]*error_log .*#error_log /dev/stderr warn;#' \
+              /etc/nginx/nginx.conf \
+    && grep -q 'access_log /dev/stdout' /etc/nginx/nginx.conf \
+    && grep -q 'error_log /dev/stderr' /etc/nginx/nginx.conf \
+    && mkdir -p /var/lib/nginx/tmp /var/lib/nginx/logs \
+    && ln -sf /dev/stderr /var/lib/nginx/logs/error.log \
+    && chown -R autosys:autosys /var/lib/nginx
 
 COPY --from=frontend-build /app/wcc-frontend/dist ./wcc-frontend/dist
 COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
