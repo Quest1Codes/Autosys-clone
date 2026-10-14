@@ -38,7 +38,7 @@ dependencies = [
     # Pinned exactly to match shinro/apps/api's pin (A1: one CVE report for
     # the two packages, not two) -- both were previously left unpinned and had
     # drifted to different resolved versions.
-    "fastapi == 0.138.0",
+    "fastapi == 0.143.0",
     "uvicorn[standard] == 0.34.3",
 
     # CLI
