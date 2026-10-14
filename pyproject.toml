@@ -43,7 +43,7 @@ dependencies = [
 
     # CLI
     # Pinned exactly to match shinro/apps/api's pin (A1), same reason as fastapi above.
-    "click == 8.3.3",
+    "click == 8.5.0",
     "rich == 14.0.0",
 
     # Logging
