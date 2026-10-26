@@ -43,7 +43,7 @@ if [ "$#" -eq 0 ]; then
   # UID and can't be opened -- recreate it (`docker volume rm`) or chown it
   # to 1001 once.
   # ---------------------------------------------------------------------
-  PG_BIN="$(dirname "$(find /usr/libexec /usr/lib/postgresql -maxdepth 3 -name initdb 2>/dev/null | head -n1)")"
+  PG_BIN="$(dirname "$(find /usr/libexec /usr/lib/postgresql /opt/pgsql -maxdepth 3 -name initdb 2>/dev/null | head -n1)")"
   PGDATA=/app/data/pgdata
   PG_SOCKET_DIR=/tmp
 
@@ -76,6 +76,7 @@ if [ "$#" -eq 0 ]; then
     # let any process in the container connect as any role with no password.
     (umask 077; printf '%s\n' "$PG_SUPER_PASSWORD" > /tmp/pg-pwfile)
     "${PG_BIN}/initdb" -D "${PGDATA}" -U postgres --pwfile=/tmp/pg-pwfile \
+      --encoding=UTF8 --locale=C.UTF-8 \
       --auth-local=scram-sha-256 --auth-host=scram-sha-256 \
       > /tmp/initdb.log 2>&1 \
       || { echo "[entrypoint] initdb failed:"; cat /tmp/initdb.log; rm -f /tmp/pg-pwfile; exit 1; }
@@ -131,7 +132,7 @@ SQL
   PIDS+=("$!")
 
   echo "[entrypoint] starting nginx on :8080 (WCC UI, JIL upload)"
-  nginx -g "daemon off;" &
+  nginx -e /dev/stderr -g "daemon off;" &
   PIDS+=("$!")
 
   set +e

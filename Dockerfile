@@ -28,26 +28,99 @@ RUN npm run build
 # a distribution split across separate containers/images would need the
 # client to run docker-compose and know which piece is which, which defeats
 # the point of a one-line `docker run`.
-FROM python:3.11-alpine AS runtime
+#
+# Base is ubi-micro, which has no package manager, so everything is installed
+# into /mnt/rootfs from a full UBI 9 stage (dnf --installroot) and the result
+# is copied onto ubi-micro. The nginx module stream is enabled on the build
+# host AND copied into the install root, otherwise --installroot ignores it and
+# installs the stock 1.20.
+#
+# Python and PostgreSQL are NOT installed from RPMs. Red Hat's python3.12 RPM
+# and the PostgreSQL server (UBI 9 only carries the client; the server is in
+# PGDG) drag in libraries -- libxml2, krb5, openldap, cyrus-sasl -- that the
+# app never uses but that scanners report against. Instead:
+#   * Python is an upstream python-build-standalone build (via uv), which is
+#     patched on upstream's schedule, not Red Hat's, and carries no system
+#     library dependencies beyond glibc.
+#   * PostgreSQL 17 is built from the source tarball (checksum-pinned) with
+#     libxml, gssapi, ldap, pam, icu and readline switched off, so none of
+#     those libraries are installed at all. Same major version as before, so
+#     existing /app/data volumes still open.
+FROM registry.access.redhat.com/ubi9/ubi AS pgbuild
+ARG PG_VERSION=17.11
+ARG PG_SHA256=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979
+# bison and flex are build-time only (this stage never reaches the image). UBI's
+# repos don't carry them and PostgreSQL's release tarball does not ship the
+# generated parser files, so they are built from checksum-pinned tarballs.
+ARG BISON_SHA256=9bba0214ccf7f1079c5d59210045227bcf619519840ebfa80cd3849cff5a5bf2
+ARG FLEX_SHA256=e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995
+RUN dnf install -y --setopt=install_weak_deps=false gcc gcc-c++ make tar bzip2 xz \
+        openssl-devel zlib-devel diffutils findutils perl perl-FindBin perl-File-Compare perl-File-Copy perl-File-Basename perl-Getopt-Long perl-Data-Dumper perl-Time-HiRes perl-IPC-Cmd m4 \
+    && curl -fsSL -o /tmp/bison.tar.xz https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz \
+    && echo "${BISON_SHA256}  /tmp/bison.tar.xz" | sha256sum -c - \
+    && tar -C /tmp -xJf /tmp/bison.tar.xz && cd /tmp/bison-3.8.2 \
+    && ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null \
+    && curl -fsSL -o /tmp/flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz \
+    && echo "${FLEX_SHA256}  /tmp/flex.tar.gz" | sha256sum -c - \
+    && tar -C /tmp -xzf /tmp/flex.tar.gz && cd /tmp/flex-2.6.4 \
+    && ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
+RUN curl -fsSL -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
+    && echo "${PG_SHA256}  /tmp/pg.tar.bz2" | sha256sum -c - \
+    && tar -C /tmp -xjf /tmp/pg.tar.bz2 \
+    && cd "/tmp/postgresql-${PG_VERSION}" \
+    && ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readline \
+         --without-libxml --without-libxslt --without-gssapi --without-ldap \
+         --without-pam --without-systemd --without-llvm --without-lz4 --without-zstd \
+    && make -j"$(nproc)" world-bin \
+    && make install-world-bin \
+    && (find /opt/pgsql -type f \( -name '*.so*' -o -perm -u+x \) -exec strip --strip-unneeded {} + 2>/dev/null || true) \
+    && rm -rf /opt/pgsql/include /opt/pgsql/lib/pkgconfig /opt/pgsql/share/doc /opt/pgsql/share/man \
+    && test -x /opt/pgsql/bin/initdb
+
+FROM registry.access.redhat.com/ubi9/ubi AS pybuild
+ARG UV_VERSION=0.11.27
+ARG PY_VERSION=3.12
+RUN dnf install -y --setopt=install_weak_deps=false python3-pip \
+    && pip3 install --no-cache-dir "uv==${UV_VERSION}" \
+    && UV_PYTHON_INSTALL_DIR=/opt/uvpy uv python install "${PY_VERSION}" \
+    && mv /opt/uvpy/cpython-"${PY_VERSION}".* /opt/python \
+    # uv marks its interpreters externally managed; pip must install into this one.
+    && find /opt/python -name EXTERNALLY-MANAGED -delete \
+    && /opt/python/bin/python3 --version
+
+FROM registry.access.redhat.com/ubi9/ubi AS rootfs
+
+RUN mkdir -p /mnt/rootfs && rpm --root /mnt/rootfs --initdb \
+    && dnf -y module enable nginx:1.26 \
+    && mkdir -p /mnt/rootfs/etc/dnf/modules.d \
+    && cp /etc/dnf/modules.d/nginx.module /mnt/rootfs/etc/dnf/modules.d/ \
+    && dnf install -y --installroot /mnt/rootfs --releasever 9 \
+         --setopt=install_weak_deps=false --setopt=tsflags=nodocs \
+         bash coreutils-single nginx openssl-libs zlib libstdc++ grep findutils \
+    && dnf --installroot /mnt/rootfs clean all \
+    && rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/*
+COPY --from=pybuild /opt/python /mnt/rootfs/opt/python
+COPY --from=pgbuild /opt/pgsql /mnt/rootfs/opt/pgsql
+# Fixed numeric UID/GID (see the non-root note further down).
+RUN groupadd --root /mnt/rootfs -g 1001 autosys \
+    && useradd --root /mnt/rootfs -u 1001 -g autosys -d /app -M -s /sbin/nologin autosys
 
 ARG DRY_RUN_ONLY=false
-
-WORKDIR /app
 
 # autosys/wcc/app.py and autosys/db/connection.py both resolve paths
 # relative to the installed package location (Path(__file__).parents[2]),
 # expecting autosys/ and wcc-frontend/ to be sibling directories under the
 # project root. An editable install keeps that layout intact — do not
 # switch this to installing a built wheel.
-COPY pyproject.toml README.md ./
-COPY autosys ./autosys
+COPY pyproject.toml README.md /mnt/rootfs/app/
+COPY autosys /mnt/rootfs/app/autosys
 # The __pycache__ sweep is deliberate, not tidying: .dockerignore keeps
 # compiled bytecode out of the build context, but if that entry is ever
 # dropped, deleting only the .py files would leave each stripped module's
 # .pyc behind -- still readable (`grep shell=True` finds it), which defeats
 # the point of the flag. Done unconditionally so both variants are identical
 # in this respect.
-RUN find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
+RUN cd /mnt/rootfs/app && find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
     if [ "$DRY_RUN_ONLY" = "true" ]; then \
       rm -f autosys/agent/dispatch.py autosys/agent/runner.py \
             autosys/agent/runners.py autosys/agent/server.py \
@@ -59,9 +132,10 @@ RUN find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
 # wheels so neither carries forward. setuptools vendors its own copies of
 # jaraco.context/wheel internally (setuptools/_vendor/...), which is why
 # upgrading setuptools alone clears those two as well.
-RUN pip install --no-cache-dir --upgrade pip setuptools && \
-    rm -f /usr/local/lib/python3.11/ensurepip/_bundled/pip-*.whl \
-          /usr/local/lib/python3.11/ensurepip/_bundled/setuptools-*.whl
+# Run through chroot into the install root (with resolv.conf borrowed for the
+# network) so the rpm database can be edited afterwards: see the rpm -e below.
+RUN cp /etc/resolv.conf /mnt/rootfs/etc/resolv.conf \
+    && chroot /mnt/rootfs sh -c 'cd /app && /opt/python/bin/python3 -m pip install --no-cache-dir --upgrade pip setuptools'
 # [pg] pulls in psycopg2-binary/asyncpg — the compose files point
 # AUTOSYS_DB_URL at a PostgreSQL container, not the SQLite default.
 #
@@ -72,12 +146,71 @@ RUN pip install --no-cache-dir --upgrade pip setuptools && \
 # was already cached, undoing the upgrade above. Verified via Trivy: without
 # this second line, the shipped image still carried setuptools 70.3.0 with a
 # known CVE despite the upgrade three lines up.
-RUN pip install --no-cache-dir -e .[pg] \
-    && pip install --no-cache-dir --upgrade setuptools \
+RUN chroot /mnt/rootfs sh -c 'cd /app \
+      && /opt/python/bin/python3 -m pip install --no-cache-dir -e .[pg] \
+      && /opt/python/bin/python3 -m pip install --no-cache-dir --upgrade setuptools \
+      && /opt/python/bin/python3 -m pip uninstall -y pip' \
     # pip bundles its own (older) urllib3/msgpack/setuptools copies under
     # pip/_vendor, which scanners report as CVEs in this image. Nothing at
-    # runtime installs packages, so drop pip once the install is done.
-    && python -m pip uninstall -y pip
+    # runtime installs packages, so drop pip once the install is done -- and
+    # (there is no rpm pip any more: Python is not an RPM).
+    && rm -f /mnt/rootfs/etc/resolv.conf
+# Packages nothing in the container uses at runtime. dnf pulls them in as
+# dependencies of nginx (systemd, dbus, pam), of useradd (shadow-utils) and of
+# the install scriptlets (sed); the container never runs systemd, dbus, PAM
+# logins or package scripts. The `openssl` command-line tool (only PAM needed
+# it) goes too; the libraries (openssl-libs) stay for nginx and PostgreSQL. Erased with --nodeps from the rpm database too, so
+# scanners stop reporting CVEs against files that are gone. The ldd check right
+# after fails the build if any ELF binary we ship now lacks a shared library.
+RUN for p in systemd systemd-pam systemd-libs systemd-rpm-macros dbus dbus-broker dbus-common \
+             util-linux util-linux-core libfdisk libsmartcols shadow-utils libsemanage \
+             kmod-libs sed pam libpwquality cracklib cracklib-dicts audit-libs libdb \
+             libutempter libseccomp expat libgcrypt libgpg-error lz4-libs libzstd \
+             libcap-ng libeconf xz-libs redhat-logos-httpd openssl \
+             acl gzip bzip2-libs libmount libblkid libuuid \
+             p11-kit p11-kit-trust libtasn1 libffi alternatives \
+             openssl-fips-provider openssl-fips-provider-so; do \
+      if rpm --root /mnt/rootfs -q "$p" >/dev/null 2>&1; then \
+        rpm --root /mnt/rootfs -ql "$p" | while read -r f; do \
+          if [ -f "/mnt/rootfs$f" ] || [ -L "/mnt/rootfs$f" ]; then echo "$f"; fi; done >> /mnt/rootfs/.removed-files; \
+        rpm --root /mnt/rootfs -e --nodeps "$p"; \
+      fi; \
+    done \
+    # _tkinter (needs Tcl/Tk) and _crypt (needs libxcrypt-compat) are unused by
+    # the app and would otherwise leave unresolved libraries in the image.
+    && find /mnt/rootfs/opt/python -name '_tkinter*.so' -delete -o -name '_crypt*.so' -delete \
+    && chroot /mnt/rootfs bash -c ' \
+         bad=0; \
+         for f in /usr/sbin/nginx /usr/bin/bash /usr/bin/grep /usr/bin/find \
+                  $(find /opt/python /opt/pgsql -type f \( -name "*.so*" -o -perm -u+x \)); do \
+           if ldd "$f" 2>/dev/null | grep -q "not found"; then echo "missing library for $f"; bad=1; fi; \
+         done; exit $bad'
+# After the library check: ncurses-base is terminfo data and pcre2-syntax is
+# documentation; both are data nothing reads at runtime.
+# glibc-common and glibc-minimal-langpack STAY: glibc-common owns the C.utf8
+# locale files. Without that locale (and without LANG) initdb silently creates
+# a SQL_ASCII database, and every non-ASCII character in a JIL file then fails
+# to insert. Erasing the package but keeping the files would leave files no
+# package owns, which scanners cannot see.
+RUN for p in ncurses-base pcre2-syntax; do \
+      rpm --root /mnt/rootfs -ql "$p" | while read -r f; do \
+        if [ -f "/mnt/rootfs$f" ] || [ -L "/mnt/rootfs$f" ]; then echo "$f"; fi; done >> /mnt/rootfs/.removed-files; \
+      rpm --root /mnt/rootfs -e --nodeps "$p"; \
+    done
+
+FROM registry.access.redhat.com/ubi9/ubi-micro AS runtime
+COPY --from=rootfs /mnt/rootfs/ /
+# The python base image this replaced set the same; initdb, psql and Python
+# derive their encoding from it.
+ENV LANG=C.UTF-8
+# ubi-micro's own layer already contains files of some packages erased above
+# (glibc-common's ldd/getent/iconv, locales, terminfo). Erasing them from the
+# rpm database does not delete them from that layer, which would leave files
+# on disk that no package owns and scanners can no longer see. Delete every
+# file recorded for an erased package.
+RUN while read -r f; do rm -f -- "$f"; done < /.removed-files && rm -f /.removed-files
+ENV PATH=/opt/python/bin:/usr/local/bin:/usr/bin:/usr/sbin
+WORKDIR /app
 
 # nginx is the single origin the browser talks to: WCC's own SPA fallback
 # 404s anything under /api/v1/ (login, JIL import), which lives in the API
@@ -90,20 +223,8 @@ RUN pip install --no-cache-dir -e .[pg] \
 # and SQLite's single-writer model cannot take 300k+ files' worth of
 # concurrent writes. Only that mode uses it; the multi-container compose
 # files run their own separate `postgres` service instead.
-# Alpine (musl) rather than Debian slim: the Debian images carry ~270 unpatched
-# OS-package CVEs (glibc, libxml2, systemd libs...) with no fix available, where
-# Alpine's far smaller package set has none outstanding. bash is needed by
-# docker-entrypoint.sh (`wait -n`, arrays).
-#
-# PostgreSQL 17, the same major version the Debian image shipped: PostgreSQL
-# cannot open a data directory written by a newer major version, so moving to
-# Alpine's postgresql16 made every existing /app/data volume fail to start.
-#
-# upgrade first: the base image's own published snapshot lags Alpine's
-# security repo by however long it's been since that snapshot was built --
-# apply what's already patched upstream before installing anything else.
-RUN apk upgrade --no-cache \
-    && apk add --no-cache bash nginx postgresql17
+# nginx, bash, postgresql17-server and python were installed into the root
+# filesystem by the rootfs stage above; nothing to install here.
 
 # Non-root runtime (static-analysis finding SEC-01: this image used to run
 # every process -- API, WCC, nginx, PostgreSQL -- as UID 0, which bank
@@ -112,36 +233,34 @@ RUN apk upgrade --no-cache \
 # resolving a name. Single user rather than per-process users: the old
 # design only needed root to `su postgres`, and PostgreSQL is equally happy
 # to run as any non-root user that owns its data directory.
-#
-# nginx needs adjustments to run unprivileged: Alpine's stock default site
-# (http.d/default.conf) listens on :80 -- a privileged port, and unused, ours
-# is http.d/default.conf on :8080 -- its pid file defaults to root-owned /run, and
-# the `user` directive only applies to a root master process (a warning
-# otherwise). Its log and temp dirs are handed to the runtime user.
-#
-# Logs go to stdout/stderr, not /var/log/nginx: a container's logs belong on
-# its stdout so the cluster's log collector picks them up (and the client
-# document says all components write there), and writing to files is what
-# would otherwise force a writable /var/log/nginx mount under
-# readOnlyRootFilesystem. Rewritten in the base image's nginx.conf rather
-# than our server block because access_log/error_log are set at http level
-# there, and nginx opens those paths at startup whatever a server block says.
-RUN addgroup -S -g 1001 autosys \
-    && adduser -S -u 1001 -G autosys -h /app -H -s /sbin/nologin autosys \
-    && rm -f /etc/nginx/http.d/default.conf \
-    && sed -i -e '/^user /d' -e '1i pid /tmp/nginx.pid;' /etc/nginx/nginx.conf \
-    && sed -i -e 's#^[[:space:]]*access_log .*#    access_log /dev/stdout main;#' \
-              -e 's#^[[:space:]]*error_log .*#error_log /dev/stderr warn;#' \
-              /etc/nginx/nginx.conf \
-    && grep -q 'access_log /dev/stdout' /etc/nginx/nginx.conf \
-    && grep -q 'error_log /dev/stderr' /etc/nginx/nginx.conf \
+RUN rm -f /etc/nginx/conf.d/*.conf \
     && mkdir -p /var/lib/nginx/tmp /var/lib/nginx/logs \
-    && ln -sf /dev/stderr /var/lib/nginx/logs/error.log \
     && chown -R autosys:autosys /var/lib/nginx
+# Replaces RHEL's nginx.conf wholesale: its stock file declares a default
+# server on :80 (privileged, unused), a `user` directive and root-owned pid
+# and log paths, each of which fails or warns unprivileged. Logs go to
+# stdout/stderr for the cluster's log collector; temp dirs and the pid file
+# are writable by the runtime user.
+RUN printf '%s\n' \
+      'pid /tmp/nginx.pid;' \
+      'error_log /dev/stderr warn;' \
+      'events { worker_connections 1024; }' \
+      'http {' \
+      '    include /etc/nginx/mime.types;' \
+      '    default_type application/octet-stream;' \
+      '    log_format main "$remote_addr - $remote_user [$time_local] \"$request\" $status $body_bytes_sent \"$http_referer\" \"$http_user_agent\"";' \
+      '    access_log /dev/stdout main;' \
+      '    client_body_temp_path /var/lib/nginx/tmp/client_body;' \
+      '    proxy_temp_path /var/lib/nginx/tmp/proxy;' \
+      '    fastcgi_temp_path /var/lib/nginx/tmp/fastcgi;' \
+      '    uwsgi_temp_path /var/lib/nginx/tmp/uwsgi;' \
+      '    scgi_temp_path /var/lib/nginx/tmp/scgi;' \
+      '    include /etc/nginx/conf.d/*.conf;' \
+      '}' > /etc/nginx/nginx.conf
 
 COPY --from=frontend-build /app/wcc-frontend/dist ./wcc-frontend/dist
 COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
-COPY nginx.bundled.conf /etc/nginx/http.d/default.conf
+COPY nginx.bundled.conf /etc/nginx/conf.d/default.conf
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 
