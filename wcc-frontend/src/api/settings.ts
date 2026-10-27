@@ -2,6 +2,8 @@ import { api } from './client';
 
 export interface ExecutionMode {
   dry_run: boolean;
+  // True when the image was built DRY_RUN_ONLY (no real-execution code at all).
+  dry_run_only?: boolean;
 }
 
 // V1 removed PUT /settings/execution-mode (no client-facing deployment

@@ -57,6 +57,13 @@ class TestExecutionModeReadOnly:
         assert resp.status_code == 200
         assert "dry_run" in resp.json()
 
+    def test_execution_mode_reports_dry_run_only_build(self, client):
+        """The WCC hides hold/ice controls and the alarm console when this is
+        true, so it must track the build, not the --dry-run flag."""
+        from autosys.safety import DRY_RUN_ONLY_BUILD
+        resp = client.get("/api/v1/settings/execution-mode")
+        assert resp.json()["dry_run_only"] is DRY_RUN_ONLY_BUILD
+
     def test_put_execution_mode_removed(self, client):
         """No client-facing deployment should be able to flip a running
         server between dry-run and real execution over the network."""

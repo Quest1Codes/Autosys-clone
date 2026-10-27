@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { EventType } from '../types';
+import { useExecutionMode } from '../contexts/ExecutionModeContext';
 
 const EVENT_DESCRIPTIONS: Record<EventType, string> = {
   STARTJOB:       'Start the job if its conditions are satisfied.',
@@ -26,7 +27,11 @@ interface Props {
   onSubmit: (event: EventType) => Promise<void>;
 }
 
+const HOLD_ICE: EventType[] = ['JOB_ON_HOLD', 'JOB_OFF_HOLD', 'JOB_ON_ICE', 'JOB_OFF_ICE'];
+
 const SendEventModal: React.FC<Props> = ({ jobName, initialEvent = 'STARTJOB', onClose, onSubmit }) => {
+  const { dryRunOnly } = useExecutionMode();
+  const events = dryRunOnly ? ALL_EVENTS.filter(ev => !HOLD_ICE.includes(ev)) : ALL_EVENTS;
   const [selectedEvent, setSelectedEvent] = useState<EventType>(initialEvent);
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -66,7 +71,7 @@ const SendEventModal: React.FC<Props> = ({ jobName, initialEvent = 'STARTJOB', o
             <label>Event Type</label>
             <select className="wcc-select" style={{ height: 26, fontSize: 12 }}
               value={selectedEvent} onChange={handleEventChange}>
-              {ALL_EVENTS.map(ev => (
+              {events.map(ev => (
                 <option key={ev} value={ev}>{ev}</option>
               ))}
             </select>

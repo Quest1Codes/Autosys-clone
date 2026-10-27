@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchJobs, sendEvent } from '../api/jobs';
 import { useSSE } from '../hooks/useSSE';
 import { useToast } from '../contexts/ToastContext';
+import { useExecutionMode } from '../contexts/ExecutionModeContext';
 import StatusBadge from '../components/StatusBadge';
 import Header from '../components/Header';
 import SendEventModal from '../components/SendEventModal';
@@ -56,6 +57,10 @@ function buildTree(jobs: Job[], expandedBoxes: Set<string>): TreeRow[] {
   return rows;
 }
 
+// Hold and ice make no sense in a dry-run-only simulator.
+const HOLD_ICE_EVENTS: EventType[] = ['JOB_ON_HOLD', 'JOB_OFF_HOLD', 'JOB_ON_ICE', 'JOB_OFF_ICE'];
+const HOLD_ICE_STATUSES = ['ON_HOLD', 'ON_ICE'];
+
 const TOOLBAR_ACTIONS: Array<{ id: EventType; label: string; icon: string; danger?: boolean }> = [
   { id: 'STARTJOB',       label: 'Start Job',    icon: '▶' },
   { id: 'FORCE_STARTJOB', label: 'Force Start',  icon: '▶▶', danger: true },
@@ -70,6 +75,8 @@ type SortKey = 'job_name' | 'job_type' | 'status' | 'machine' | 'last_start' | '
 
 const JobMonitor: React.FC = () => {
   const { showToast } = useToast();
+  const { dryRunOnly } = useExecutionMode();
+  const toolbarActions = dryRunOnly ? TOOLBAR_ACTIONS.filter(a => !HOLD_ICE_EVENTS.includes(a.id)) : TOOLBAR_ACTIONS;
   const [jobs, setJobs]           = useState<Job[]>([]);
   const [loading, setLoading]     = useState(true);
   const [selectedJob, setSelected]= useState<string | null>(null);
@@ -227,9 +234,9 @@ const JobMonitor: React.FC = () => {
 
       {/* Toolbar */}
       <div className="wcc-toolbar">
-        {TOOLBAR_ACTIONS.map((action, i) => (
+        {toolbarActions.map((action) => (
           <React.Fragment key={action.id}>
-            {i === 3 && <div className="toolbar-sep" />}
+            {action.id === 'JOB_ON_HOLD' && <div className="toolbar-sep" />}
             <button
               className="toolbar-btn"
               disabled={!selectedJob}
@@ -267,7 +274,8 @@ const JobMonitor: React.FC = () => {
           onKeyDown={e => e.key === 'Enter' && applyFilters()} />
         <select className="wcc-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="">— Status —</option>
-          {['RUNNING','STARTING','ACTIVATED','SUCCESS','FAILURE','INACTIVE','ON_HOLD','ON_ICE','TERMINATED','QUE_WAIT'].map(s => (
+          {['RUNNING','STARTING','ACTIVATED','SUCCESS','FAILURE','INACTIVE','ON_HOLD','ON_ICE','TERMINATED','QUE_WAIT']
+            .filter(s => !(dryRunOnly && HOLD_ICE_STATUSES.includes(s))).map(s => (
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
@@ -373,11 +381,15 @@ const JobMonitor: React.FC = () => {
           <div className="context-menu-item" onClick={() => handleCtxAction('FORCE_STARTJOB')}>▶▶ Force Start</div>
           <div className="context-menu-sep" />
           <div className="context-menu-item danger" onClick={() => handleCtxAction('KILLJOB')}>■ Kill Job</div>
-          <div className="context-menu-sep" />
-          <div className="context-menu-item" onClick={() => handleCtxAction('JOB_ON_HOLD')}>⏸ Hold</div>
-          <div className="context-menu-item" onClick={() => handleCtxAction('JOB_OFF_HOLD')}>▷ Off Hold</div>
-          <div className="context-menu-item" onClick={() => handleCtxAction('JOB_ON_ICE')}>❄ On Ice</div>
-          <div className="context-menu-item" onClick={() => handleCtxAction('JOB_OFF_ICE')}>✦ Off Ice</div>
+          {!dryRunOnly && (
+            <>
+              <div className="context-menu-sep" />
+              <div className="context-menu-item" onClick={() => handleCtxAction('JOB_ON_HOLD')}>⏸ Hold</div>
+              <div className="context-menu-item" onClick={() => handleCtxAction('JOB_OFF_HOLD')}>▷ Off Hold</div>
+              <div className="context-menu-item" onClick={() => handleCtxAction('JOB_ON_ICE')}>❄ On Ice</div>
+              <div className="context-menu-item" onClick={() => handleCtxAction('JOB_OFF_ICE')}>✦ Off Ice</div>
+            </>
+          )}
           <div className="context-menu-sep" />
           <div className="context-menu-item" onClick={() => { setCtxMenu(null); window.location.href = `/jobs/${encodeURIComponent(contextMenu.jobName)}`; }}>
             ⬡ View Detail

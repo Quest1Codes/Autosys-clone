@@ -220,6 +220,9 @@ class JILImportResponse(BaseModel):
 
 class ExecutionModeResponse(BaseModel):
     dry_run: bool
+    # True in a DRY_RUN_ONLY image build (real-execution code deleted). The UI
+    # uses it to hide controls that make no sense in a simulator.
+    dry_run_only: bool = False
 
 
 # ---------------------------------------------------------------------------

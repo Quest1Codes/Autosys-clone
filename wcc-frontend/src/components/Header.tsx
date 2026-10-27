@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getExecutionMode } from '../api/settings';
+import { useExecutionMode } from '../contexts/ExecutionModeContext';
+import { useToast } from '../contexts/ToastContext';
+import { downloadAssessmentJson } from '../api/assessment';
 import type { SSEStatus } from '../hooks/useSSE';
 import quest1Logo from '../assets/quest1-logo.svg';
 
@@ -12,11 +14,21 @@ interface Props {
 const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
-  const [dryRun, setDryRun] = useState<boolean | null>(null);
+  const { dryRun, dryRunOnly } = useExecutionMode();
+  const { showToast } = useToast();
+  const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    getExecutionMode().then(m => setDryRun(m.dry_run)).catch(() => {});
-  }, []);
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const name = await downloadAssessmentJson();
+      showToast(`Saved ${name}`, 'success');
+    } catch {
+      showToast('Could not generate the complexity assessment', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -53,7 +65,15 @@ const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
 
       <nav className="wcc-nav">
         <NavLink to="/"       className={({ isActive }) => `wcc-nav-tab${isActive ? ' active' : ''}`} end>Job Monitor</NavLink>
-        <NavLink to="/alarms" className={({ isActive }) => `wcc-nav-tab${isActive ? ' active' : ''}`}>Alarms</NavLink>
+        {!dryRunOnly && (
+          <NavLink to="/alarms" className={({ isActive }) => `wcc-nav-tab${isActive ? ' active' : ''}`}>Alarms</NavLink>
+        )}
+        <div style={{ flex: 1 }} />
+        <button className="toolbar-btn" onClick={handleDownload} disabled={downloading}
+          title="Download the complexity assessment report as JSON">
+          <span>⬇</span>
+          <span>{downloading ? 'Preparing…' : 'Complexity assessment (JSON)'}</span>
+        </button>
       </nav>
     </>
   );

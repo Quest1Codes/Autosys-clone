@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { fetchBoxGraph } from '../api/boxes';
 import { useSSE } from '../hooks/useSSE';
 import Header from '../components/Header';
+import { useExecutionMode } from '../contexts/ExecutionModeContext';
 import type { GraphNode, GraphEdge, JobStatus } from '../types';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -85,6 +86,8 @@ function computeLayout(nodes: GraphNode[], edges: GraphEdge[]): LayoutNode[] {
 const LEGEND_STATUSES = ['RUNNING','STARTING','SUCCESS','FAILURE','ACTIVATED','ON_HOLD','ON_ICE','INACTIVE','TERMINATED','QUE_WAIT'];
 
 const BoxGraph: React.FC = () => {
+  const { dryRunOnly } = useExecutionMode();
+  const legendStatuses = dryRunOnly ? LEGEND_STATUSES.filter(s => s !== 'ON_HOLD' && s !== 'ON_ICE') : LEGEND_STATUSES;
   const { name } = useParams<{ name: string }>();
   const svgRef = useRef<SVGSVGElement>(null);
   const [rawNodes, setRawNodes]   = useState<GraphNode[]>([]);
@@ -275,7 +278,7 @@ const BoxGraph: React.FC = () => {
 
           {/* Legend */}
           <div className="graph-legend">
-            {LEGEND_STATUSES.map(s => (
+            {legendStatuses.map(s => (
               <div key={s} className="legend-item">
                 <span className="legend-dot" style={{ background: STATUS_COLORS[s] }} />
                 <span style={{ fontSize: 10 }}>{s}</span>

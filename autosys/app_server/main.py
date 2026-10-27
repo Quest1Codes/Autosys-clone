@@ -63,7 +63,7 @@ def get_broadcaster() -> EventBroadcaster:
 # Defined in autosys.safety, which the agent runners also enforce; re-exported
 # here because cli/scheduler_cmd.py and existing callers import them from main.
 from autosys.safety import (  # noqa: E402, F401  (re-exported)
-    REAL_EXECUTION_ENV_VAR, real_execution_allowed, real_execution_error,
+    DRY_RUN_ONLY_BUILD, REAL_EXECUTION_ENV_VAR, real_execution_allowed, real_execution_error,
 )
 
 
@@ -404,4 +404,7 @@ def _register_settings_routes(app: FastAPI) -> None:
 
     @app.get("/api/v1/settings/execution-mode", response_model=ExecutionModeResponse, tags=["settings"])
     def get_execution_mode():
-        return ExecutionModeResponse(dry_run=getattr(app.state, "dry_run", True))
+        return ExecutionModeResponse(
+            dry_run=getattr(app.state, "dry_run", True),
+            dry_run_only=DRY_RUN_ONLY_BUILD,
+        )
