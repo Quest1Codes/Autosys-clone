@@ -67,6 +67,11 @@ services:
       - autosys-data:/app/data
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
+      # The dashboard API verifies the same JWTs `api` issues, so it needs the
+      # same secret and user list; without them every request is a 401.
+      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
+      AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
+      AUTOSYS_USERS: ${AUTOSYS_USERS:-}
     depends_on:
       postgres:
         condition: service_healthy

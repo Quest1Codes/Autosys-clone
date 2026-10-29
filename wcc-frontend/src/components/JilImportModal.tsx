@@ -113,8 +113,12 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
     }
   };
 
+  const [folderPicked, setFolderPicked] = useState(0);
+
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? [])
+    const picked = Array.from(e.target.files ?? []);
+    setFolderPicked(picked.length);
+    const files = picked
       .filter(f => f.name.toLowerCase().endsWith('.jil'))
       // Preserve the numeric-prefix ordering convention (00_globals, 01_..., ...)
       // used throughout jil_files/, so globals/machines import before the
@@ -124,6 +128,8 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
       );
     setFolderFiles(files);
     setFolderResults(files.map(f => ({ name: f.name, status: 'pending', detail: '' })));
+    // Clear the input so choosing the same folder again still fires onChange.
+    e.target.value = '';
   };
 
   const runFolderImport = async (dryRun: boolean) => {
@@ -240,13 +246,12 @@ const JilImportModal: React.FC<Props> = ({ onClose, onImported }) => {
                 ref={folderRef}
                 type="file"
                 multiple
-                accept=".jil"
                 {...FOLDER_INPUT_PROPS}
                 style={{ display: 'none' }}
                 onChange={handleFolderSelect}
               />
               <span style={{ fontSize: 11, color: '#555' }}>
-                {folderFiles.length > 0 ? `${folderFiles.length} .jil file(s) selected` : 'No folder selected'}
+                {folderFiles.length > 0 ? `${folderFiles.length} .jil file(s) selected` : folderPicked > 0 ? `0 .jil files among ${folderPicked} in that folder` : 'No folder selected'}
               </span>
               <label style={{ fontSize: 11, color: '#555', display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
                 <input type="checkbox" checked={stopOnError} onChange={e => setStopOnError(e.target.checked)} />
