@@ -92,6 +92,62 @@ class TestDuplicates:
         with sf() as se:
             assert se.execute(select(JobRow.command)).scalar() == "OTHER"
 
+    def test_orphaned_duplicate_after_removal_is_flagged_not_silently_dropped(self, sf, tmp_path):
+        """The import-audit archive (ING-05) that DUPLICATE checks against is
+        permanent and outlives job removal (Clear Estate / replace-estate).
+        A re-import of the same job_name from a DIFFERENT file path (the
+        real-world case: Clear Estate, then `import-dir` against a fresh
+        checkout/container path, not the exact path originally loaded from --
+        a same-path reimport instead replaces its own archive, see
+        test_reimport_replaces_archive, and never reaches this check) sees
+        "already defined" and skips reloading it -- correct for ordinary JIL
+        maintenance, but silent and misleading right after the job was
+        removed from the live estate: every file still reports OK while the
+        job just never comes back. orphaned_duplicates is the cross-check
+        that catches this."""
+        from autosys.db.schema import JobRow
+        from autosys.parser.jil_ingest import ingest_paths, remove_jobs_not_in
+
+        first = tmp_path / "first"; first.mkdir()
+        (first / "a.jil").write_text(GOOD)
+        ingest_paths(sf, [first / "a.jil"])
+        with sf() as se:
+            assert se.execute(select(JobRow.job_name)).scalar() == "a"
+            remove_jobs_not_in(se, present=set())
+            se.commit()
+            assert se.execute(select(JobRow.job_name)).first() is None
+
+        # Re-import the same job_name from a DIFFERENT path -- looks like a
+        # normal, successful run (every file OK, no errors) but the job does
+        # not come back.
+        second = tmp_path / "second"; second.mkdir()
+        (second / "a.jil").write_text(GOOD)
+        s2 = ingest_paths(sf, [second / "a.jil"])
+        assert s2.dispositions.get("DUPLICATE") == 1
+        assert s2.orphaned_duplicates == ["a"]
+        with sf() as se:
+            assert se.execute(select(JobRow.job_name)).first() is None
+
+    def test_replace_estate_reload_has_no_orphaned_duplicates(self, sf, tmp_path):
+        """--replace-estate (duplicates="last") is the documented way to
+        restore after a removal -- it must never trip this warning."""
+        from autosys.db.schema import JobRow
+        from autosys.parser.jil_ingest import ingest_paths, remove_jobs_not_in
+
+        first = tmp_path / "first"; first.mkdir()
+        (first / "a.jil").write_text(GOOD)
+        ingest_paths(sf, [first / "a.jil"])
+        with sf() as se:
+            remove_jobs_not_in(se, present=set())
+            se.commit()
+
+        second = tmp_path / "second"; second.mkdir()
+        (second / "a.jil").write_text(GOOD)
+        s2 = ingest_paths(sf, [second / "a.jil"], replace_estate=True)
+        assert s2.orphaned_duplicates == []
+        with sf() as se:
+            assert se.execute(select(JobRow.job_name)).scalar() == "a"
+
 
 class TestTolerance:
     def test_prose_and_unknown_types_do_not_raise(self, sf, tmp_path):

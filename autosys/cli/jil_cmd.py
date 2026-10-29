@@ -344,6 +344,14 @@ def jil_import_dir(path: Path, pattern: str, excludes: tuple, duplicates: str,
     per file. Re-run this command on the files after the one it stopped at
     (sorted order is deterministic) to resume; everything up to that point
     is already durably committed.
+
+    A job already loaded once (by path or job_name, ever) stays DUPLICATE
+    and is NOT reloaded by default, even if it was since removed from the
+    estate (e.g. by `estate clear`) -- this is what makes a routine re-run
+    over mostly-unchanged files safe. If you're specifically trying to
+    restore jobs that were removed, use --replace-estate (or --duplicates
+    last); this command warns if it detects the plain-duplicate case
+    silently left any of them un-reloaded.
     """
     import json
     from autosys.parser.jil_ingest import ingest_paths, iter_files
@@ -368,6 +376,20 @@ def jil_import_dir(path: Path, pattern: str, excludes: tuple, duplicates: str,
     if replace_estate and not summary.aborted:
         _console.print(f"  {'removed (not in export)':<22}{len(summary.removed_jobs)}"
                        + ("  — archived under reconcile:<time>" if summary.removed_jobs else ""))
+
+    if summary.orphaned_duplicates:
+        n = len(summary.orphaned_duplicates)
+        shown = ", ".join(summary.orphaned_duplicates[:10])
+        more = f", +{n - 10} more" if n > 10 else ""
+        _err.print(
+            f"\n[yellow]Warning[/yellow]: [bold]{n}[/bold] job(s) were skipped as "
+            f"DUPLICATE (already defined in an earlier import) but [bold]do not exist in "
+            f"the live estate right now[/bold] -- most likely removed by Clear Estate or "
+            f"a --replace-estate run since then. They were [bold]not[/bold] reloaded.\n"
+            f"  {shown}{more}\n"
+            f"Re-run with [bold]--replace-estate[/bold] (or [bold]--duplicates last[/bold]) "
+            f"if you intended to restore them."
+        )
 
     if summary.aborted:
         _err.print(

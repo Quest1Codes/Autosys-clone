@@ -100,9 +100,16 @@ class JobAssessment:
     # keep working when a caller doesn't supply run_stats.
     risk:         str = "NO_DATA"
     risk_drivers: str = ""
-    # Where the risk verdict's run history came from: "history" (rows already
-    # in the DB), "simulated" (scratch-DB dry run, see simulated_risk.py) or
-    # "none" (NO_DATA). BOX jobs that inherit risk inherit the source too.
+    # Where the risk verdict's run history came from: "observed" (real run
+    # rows, enough of them -- this instance's own execution, source="live",
+    # or a client's imported export, source="imported"; see
+    # JobRunRow.source), "observed_insufficient" (real rows but below
+    # operational_risk.MIN_OBSERVED_RUNS -- verdict is NO_DATA, no rate is
+    # reported), "simulated" (scratch-DB dry run, see simulated_risk.py; see
+    # also dev/task10-productionization/04-simulator-flaws.md F0 for why rows
+    # with no provenance tag used to be mislabelled "observed") or "none"
+    # (NO_DATA, no history of any kind). BOX jobs that inherit risk inherit
+    # the source too.
     risk_source:  str = "none"
     # Cross-job blast radius — how many other jobs' conditions reference
     # this one (see dependency_graph.fan_in_counts).
@@ -363,8 +370,10 @@ def build_report(
     paths, and timezone signals.
 
     *risk_sources* optionally labels where each job's run_stats came from
-    ({job_name: "history" | "simulated"}); jobs absent from it are labelled
-    "history" if they have run_stats and "none" otherwise.
+    ({job_name: "observed" | "observed_insufficient" | "simulated"}); jobs
+    absent from it fall back to "observed" if they have run_stats (a caller
+    that didn't classify its own stats is assumed to mean real evidence) and
+    "none" otherwise. routers/assessment.py always supplies this dict.
     """
     all_by_name: dict[str, JobRow] = {r.job_name: r for r in rows}
     # Blast radius is a global-graph property — computed once over the full,
@@ -475,8 +484,14 @@ def build_report(
             r, all_by_name, wave_depth, r.job_name in chain_interior,
             child_counts=child_counts,
         )
+        # A simulated job's stats carry no real calendar window (see
+        # operational_risk.RunStats.has_sufficient_sample), so the window
+        # gate must not apply to it -- only to observed (live/imported)
+        # evidence, which is everything risk_sources does NOT label
+        # "simulated" (including the default when no label was supplied).
         risk, risk_drivers = score_operational_risk(
-            r, (run_stats or {}).get(r.job_name)
+            r, (run_stats or {}).get(r.job_name),
+            require_window=((risk_sources or {}).get(r.job_name) != "simulated"),
         )
         results.append(JobAssessment(
             job_name = r.job_name,
@@ -490,7 +505,7 @@ def build_report(
             risk_drivers = "; ".join(risk_drivers),
             risk_source  = (
                 (risk_sources or {}).get(r.job_name)
-                or ("history" if r.job_name in (run_stats or {}) else "none")
+                or ("observed" if r.job_name in (run_stats or {}) else "none")
             ),
             blast_radius = blast_radius.get(r.job_name, 0),
             gap_tags     = ", ".join(compute_gap_tags(r)),

@@ -898,7 +898,11 @@ class TestSimulatedRisk:
 
         data = _report(sim_client)
         by_name = {j["job_name"]: j for j in data["jobs"]}
-        assert by_name["a"]["risk_source"] == "history"
+        # "observed", not "observed_insufficient": 5 runs is below
+        # MIN_OBSERVED_RUNS, but all 5 failed -- a unanimous outcome needs
+        # no statistical backing to be meaningful (see RunStats.
+        # has_sufficient_sample's carve-out), unlike a middling rate.
+        assert by_name["a"]["risk_source"] == "observed"
         assert by_name["a"]["risk"] == "HIGH"
         assert by_name["b"]["risk_source"] == "simulated"
         assert by_name["c"]["risk_source"] == "simulated"
@@ -915,7 +919,21 @@ class TestSimulatedRisk:
 
         data = _report(sim_client)
         assert data["simulation"]["status"] == "not_needed"
-        assert all(j["risk_source"] == "history" for j in data["jobs"])   # box inherits history
+        by_name = {j["job_name"]: j for j in data["jobs"]}
+        # "observed_insufficient", not "observed": one run each is below
+        # MIN_OBSERVED_RUNS and not a unanimous-failure case (they're all
+        # SUCCESS), so no rate is reported for any of them -- correctly:
+        # one clean run is exactly the kind of thin sample the minimum
+        # exists to stop this report calling "clean", full stop.
+        for name in ("a", "b", "c"):
+            assert by_name[name]["risk_source"] == "observed_insufficient"
+            assert by_name[name]["risk"] == "NO_DATA"
+        # The box has no run rows of its own (pre-existing behaviour) and,
+        # also pre-existing, does not inherit a verdict from a child that
+        # itself has none to give -- NO_DATA rolls up as "no information",
+        # not as the box's own worst case.
+        assert by_name["seq_box"]["risk_source"] == "none"
+        assert by_name["seq_box"]["risk"] == "NO_DATA"
 
     def test_simulate_false_skips(self, sim_client, isolated_db):
         _seed_boxes(isolated_db)
@@ -1069,11 +1087,17 @@ box_name: warm_box
         from autosys.db.schema import JobRunRow
         _seed_boxes(isolated_db)
 
-        r = sim_client.get("/api/v1/assessment/migration-report", params={"cycles": 3})
+        # cycles=15, not 3: below MIN_OBSERVED_RUNS a simulated job reports
+        # NO_DATA by design (see F4 in dev/task10-productionization/
+        # 04-simulator-flaws.md -- a handful of synthetic cycles shouldn't
+        # read as a confident verdict either), so this test's own
+        # risk_source assertion needs enough cycles to clear that floor;
+        # the isolation behaviour below is what the test actually verifies.
+        r = sim_client.get("/api/v1/assessment/migration-report", params={"cycles": 15})
         assert r.status_code == 200
         data = r.json()
         assert data["simulation"]["status"] == "ready"
-        assert data["simulation"]["cycles"] == 3
+        assert data["simulation"]["cycles"] == 15
         assert data["csv"].startswith("job_name,")
         assert all(j["risk_source"] == "simulated" for j in data["jobs"])
 

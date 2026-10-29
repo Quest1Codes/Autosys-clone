@@ -497,6 +497,46 @@ body {
 .status-badge.TERMINATED { background: var(--status-terminated); }
 .status-badge.QUE_WAIT   { background: var(--status-que_wait); }
 
+/* ── Risk Chip ───────────────────────────────────────────── */
+/* Gives the Risk column the same visual weight as the Status badge, so
+   provenance (real import vs simulated dry-run) reads as a first-class
+   signal instead of secondary text -- see JobMonitor.tsx's RiskCell. */
+
+.risk-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Row evidence edge-bar ───────────────────────────────── */
+/* A per-row color bar keyed to risk_source -- lets a user scan the whole
+   table at a glance for which rows are real vs simulated vs unknown,
+   without reading every Risk cell individually. inset box-shadow instead
+   of border-left so it doesn't shift column widths or tree-indent math. */
+
+.wcc-table tr[data-risk-source="observed"] td:first-child,
+.wcc-table tr[data-risk-source="observed_insufficient"] td:first-child {
+  box-shadow: inset 3px 0 0 #00A650;
+}
+.wcc-table tr[data-risk-source="simulated"] td:first-child {
+  box-shadow: inset 3px 0 0 #B8860B;
+}
+
+/* ── Action flash ────────────────────────────────────────── */
+/* A transient highlight on rows affected by the action just taken (Import
+   Run History or Run All Boxes) -- the actual fix for "it looks like
+   nothing happened," since the permanent cues above (chip, edge-bar) are
+   easy to miss at the moment of the action itself. */
+
+@keyframes row-flash-real { from { background: #B7E8C9; } to { background: transparent; } }
+@keyframes row-flash-sim  { from { background: #F0C36D; } to { background: transparent; } }
+.wcc-table tr.flash-real td { animation: row-flash-real 2.2s ease-out; }
+.wcc-table tr.flash-sim  td { animation: row-flash-sim 2.2s ease-out; }
+
 /* ── Modal ───────────────────────────────────────────────── */
 
 .modal-overlay {

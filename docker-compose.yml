@@ -91,6 +91,26 @@ services:
       - autosys-data:/app/data
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
+      # Must be the SAME secret as api's, below -- this service verifies the
+      # exact JWT /api/v1/auth/token (served by api) mints, via the same
+      # auth.py module (autosys/wcc/app.py's _REQUIRE_LOGIN). Left out
+      # before, this service booted anyway (now it won't -- see
+      # cli/scheduler_cmd.py's scheduler_wcc) with no secret configured at
+      # all, so every real token failed verification here: every
+      # /api/wcc/* and /api/sse/* call 401'd, which is what made the job
+      # grid show "No jobs found" / DISCONNECTED regardless of how much JIL
+      # or run history had actually been imported through api.
+      AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
+      AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
+      # startup_check_errors() (auth.py) requires this set too, not just the
+      # secret -- even though wcc only ever verifies an already-issued JWT
+      # and never authenticates a username/password itself (that's api's
+      # /api/v1/auth/token alone). Narrowing the check to skip AUTOSYS_USERS
+      # for a verify-only service would be more precise, but duplicating
+      # api's exact config here is simpler to reason about and costs nothing
+      # -- both read the same ${AUTOSYS_USERS} value, so there is nothing to
+      # keep in sync.
+      AUTOSYS_USERS: ${AUTOSYS_USERS:-}
     depends_on:
       postgres:
         condition: service_healthy

@@ -270,7 +270,18 @@ class AssessmentJobRecord(BaseModel):
     drivers:  str
     risk:         str = "NO_DATA"
     risk_drivers: str = ""
-    # "history" | "simulated" | "none" — see AssessmentSimulation.
+    # "observed"             real run history (this instance's own execution,
+    #                        or a client's imported export), enough of it to
+    #                        report a rate
+    # "observed_insufficient" real history exists but below the minimum
+    #                        sample (see operational_risk.MIN_OBSERVED_RUNS) —
+    #                        risk is NO_DATA, no rate is reported
+    # "simulated"            FailureInjector output — not production evidence
+    # "none"                 no run history of any kind
+    # Before this field distinguished "observed" from "simulated" writes that
+    # had no provenance tag, the dry-run event processor's own generated runs
+    # were indistinguishable from real ones and were reported as "history" --
+    # see dev/task10-productionization/04-simulator-flaws.md F0.
     risk_source:  str = "none"
     blast_radius: int = 0
     gap_tags:     str = ""
@@ -325,7 +336,9 @@ class AssessmentSimulation(BaseModel):
       "failed"     the simulation errored (see ``error``)
       "skipped"    not attempted (real execution mode, or disabled)
     Simulated numbers come from the deterministic FailureInjector (failure rate
-    derived from each job's n_retrys), not from real executions.
+    derived from each job's n_retrys), not from real executions. See
+    AssessmentCoverage for how many jobs this affects and AssessmentJobRecord
+    .risk_source for which jobs.
     """
     status:         str
     reason:         str = ""
@@ -354,6 +367,29 @@ class AITokenBudgetResponse(BaseModel):
     pricing_note: str = ""
 
 
+class AssessmentCoverage(BaseModel):
+    """
+    How many jobs' operational-risk numbers rest on real evidence versus a
+    generated estimate -- the headline this report should never bury. See
+    AssessmentJobRecord.risk_source for the per-job breakdown this is
+    aggregated from.
+    """
+    jobs_total:                 int = 0
+    jobs_observed:              int = 0    # risk_source == "observed"
+    jobs_observed_insufficient: int = 0    # real evidence, too thin to score
+    jobs_simulated:             int = 0
+    jobs_no_history:            int = 0    # no evidence of any kind
+    # jobs_observed / (jobs_total - BOX jobs), i.e. of jobs that could ever
+    # carry their own run history.
+    coverage_pct:               float = 0.0
+    min_runs_threshold:         int = 0
+    min_window_days_threshold:  int = 0
+    # False means no alarm source (live or imported) contributed anywhere in
+    # this estate -- every risk verdict is missing that signal. See
+    # score_operational_risk's "alarm history not available" driver.
+    alarms_observed:            bool = False
+
+
 class AssessmentReportResponse(BaseModel):
     """GET /api/v1/assessment/report — full T-shirt-size complexity report."""
     generated_at:   datetime
@@ -361,10 +397,65 @@ class AssessmentReportResponse(BaseModel):
     job_count:      int
     execution_mode: str = "dry_run"     # "dry_run" | "real"
     simulation:     AssessmentSimulation = AssessmentSimulation(status="skipped")
+    coverage:       AssessmentCoverage = AssessmentCoverage()
     jobs:           list[AssessmentJobRecord]
     box_breakdown:  list[dict[str, Any]] = []
     summary:        AssessmentSummaryResponse
     ai_token_budget: Optional[AITokenBudgetResponse] = None
+
+
+class EstateClearResponse(BaseModel):
+    """DELETE /api/v1/estate -- see routers/estate.py for the safety model."""
+    jobs_removed: int = 0
+    jobs_failed:  int = 0   # a job remove_jobs_not_in could not delete (see its docstring)
+    archive_path: str = ""
+
+
+class HistoryImportResponse(BaseModel):
+    """Result of POST /api/v1/history/import. See
+    autosys/parser/run_history_ingest.py's module docstring for what the
+    fields mean -- this mirrors RunHistoryReport.as_dict() field for field."""
+    import_id:      Optional[int] = None
+    status:         str = ""          # "OK" | "WARN" | "REJECTED"
+    format:         str = ""          # "csv" | "tsv" | "pipe" | "jsonl"
+    encoding:       str = ""
+    reject_reason:  str = ""
+    n_rows_read:        int = 0
+    n_rows_loaded:       int = 0
+    n_rows_skipped:      int = 0
+    n_rows_duplicate:    int = 0
+    n_rows_unknown_job:  int = 0
+    n_jobs:              int = 0
+    window_start: Optional[datetime] = None
+    window_end:   Optional[datetime] = None
+    issue_codes: dict[str, int] = {}
+    unknown_job_samples: list[str] = []
+    aborted:      bool = False
+    abort_reason: str = ""
+
+
+class HistoryCoverageResponse(BaseModel):
+    """GET /api/v1/history/coverage -- the same numbers the assessment
+    report's `coverage` block exposes, without running the full complexity
+    scan."""
+    jobs_total:                 int = 0
+    jobs_non_box:                int = 0
+    jobs_observed_sufficient:    int = 0
+    jobs_observed_insufficient:  int = 0
+    jobs_no_evidence:            int = 0
+    coverage_pct:                float = 0.0
+    min_runs_threshold:          int = 0
+    min_window_days_threshold:   int = 0
+    # Estate-level mode signal, not a per-job count: how many jobs have ANY
+    # row of each provenance, regardless of sample sufficiency. Used to keep
+    # "import real history" and "Run All Boxes" (which writes source=
+    # "simulated" rows via the live dry-run EPS -- see JobMonitor.tsx's
+    # handleRunAllBoxes, a real FORCE_STARTJOB, not a rolled-back preview)
+    # mutually exclusive at the UI level, so the two provenances are never
+    # both deliberately populated for the same estate and the operator
+    # always knows which one the estate's risk numbers are resting on.
+    jobs_with_imported_evidence: int = 0
+    jobs_with_dry_run_evidence:  int = 0
 
 
 class BoxTraceRequest(BaseModel):

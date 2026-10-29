@@ -368,8 +368,27 @@ def scheduler_wcc(host: str, port: int) -> None:
         Open: http://localhost:8080
         ^C  Stopped.
     """
+    import sys
     import uvicorn
+    from autosys.app_server.auth import startup_check_errors
     from autosys.wcc.app import create_wcc_app
+
+    # Same gate as `scheduler serve` (see that command's comment and
+    # auth.py's startup_check_errors docstring), and for the same reason:
+    # this is the other real network-facing entrypoint that verifies the
+    # same JWT every /api/v1/auth/token mints. Until this call was added,
+    # `scheduler wcc` booted successfully with no secret configured at all,
+    # silently diverging from `api`'s secret (which refuses to start without
+    # a real one) -- every token `api` minted then failed verification here,
+    # as 401 on every /api/wcc/* and /api/sse/* route, with nothing in this
+    # process's own logs to explain why. Same defect class as audit SEC-01
+    # (a check present at one entry point, silently absent at another).
+    problems = startup_check_errors()
+    if problems:
+        _err.print("[bold red]Refusing to start:[/bold red]")
+        for p in problems:
+            _err.print(f"  - {p}")
+        sys.exit(1)
 
     _console.print(
         f"\n[bold cyan]AutoSys WCC Dashboard[/bold cyan] starting on "

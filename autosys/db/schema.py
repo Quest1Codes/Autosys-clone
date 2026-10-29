@@ -238,6 +238,10 @@ class JobRunRow(Base):
     __tablename__ = "ujo_job_runs"
     __table_args__ = (
         Index("ix_job_runs_job_date", "job_name", "run_date"),
+        # fetch_run_stats() filters on source before grouping by job_name;
+        # without this it sequential-scans, which at 86K jobs x 90 days of
+        # imported history is millions of rows per assessment request.
+        Index("ix_job_runs_source_job", "source", "job_name"),
     )
 
     run_id      = Column(String(255), primary_key=True)
@@ -253,6 +257,33 @@ class JobRunRow(Base):
     stdout_path  = Column(Text)
     stderr_path  = Column(Text)
     created_at   = Column(DateTime, default=utcnow, nullable=False)
+
+    # --- Provenance -------------------------------------------------------
+    # Where this row came from. Before this column existed, the dry-run event
+    # processor wrote synthetic rows (FailureInjector outcome, estimated
+    # duration) into the live DB, and routers/assessment.py labelled every row
+    # it found "history" -- i.e. reported generated numbers as observed
+    # evidence. See dev/task10-productionization/04-simulator-flaws.md F0.
+    #
+    #   "live"       written by a real agent execution, OR by the in-place
+    #                dry-run EPS before this column existed. Honest default
+    #                for pre-existing rows: we cannot tell those two apart
+    #                retrospectively, so they are never promoted to evidence
+    #                beyond what they already were.
+    #   "simulated"  FailureInjector output. Never counted as observed.
+    #   "imported"   loaded from a client's real AutoSys run-history export.
+    #
+    # server_default is required as well as default: migrations.py only
+    # auto-adds a NOT NULL column when it can emit a literal DEFAULT.
+    source      = Column(String(16), nullable=False, default="live",
+                         server_default="live")
+    import_id   = Column(Integer, ForeignKey("ujo_run_import.import_id"),
+                         nullable=True, index=True)
+    # Denormalised on purpose: deriving a duration from two DateTime columns
+    # needs dialect-specific SQL (julianday() vs EXTRACT(EPOCH FROM ...)),
+    # and tests/test_postgres_compat.py forbids raw SQL in this layer.
+    # Computed once at write time so the stats query stays portable.
+    duration_secs = Column(Integer, nullable=True)
 
     # --- Relationships ---
     job    = relationship("JobRow",   back_populates="runs")
@@ -715,6 +746,59 @@ class ReportRow(Base):
 # ---------------------------------------------------------------------------
 # 19. JIL source archive  (lossless record of every imported stanza)
 # ---------------------------------------------------------------------------
+
+class RunImportRow(Base):
+    """
+    One row per imported run-history file: provenance and what happened.
+
+    Deliberately NOT modelled on JilStanzaRow, which archives every stanza
+    verbatim. JIL is lossy into typed tables so an operator may need the
+    original text back; a run-history CSV is millions of rows of numbers that
+    load without loss, and archiving them would double storage and store the
+    client's machine names twice. Only the digest, the counters and a capped
+    sample of rejected rows are kept.
+    """
+    __tablename__ = "ujo_run_import"
+
+    import_id   = Column(Integer, primary_key=True, autoincrement=True)
+    # NOT unique, unlike JilFileRow.path: a JIL file is a snapshot of
+    # definitions, re-importing the same path means "re-sync this file" (one
+    # row). A run-history export is a recurring event -- the same filename
+    # ("daily_export.csv", an API caller's synthetic api:history:<user>:<uuid>
+    # label) legitimately recurs on every import attempt, and each attempt
+    # deserves its own audit row. The data itself still dedupes correctly via
+    # JobRunRow.run_id regardless of how many RunImportRow rows reference it.
+    path        = Column(String(1024), nullable=False, index=True)
+    sha256      = Column(String(64))
+    size_bytes  = Column(Integer)
+    encoding    = Column(String(32))
+    # IANA name the caller declared for naive timestamps. A file with naive
+    # timestamps and no declared zone is rejected outright: silently assuming
+    # UTC shifts an estate's history by up to 14h, which corrupts run_date,
+    # the coverage window and every date-bucketed figure downstream.
+    declared_timezone = Column(String(64))
+    # Which idempotency key this file used: "n" = (job_name, run_num, ntry),
+    # "t" = (job_name, start_time, ntry). Recorded because mixing the two
+    # across imports double-counts the same run -- see run_history_ingest.
+    key_kind    = Column(String(1))
+
+    window_start = Column(DateTime)       # plausibility-filtered min(start_time)
+    window_end   = Column(DateTime)       # plausibility-filtered max(start_time)
+
+    n_rows_read        = Column(Integer, default=0, nullable=False)
+    n_rows_loaded      = Column(Integer, default=0, nullable=False)
+    n_rows_skipped     = Column(Integer, default=0, nullable=False)
+    n_rows_duplicate   = Column(Integer, default=0, nullable=False)
+    n_rows_unknown_job = Column(Integer, default=0, nullable=False)
+    n_jobs             = Column(Integer, default=0, nullable=False)
+
+    status      = Column(String(24))     # OK | WARN | ERROR_RECOVERED | REJECTED
+    issues_json = Column(Text)           # capped list + exact per-code counters
+    imported_at = Column(DateTime, default=utcnow, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<RunImportRow {self.path} {self.status} loaded={self.n_rows_loaded}>"
+
 
 class JilFileRow(Base):
     """One row per imported JIL file: where it came from and how it decoded."""

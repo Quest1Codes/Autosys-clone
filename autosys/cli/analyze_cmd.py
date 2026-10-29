@@ -409,8 +409,16 @@ def migration_report(
             f"Failure rate: {sim_result['failure_rate']:.1%}[/dim]"
         )
 
-        # Fetch run stats from simulated history
-        run_stats = fetch_run_stats(session, [r.job_name for r in rows])
+        # Fetch run stats from the simulation just run above. Filtered to
+        # source="simulated" (what run_simulation's own EventProcessor
+        # writes -- see event_processor._record_run) so this never blends in
+        # whatever pre-existing "live" rows this DB happens to hold; see
+        # dev/task10-productionization/04-simulator-flaws.md F0, which this
+        # command had the same shape of bug as before JobRunRow.source
+        # existed: it commits simulated rows to the live DB (documented
+        # above, intentional for this CLI command) and used to read them
+        # back with no way to tell them apart from anything else in the table.
+        run_stats = fetch_run_stats(session, [r.job_name for r in rows], sources=("simulated",))
 
         # Run structural analyses
         signals = run_all_structural_analyses(session)

@@ -55,6 +55,10 @@ from autosys.parser.jil_parser import JILOperation, JILParser
 LOADED, WARN, ARCHIVE, QUARANTINED, DUPLICATE = (
     "LOADED", "LOADED_WITH_WARNINGS", "ARCHIVE_ONLY", "QUARANTINED", "DUPLICATE")
 
+# Shared with ingest_paths's orphaned-duplicate check below -- a single
+# literal so the two spots can't drift apart.
+_DUPLICATE_DETAIL = "duplicate definition (kept first)"
+
 
 # ===========================================================================
 # Decoding
@@ -180,6 +184,17 @@ class IngestSummary:
     files_committed: int  = 0
     last_path:       str  = ""
 
+    # Names kept as DUPLICATE (an earlier successful import already defined
+    # them) that are, right now, not in the live estate at all -- e.g. a
+    # plain re-import of the same directory after Clear Estate or a
+    # replace-estate reimport dropped them. The duplicate archive (ING-05)
+    # is permanent by design and outlives job removal, so a plain
+    # `--duplicates first` run sees "already defined" and skips reloading
+    # them, silently, with no error: the files report OK, the estate just
+    # stays missing those jobs. Populated only when duplicates=="first"
+    # (a replace_estate run forces "last", which has no such gap).
+    orphaned_duplicates: list = field(default_factory=list)
+
     def add(self, r: FileReport, stanza_issue_codes: Iterable[str] = ()) -> None:
         self.files += 1
         self.stanzas += r.n_stanzas
@@ -201,6 +216,7 @@ class IngestSummary:
             "aborted": self.aborted, "abort_reason": self.abort_reason,
             "files_committed": self.files_committed, "last_path": self.last_path,
             "removed_jobs": self.removed_jobs,
+            "orphaned_duplicates": self.orphaned_duplicates,
         }
 
 
@@ -537,7 +553,7 @@ def _apply_one(session, op, issues, report, seen, file_id, path, *,
                            "message": f"insert_job {name!r} was already defined at "
                                       f"{prior[0]}:{prior[1]}"})
             if duplicates == "first":
-                return DUPLICATE, ApplyResult("SKIPPED", name, "duplicate definition (kept first)",
+                return DUPLICATE, ApplyResult("SKIPPED", name, _DUPLICATE_DETAIL,
                                               persisted=False)
 
     # ---- apply in a savepoint --------------------------------------------------------
@@ -740,6 +756,7 @@ def ingest_paths(
     if replace_estate:
         duplicates = "last"
     present: set[str] = set()
+    duplicate_names: set[str] = set()   # orphaned-duplicate check below; "first" runs only
     whole_file_failed = False
     with session_factory() as session:
         n = 0
@@ -772,6 +789,10 @@ def ingest_paths(
                 # every insert_job in the export, stored or not: a job the
                 # database refused is still in the estate and must not be removed
                 present.update(rep.defined_jobs)
+            else:
+                duplicate_names.update(
+                    name for action, name, detail in rep.results
+                    if action == "SKIPPED" and detail == _DUPLICATE_DETAIL)
             if progress:
                 progress(n, rep)
             if n % commit_every == 0:
@@ -793,6 +814,30 @@ def ingest_paths(
                 logger.warning("replace-estate: {}; nothing removed",
                                "a file could not be read" if whole_file_failed
                                else "no jobs in these files")
+        elif duplicate_names:
+            # DUPLICATE here means "an earlier successful import already
+            # defined this job_name" -- checked against the permanent
+            # import-audit archive (ING-05), which outlives job removal by
+            # design. That makes it blind to the one case that matters here:
+            # the job was removed from the *live* estate since (Clear Estate,
+            # or an earlier replace-estate run) and this plain re-import,
+            # seeing "already defined", skips reloading it -- silently, with
+            # every file still reporting OK. Cross-check once, batched, so a
+            # plain `import-dir` after Clear Estate doesn't look like it
+            # worked while quietly leaving the estate empty.
+            from autosys.db.schema import JobRow
+            still_live = set(session.scalars(
+                select(JobRow.job_name).where(JobRow.job_name.in_(duplicate_names))))
+            orphaned = sorted(duplicate_names - still_live)
+            if orphaned:
+                summary.orphaned_duplicates = orphaned
+                logger.warning(
+                    "{} job(s) were skipped as duplicates of an earlier import but no "
+                    "longer exist in the live estate -- they were NOT reloaded. Re-run "
+                    "with --replace-estate (or --duplicates last) if you intended to "
+                    "restore them: {}{}",
+                    len(orphaned), ", ".join(orphaned[:10]),
+                    f", +{len(orphaned) - 10} more" if len(orphaned) > 10 else "")
     summary.files_committed = files_committed
     return summary
 

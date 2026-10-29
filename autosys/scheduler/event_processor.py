@@ -1236,14 +1236,30 @@ class EventProcessor:
         failed: bool = False,
     ) -> None:
         """
-        Create a JobRunRow record for a completed job.
+        Create a JobRunRow record for a completed job, marked source="simulated".
 
-        Only reached when a FailureInjector is configured (auto_complete
-        dry-run/simulation mode) — see ``scheduler/simulation_runner.py``,
-        which always runs this against an isolated throwaway DB, never the
-        live one.  Real (non-simulated) executions record their run history
-        via ``AgentDispatch``/``RunRepository.start()``/``finish()`` instead,
-        with real timestamps and exit codes.
+        Only reached when a FailureInjector is configured, which is exactly
+        dry-run mode (app_server/main.py's _build_eps_processor) -- so the
+        outcome here is FailureInjector output and the duration is
+        estimated_run_secs(), never a measurement.
+
+        This docstring previously claimed the write "always runs against an
+        isolated throwaway DB, never the live one". That was wrong, and it
+        mattered: the shipped container runs `scheduler serve --dry-run`
+        (docker-entrypoint.sh), which installs this failure injector on the
+        LIVE event processor, so these rows went into the live database and
+        routers/assessment.py reported them as observed "history". On a
+        default container that was 277 of 297 jobs carrying generated failure
+        rates presented as evidence. The source="simulated" tag below is what
+        stops that; see dev/task10-productionization/04-simulator-flaws.md F0.
+
+        scheduler/simulation_runner.py does additionally run this against a
+        scratch DB (analysis/simulated_risk.py), which is correct -- but it
+        was never the only caller.
+
+        Real executions record run history via
+        ``AgentDispatch``/``RunRepository.start()``/``finish()`` instead, with
+        real timestamps and exit codes, and leave source at its "live" default.
         """
         import uuid
         from autosys.db.repository import runs as run_repo
@@ -1261,12 +1277,14 @@ class EventProcessor:
             command=row.command or "",
             machine=row.machine or "localhost",
             run_date=now.strftime("%Y-%m-%d"),
+            source="simulated",
         )
         session.flush()
         from autosys.db.schema import JobRunRow as _JR
         jr = session.get(_JR, run_id)
         if jr is not None:
             jr.start_time = start
+            jr.duration_secs = int(run_secs)
             # Simulate retry count: if job failed and has n_retrys, count retries
             if failed and row.n_retrys and row.n_retrys > 0:
                 jr.retry_count = min(row.n_retrys, 3)

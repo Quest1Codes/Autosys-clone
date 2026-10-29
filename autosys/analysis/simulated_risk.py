@@ -155,6 +155,15 @@ def take_snapshot(session: Session) -> dict[str, list[dict[str, Any]]]:
     return snap
 
 
+# Keys only on job definitions, not on observed/imported run history. That is
+# correct today -- simulation stats are only ever consumed for jobs absent
+# from fetch_run_stats(sources=("observed",...)) (routers/assessment.py's
+# `uncovered` list), so a history import shrinking that list just means
+# fewer jobs draw from this cache, not that stale entries get served. It
+# would stop being correct the moment the simulation is scoped to run only
+# over the uncovered set (worth doing at 86K jobs) -- at that point this key
+# must include the uncovered set, or an import could invalidate nothing
+# while the set of jobs needing simulation changed underneath it.
 def _snapshot_key(snap: dict[str, list[dict[str, Any]]], cycles: int, seed: int) -> str:
     jobs = sorted(
         (

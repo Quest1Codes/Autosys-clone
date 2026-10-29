@@ -126,13 +126,53 @@ def _add_missing_columns_conn(conn) -> list[str]:
     return added
 
 
+def _add_missing_indexes_conn(conn) -> list[str]:
+    """CREATE INDEX for every model index absent from an existing table.
+
+    ``create_all`` skips an existing table wholesale, and
+    ``_add_missing_columns_conn`` iterates ``table.columns`` only -- so an
+    index added to a model after a database was created silently never
+    exists on that database. Fresh installs get it, upgraded ones (the
+    client's existing Docker volume) do not, and the difference is invisible
+    until a query that needed it sequential-scans in production.
+
+    Uses SQLAlchemy's own ``Index.create(checkfirst=True)``, so no raw DDL is
+    emitted here (tests/test_postgres_compat.py asserts that).
+    """
+    insp = inspect(conn)
+    existing_tables = set(insp.get_table_names())
+    created: list[str] = []
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue          # create_all already made it, indexes included
+        have = {ix["name"] for ix in insp.get_indexes(table.name)}
+        # Unique constraints surface as indexes on some backends and as
+        # constraints on others; both spellings are treated as present.
+        have |= {uc["name"] for uc in insp.get_unique_constraints(table.name)}
+        for index in table.indexes:
+            if index.name in have:
+                continue
+            try:
+                index.create(bind=conn, checkfirst=True)
+            except OperationalError as exc:
+                if "already exists" in str(exc).lower():
+                    continue
+                raise
+            logger.info("Migrated schema: created index %s on %s",
+                        index.name, table.name)
+            created.append(f"{table.name}.{index.name}")
+    return created
+
+
 def add_missing_columns(engine=None) -> list[str]:
     """Add columns present in the models but missing from existing tables,
     then widen any column an older release created narrower than the model."""
     engine = engine or get_sync_engine()
     with engine.begin() as conn:
         added = _add_missing_columns_conn(conn)
-        return added + _widen_columns_conn(conn)
+        # Indexes after columns: an index may reference a column this same
+        # call just added.
+        return added + _widen_columns_conn(conn) + _add_missing_indexes_conn(conn)
 
 
 def _widen_columns_conn(conn) -> list[str]:
@@ -260,6 +300,7 @@ async def create_all_async(drop_first: bool = False) -> None:
                 raise
         await conn.run_sync(_add_missing_columns_conn)
         await conn.run_sync(_widen_columns_conn)
+        await conn.run_sync(_add_missing_indexes_conn)
 
     logger.info("AutoSys schema ensured (async) on %s", engine.url)
     await _seed_defaults_async()

@@ -41,12 +41,14 @@ from autosys.analysis.complexity import (
     build_report, compute_summary, export_csv, risk_mitigation,
 )
 from autosys.analysis.migration_signals import run_all_structural_analyses
-from autosys.analysis.operational_risk import fetch_run_stats
+from autosys.analysis.operational_risk import (
+    MIN_OBSERVED_RUNS, MIN_OBSERVED_WINDOW_DAYS, fetch_run_stats,
+)
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas import (
     AITokenBudgetResponse,
-    AssessmentJobRecord, AssessmentReportResponse, AssessmentSimulation,
-    AssessmentSummaryResponse,
+    AssessmentCoverage, AssessmentJobRecord, AssessmentReportResponse,
+    AssessmentSimulation, AssessmentSummaryResponse,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
 )
 from autosys.db.repository import jobs as job_repo
@@ -60,6 +62,7 @@ class _Assessment:
     summary:    AssessmentSummary
     signals:    dict
     simulation: AssessmentSimulation
+    coverage:   AssessmentCoverage
     mode:       str
 
 
@@ -79,15 +82,33 @@ def _assess(
     *force* simulates even in real execution mode (safe because the simulation is
     isolated); *wait_s* bounds how long to wait for it (None = until it finishes).
     """
-    rows      = job_repo.list_all(session)
-    live      = fetch_run_stats(session, [r.job_name for r in rows])
+    rows       = job_repo.list_all(session)
+    job_names  = [r.job_name for r in rows]
+
+    # Real evidence only. Never includes "simulated" -- this is the fix for
+    # F0 (dev/task10-productionization/04-simulator-flaws.md): before the
+    # JobRunRow.source column existed, the live dry-run event processor wrote
+    # FailureInjector output into this same table with no provenance tag, and
+    # this function read every row back as observed fact. "imported" is a
+    # client's real run-history export (see parser/run_history_ingest.py
+    # once it exists); it wins over "live" per job because it is the
+    # client's own estate, not this instance's incidental execution history.
+    imported = fetch_run_stats(session, job_names, sources=("imported",))
+    live     = fetch_run_stats(session, job_names, sources=("live",))
+    observed = {**live, **imported}
+
     dry_run   = getattr(request.app.state, "dry_run", True)
     mode      = "dry_run" if dry_run else "real"
     # BOX jobs never have run rows of their own (they inherit risk from their
-    # children), so only non-BOX jobs count as "missing history".
+    # children). A job with real evidence -- even too little of it to score,
+    # see MIN_OBSERVED_RUNS -- is never simulated: replacing a handful of real
+    # observations with FailureInjector fiction would be worse than reporting
+    # NO_DATA, and would make risk_source flip from observed to simulated as
+    # a client sends *more* data, which is backwards.
     uncovered = [
-        r.job_name for r in rows
-        if r.job_name not in live and (r.job_type or "").upper() != "BOX"
+        name for name in job_names
+        if name not in observed
+        and (next(r for r in rows if r.job_name == name).job_type or "").upper() != "BOX"
     ]
 
     sim_stats: dict = {}
@@ -110,17 +131,41 @@ def _assess(
             failure_rate=round(out.summary.get("failure_rate", 0.0), 4),
         )
 
-    # Live history wins per job; simulated stats only fill jobs that have none.
-    merged  = {**sim_stats, **live}
-    sources = {name: "history" for name in live}
-    sources.update({name: "simulated" for name in sim_stats if name not in live})
+    # Observed wins per job over simulated. Within "observed", score_
+    # operational_risk itself decides sufficient vs insufficient sample
+    # (RunStats.has_sufficient_sample) -- the split here is only for the
+    # risk_source label and the coverage counts, not for which stats dict a
+    # job's score is computed from.
+    merged  = {**sim_stats, **observed}
+    sources: dict[str, str] = {}
+    for name, stats in observed.items():
+        sources[name] = "observed" if stats.has_sufficient_sample() else "observed_insufficient"
+    for name in sim_stats:
+        sources.setdefault(name, "simulated")
     sim.jobs_simulated = sum(1 for v in sources.values() if v == "simulated")
+
+    non_box_total = sum(1 for r in rows if (r.job_type or "").upper() != "BOX")
+    jobs_observed = sum(1 for v in sources.values() if v == "observed")
+    coverage = AssessmentCoverage(
+        jobs_total                 = len(rows),
+        jobs_observed              = jobs_observed,
+        jobs_observed_insufficient = sum(1 for v in sources.values() if v == "observed_insufficient"),
+        jobs_simulated             = sim.jobs_simulated,
+        jobs_no_history            = sum(
+            1 for r in rows
+            if (r.job_type or "").upper() != "BOX" and r.job_name not in sources
+        ),
+        coverage_pct               = round(jobs_observed / non_box_total, 4) if non_box_total else 0.0,
+        min_runs_threshold         = MIN_OBSERVED_RUNS,
+        min_window_days_threshold  = MIN_OBSERVED_WINDOW_DAYS,
+        alarms_observed            = any(st.alarms_observed for st in merged.values()),
+    )
 
     signals = run_all_structural_analyses(session) if rows else {}
     results = build_report(
         rows, box, run_stats=merged, migration_signals=signals, risk_sources=sources,
     )
-    return _Assessment(results, compute_summary(results), signals, sim, mode)
+    return _Assessment(results, compute_summary(results), signals, sim, coverage, mode)
 
 
 def _job_record(
@@ -195,6 +240,9 @@ def get_report(
     Jobs with no run history get simulated risk (``risk_source: "simulated"``) — the
     simulation runs in the background on a scratch DB and is cached, so the first call
     after importing JIL may report ``simulation.status: "pending"``; call again shortly.
+    A job with real run history (this instance's own execution, or an imported client
+    export) is never simulated; see ``risk_source`` on AssessmentJobRecord and the
+    ``coverage`` block for how much of the estate each category covers.
     """
     a = _assess(
         session, request, box=box, cycles=simulated_risk.DEFAULT_CYCLES,
@@ -208,6 +256,7 @@ def get_report(
         job_count      = len(a.results),
         execution_mode = a.mode,
         simulation     = a.simulation,
+        coverage       = a.coverage,
         jobs           = [_job_record(r, ai_budget.by_job.get(r.job_name)) for r in a.results],
         box_breakdown  = box_effort_breakdown(a.results),
         summary        = _summary_response(a.summary),
@@ -288,6 +337,7 @@ def get_migration_report(
         "generated_at": datetime.now().isoformat(),
         "job_count": len(a.results),
         "simulation": a.simulation.model_dump(),
+        "coverage": a.coverage.model_dump(),
         "jobs": [_job_record(r, ai_budget.by_job.get(r.job_name)).model_dump() for r in a.results],
         "box_breakdown": box_effort_breakdown(a.results),
         "summary": _summary_response(a.summary).model_dump(),

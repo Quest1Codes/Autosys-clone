@@ -33,6 +33,8 @@ import click
 from rich.console import Console
 
 from autosys.cli.jil_cmd        import jil_group
+from autosys.cli.history_cmd    import history_group
+from autosys.cli.estate_cmd     import estate_group
 from autosys.cli.sendevent_cmd  import sendevent
 from autosys.cli.autorep_cmd    import autorep
 from autosys.cli.scheduler_cmd  import scheduler_group
@@ -102,6 +104,8 @@ def autosys(ctx: click.Context, db: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 autosys.add_command(jil_group)
+autosys.add_command(history_group)
+autosys.add_command(estate_group)
 autosys.add_command(sendevent)
 autosys.add_command(autorep)
 autosys.add_command(scheduler_group)

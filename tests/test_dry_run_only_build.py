@@ -69,6 +69,34 @@ def test_agent_commands_refuse(stripped_tree):
     assert r.returncode == 0, r.stderr
 
 
+def test_history_import_works_in_stripped_build(stripped_tree):
+    """Run-history import needs none of the real-execution modules -- by
+    design it only touches db/schema, db/repository, db/connection and
+    models/enums, none of which are stripped -- so it must work unchanged
+    in the client-shipped DRY_RUN_ONLY image."""
+    r = _run(stripped_tree, """
+        import autosys.cli.history_cmd
+        import autosys.app_server.routers.history
+        from autosys.parser.run_history_ingest import ingest_run_history_stream
+        assert callable(ingest_run_history_stream)
+    """)
+    assert r.returncode == 0, r.stderr
+
+
+def test_estate_clear_works_in_stripped_build(stripped_tree):
+    """Estate-clear needs none of the real-execution modules -- it only
+    touches db/schema, db/repository, db/connection and parser/jil_ingest,
+    none of which are stripped -- so it must work unchanged in the
+    client-shipped DRY_RUN_ONLY image."""
+    r = _run(stripped_tree, """
+        import autosys.cli.estate_cmd
+        import autosys.app_server.routers.estate
+        from autosys.parser.jil_ingest import remove_jobs_not_in
+        assert callable(remove_jobs_not_in)
+    """)
+    assert r.returncode == 0, r.stderr
+
+
 def test_full_tree_unchanged():
     from autosys import safety
     assert not safety.DRY_RUN_ONLY_BUILD

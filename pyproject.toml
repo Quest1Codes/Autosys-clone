@@ -40,6 +40,11 @@ dependencies = [
     # drifted to different resolved versions.
     "fastapi == 0.138.0",
     "uvicorn[standard] == 0.34.3",
+    # FastAPI's UploadFile (history import -- a run-history export is
+    # expected to be large, so it goes through multipart rather than a
+    # JSON string body) needs this to parse multipart/form-data at all.
+    # Pinned exactly to match shinro/apps/api's pin (A1).
+    "python-multipart == 0.0.31",
 
     # CLI
     # Pinned exactly to match shinro/apps/api's pin (A1), same reason as fastapi above.

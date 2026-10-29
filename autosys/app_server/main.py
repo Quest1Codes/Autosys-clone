@@ -40,7 +40,7 @@ from autosys.app_server.schemas     import (
     TokenRequest, TokenResponse, HealthResponse,
     ExecutionModeResponse,
 )
-from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment, metrics as metrics_router
+from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment, metrics as metrics_router, history as history_router, estate as estate_router
 from autosys.db.connection          import sync_session
 
 
@@ -236,6 +236,8 @@ def create_app(
     app.include_router(machines.router)
     app.include_router(globals_router.router)
     app.include_router(jil_router.router)
+    app.include_router(history_router.router)
+    app.include_router(estate_router.router)
     app.include_router(alarms_router.router)
     app.include_router(assessment.router)
     app.include_router(metrics_router.router)

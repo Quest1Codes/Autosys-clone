@@ -698,6 +698,7 @@ class RunRepository:
         command: str,
         machine: str,
         run_date: str,
+        source: str = "live",
     ) -> JobRunRow:
         """
         Insert a new RUNNING run record at job dispatch time.
@@ -705,6 +706,12 @@ class RunRepository:
         Called by AgentDispatch.dispatch() just before forking the subprocess.
         The PID and exit_code are left NULL here and filled in by
         ``finish()`` when the process exits.
+
+        *source* records provenance on the row (see JobRunRow.source). It
+        defaults to "live" because a real dispatch is the only caller that
+        should leave it unset; the dry-run event processor passes
+        "simulated" explicitly so its generated runs are never counted as
+        observed evidence.
         """
         row = JobRunRow(
             run_id     = run_id,
@@ -713,6 +720,7 @@ class RunRepository:
             start_time = utcnow(),
             machine    = machine,
             run_date   = run_date,
+            source     = source,
         )
         session.add(row)
         return row
