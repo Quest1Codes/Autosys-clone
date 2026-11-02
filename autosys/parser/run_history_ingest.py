@@ -627,7 +627,7 @@ def ingest_run_history_stream(
             try:
                 session.rollback()
             except Exception:
-                pass
+                logger.opt(exception=True).debug("rollback after lost connection failed")
             report.aborted = True
             report.abort_reason = f"{type(exc).__name__}: {exc}"
             logger.error(

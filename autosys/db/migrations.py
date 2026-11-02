@@ -22,7 +22,7 @@ from datetime import date, datetime
 from autosys.timeutil import utcnow
 from pathlib import Path
 
-from sqlalchemy import inspect, text
+from sqlalchemy import column as sa_column, func, inspect, table as sa_table, text, update
 from sqlalchemy.exc import OperationalError
 
 from autosys.db.connection import get_async_engine, get_sync_engine
@@ -117,10 +117,10 @@ def _add_missing_columns_conn(conn) -> list[str]:
                 # Same justification as the ADD COLUMN above: table.name and
                 # col.name are Base.metadata identifiers from db/schema.py,
                 # and the only value set is the SQL CURRENT_TIMESTAMP keyword.
-                # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
-                conn.execute(text(
-                    f'UPDATE "{table.name}" SET "{col.name}" = CURRENT_TIMESTAMP'
-                ))
+                # Lightweight table/column constructs on purpose: the ORM Table would
+                # drag in every column's Python-side default/onupdate, including columns
+                # not added yet.
+                conn.execute(update(sa_table(table.name, sa_column(col.name))).values({col.name: func.current_timestamp()}))
             logger.info("Migrated schema: added column %s.%s (%s)", table.name, col.name, coltype)
             added.append(f"{table.name}.{col.name}")
     return added

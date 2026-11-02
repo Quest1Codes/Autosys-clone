@@ -36,13 +36,13 @@ services:
   postgres:
     build:
       context: deploy/postgres
-    image: autosys-postgres:16
+    image: autosys-postgres:17
     environment:
       POSTGRES_USER: ${AUTOSYS_DB_USER:-autosys}
       POSTGRES_PASSWORD: ${AUTOSYS_DB_PASSWORD:-autosys}
       POSTGRES_DB: ${AUTOSYS_DB_NAME:-autosys}
     volumes:
-      - autosys-pgdata:/var/lib/postgresql/data
+      - autosys-pgdata17:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${AUTOSYS_DB_USER:-autosys}"]
       interval: 5s
@@ -132,4 +132,7 @@ services:
 
 volumes:
   autosys-data:
-  autosys-pgdata:
+  # New volume for PostgreSQL 17: the old `autosys-pgdata` was written by
+  # postgres:16-alpine and cannot be opened by this image (different major
+  # version and collation). Left in place as a backup; restore from a dump.
+  autosys-pgdata17:

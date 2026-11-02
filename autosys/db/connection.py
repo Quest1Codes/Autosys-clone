@@ -41,6 +41,7 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import AsyncGenerator, Generator
 
+from loguru import logger
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -143,7 +144,7 @@ def reset_engines() -> None:
         try:
             eng.dispose()
         except Exception:
-            pass
+            logger.opt(exception=True).debug("engine dispose failed")
     _sync_engines.clear()
     _sync_session_factories.clear()
 

@@ -50,11 +50,9 @@ class AirflowClient:
 def _default_http_post(url: str, headers: dict, body: str) -> dict:
     """Default HTTP POST using urllib."""
     import urllib.request
-    # urlopen also accepts file:// and ftp:// -- only ever meant for HTTP APIs.
-    if not url.lower().startswith(("http://", "https://")):
-        raise ValueError(f"Refusing non-HTTP URL: {url!r}")
-    req = urllib.request.Request(url, data=body.encode(), headers=headers, method="POST")
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    from autosys.netutil import urlopen_http
+    req = urllib.request.Request(url, data=body.encode(), headers=headers, method="POST")  # scheme checked in urlopen_http
+    with urlopen_http(req, timeout=30) as resp:
         return json.loads(resp.read().decode())
 
 

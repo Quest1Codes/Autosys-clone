@@ -21,7 +21,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404  # fixed local commands only (top, pgrep)
 from datetime import datetime
 from autosys.timeutil import utcnow
 from typing import Optional
@@ -154,7 +154,7 @@ def _handle_cpu_monitor(attrs: dict) -> Optional[dict]:
     """Check CPU usage against threshold."""
     threshold = attrs.get("threshold", 90)
     try:
-        load = subprocess.check_output(
+        load = subprocess.check_output(  # nosec B603 B607  # constant command string, no user input
             ["sh", "-c", "top -l 1 -n 0 | grep 'CPU usage' | awk '{print $3}' | tr -d '%'"],
             timeout=5,
             text=True,
@@ -192,7 +192,7 @@ def _handle_process_monitor(attrs: dict) -> Optional[dict]:
     if not process_name:
         return None
     try:
-        result = subprocess.run(
+        result = subprocess.run(  # nosec B603 B607  # argument list (no shell); pgrep is a standard system tool
             ["pgrep", "-f", process_name],
             capture_output=True, timeout=5,
         )

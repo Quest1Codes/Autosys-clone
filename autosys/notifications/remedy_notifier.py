@@ -17,6 +17,7 @@ from typing import Optional
 from loguru import logger
 
 from autosys.db.schema import AlarmRow
+from autosys.netutil import urlopen_http
 
 
 class RemedyNotifier:
@@ -102,7 +103,7 @@ def _default_remedy_post(url: str, payload: dict, headers: dict) -> bool:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urlopen_http(req, timeout=15) as resp:
             return 200 <= resp.status < 300
     except urllib.error.HTTPError as exc:
         logger.debug("Remedy POST %s → %d", url, exc.code)

@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
+import subprocess  # nosec B404  # running the job command is this module's purpose
 import threading
 from datetime import datetime
 from typing import Callable, Optional
@@ -295,9 +295,12 @@ class LocalJobRunner:
 
         # Merge stderr into stdout so we get a single chronological stream.
         # This matches AutoSys default behaviour (stdout_file captures both).
-        self._proc = subprocess.Popen(
+        # shell=True is the product: an AutoSys `command:` is a shell command line
+        # (pipes, redirects, &&), run as the job's owner. The command comes from the
+        # JIL definition an operator loaded, never from request input at run time.
+        self._proc = subprocess.Popen(  # nosec B602
             self.command,
-            shell      = True,
+            shell      = True,  # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
             stdout     = subprocess.PIPE,
             stderr     = subprocess.STDOUT,
             stdin      = stdin_fh,
@@ -372,8 +375,8 @@ class LocalJobRunner:
         and block the subprocess — use a separate thread for DB writes in
         production (Phase 6).
         """
-        assert self._proc is not None
-        assert self._proc.stdout is not None
+        if self._proc is None or self._proc.stdout is None:
+            raise RuntimeError("process has not been started")
 
         for raw_line in self._proc.stdout:
             content = raw_line.rstrip("\n")

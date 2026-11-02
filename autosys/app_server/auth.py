@@ -50,7 +50,7 @@ from loguru import logger
 # Configuration
 # ---------------------------------------------------------------------------
 
-_INSECURE_DEFAULT_SECRET = "dev-secret-change-in-production"
+_INSECURE_DEFAULT_SECRET = "dev-secret-change-in-production"  # nosec B105  # sentinel the server REFUSES to run with
 
 
 def is_auth_enabled() -> bool:

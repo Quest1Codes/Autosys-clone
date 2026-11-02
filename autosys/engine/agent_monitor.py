@@ -50,7 +50,7 @@ class AgentHealthMonitor:
             if resp.get("type") == "alive":
                 return True
         except Exception:
-            pass
+            logger.opt(exception=True).debug("agent heartbeat failed")
 
         # Agent is down — raise alarm
         self._raise_alarm(session, machine)

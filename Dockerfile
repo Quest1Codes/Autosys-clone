@@ -30,13 +30,12 @@ RUN npm run build
 # the point of a one-line `docker run`.
 #
 # Base is ubi-micro, which has no package manager, so everything is installed
-# into /mnt/rootfs from a full UBI 9 stage (dnf --installroot) and the result
-# is copied onto ubi-micro. The nginx module stream is enabled on the build
-# host AND copied into the install root, otherwise --installroot ignores it and
-# installs the stock 1.20.
+# into /mnt/rootfs from a full UBI 10 stage (dnf --installroot) and the result
+# is copied onto ubi-micro. RHEL 10 has no module streams; nginx is a
+# plain package.
 #
 # Python and PostgreSQL are NOT installed from RPMs. Red Hat's python3.12 RPM
-# and the PostgreSQL server (UBI 9 only carries the client; the server is in
+# and the PostgreSQL server (UBI 10 only carries the client; the server is in
 # PGDG) drag in libraries -- libxml2, krb5, openldap, cyrus-sasl -- that the
 # app never uses but that scanners report against. Instead:
 #   * Python is an upstream python-build-standalone build (via uv), which is
@@ -46,7 +45,7 @@ RUN npm run build
 #     libxml, gssapi, ldap, pam, icu and readline switched off, so none of
 #     those libraries are installed at all. Same major version as before, so
 #     existing /app/data volumes still open.
-FROM registry.access.redhat.com/ubi9/ubi AS pgbuild
+FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pgbuild
 ARG PG_VERSION=17.11
 ARG PG_SHA256=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979
 # bison and flex are build-time only (this stage never reaches the image). UBI's
@@ -56,19 +55,22 @@ ARG BISON_SHA256=9bba0214ccf7f1079c5d59210045227bcf619519840ebfa80cd3849cff5a5bf
 ARG FLEX_SHA256=e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995
 RUN dnf install -y --setopt=install_weak_deps=false gcc gcc-c++ make tar bzip2 xz \
         openssl-devel zlib-devel diffutils findutils perl perl-FindBin perl-File-Compare perl-File-Copy perl-File-Basename perl-Getopt-Long perl-Data-Dumper perl-Time-HiRes perl-IPC-Cmd m4 \
+    && dnf clean all \
     && curl -fsSL -o /tmp/bison.tar.xz https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz \
     && echo "${BISON_SHA256}  /tmp/bison.tar.xz" | sha256sum -c - \
-    && tar -C /tmp -xJf /tmp/bison.tar.xz && cd /tmp/bison-3.8.2 \
-    && ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null \
+    && tar -C /tmp -xJf /tmp/bison.tar.xz \
     && curl -fsSL -o /tmp/flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz \
     && echo "${FLEX_SHA256}  /tmp/flex.tar.gz" | sha256sum -c - \
-    && tar -C /tmp -xzf /tmp/flex.tar.gz && cd /tmp/flex-2.6.4 \
-    && ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
+    && tar -C /tmp -xzf /tmp/flex.tar.gz
+WORKDIR /tmp/bison-3.8.2
+RUN ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
+WORKDIR /tmp/flex-2.6.4
+RUN ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
 RUN curl -fsSL -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
     && echo "${PG_SHA256}  /tmp/pg.tar.bz2" | sha256sum -c - \
-    && tar -C /tmp -xjf /tmp/pg.tar.bz2 \
-    && cd "/tmp/postgresql-${PG_VERSION}" \
-    && ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readline \
+    && tar -C /tmp -xjf /tmp/pg.tar.bz2
+WORKDIR /tmp/postgresql-${PG_VERSION}
+RUN ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readline \
          --without-libxml --without-libxslt --without-gssapi --without-ldap \
          --without-pam --without-systemd --without-llvm --without-lz4 --without-zstd \
     && make -j"$(nproc)" world-bin \
@@ -77,10 +79,11 @@ RUN curl -fsSL -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_V
     && rm -rf /opt/pgsql/include /opt/pgsql/lib/pkgconfig /opt/pgsql/share/doc /opt/pgsql/share/man \
     && test -x /opt/pgsql/bin/initdb
 
-FROM registry.access.redhat.com/ubi9/ubi AS pybuild
+FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pybuild
 ARG UV_VERSION=0.11.27
 ARG PY_VERSION=3.12
 RUN dnf install -y --setopt=install_weak_deps=false python3-pip \
+    && dnf clean all \
     && pip3 install --no-cache-dir "uv==${UV_VERSION}" \
     && UV_PYTHON_INSTALL_DIR=/opt/uvpy uv python install "${PY_VERSION}" \
     && mv /opt/uvpy/cpython-"${PY_VERSION}".* /opt/python \
@@ -88,16 +91,14 @@ RUN dnf install -y --setopt=install_weak_deps=false python3-pip \
     && find /opt/python -name EXTERNALLY-MANAGED -delete \
     && /opt/python/bin/python3 --version
 
-FROM registry.access.redhat.com/ubi9/ubi AS rootfs
+FROM registry.access.redhat.com/ubi10/ubi:10.2 AS rootfs
 
 RUN mkdir -p /mnt/rootfs && rpm --root /mnt/rootfs --initdb \
-    && dnf -y module enable nginx:1.26 \
-    && mkdir -p /mnt/rootfs/etc/dnf/modules.d \
-    && cp /etc/dnf/modules.d/nginx.module /mnt/rootfs/etc/dnf/modules.d/ \
-    && dnf install -y --installroot /mnt/rootfs --releasever 9 \
+    && dnf install -y --installroot /mnt/rootfs --releasever 10 \
          --setopt=install_weak_deps=false --setopt=tsflags=nodocs \
          bash coreutils-single nginx openssl-libs zlib libstdc++ grep findutils \
     && dnf --installroot /mnt/rootfs clean all \
+    && dnf clean all \
     && rm -rf /mnt/rootfs/var/cache/* /mnt/rootfs/var/log/*
 COPY --from=pybuild /opt/python /mnt/rootfs/opt/python
 COPY --from=pgbuild /opt/pgsql /mnt/rootfs/opt/pgsql
@@ -120,7 +121,8 @@ COPY autosys /mnt/rootfs/app/autosys
 # .pyc behind -- still readable (`grep shell=True` finds it), which defeats
 # the point of the flag. Done unconditionally so both variants are identical
 # in this respect.
-RUN cd /mnt/rootfs/app && find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
+WORKDIR /mnt/rootfs/app
+RUN find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
     if [ "$DRY_RUN_ONLY" = "true" ]; then \
       rm -f autosys/agent/dispatch.py autosys/agent/runner.py \
             autosys/agent/runners.py autosys/agent/server.py \
@@ -198,7 +200,7 @@ RUN for p in ncurses-base pcre2-syntax; do \
       rpm --root /mnt/rootfs -e --nodeps "$p"; \
     done
 
-FROM registry.access.redhat.com/ubi9/ubi-micro AS runtime
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.2 AS runtime
 COPY --from=rootfs /mnt/rootfs/ /
 # The python base image this replaced set the same; initdb, psql and Python
 # derive their encoding from it.
@@ -303,15 +305,42 @@ CMD []
 # is where auth/JIL-import/sendevent live, so serving the SPA from its own
 # process would break login the moment a real browser (not curl hitting a
 # port directly) loads it.
-FROM nginx:1.27-alpine AS nginx-runtime
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.2 AS nginx-runtime
 
-# Same reasoning as the runtime stage's apt-get upgrade: apply whatever
-# Alpine has already patched since this tag's snapshot was published.
-RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
+# nginx from the UBI 10 AppStream repo, patched to whatever Red Hat has already
+# released. Runs as the unprivileged `nginx` user: the main config below is
+# replaced wholesale (RHEL's stock one declares its own :80 server and writes
+# its pid/logs to root-owned paths), with logs on stdout/stderr and temp dirs
+# and the pid file in places that user can write. Port 80 binds unprivileged
+# because container runtimes default net.ipv4.ip_unprivileged_port_start to 0.
+RUN microdnf -y update \
+    && microdnf -y install --setopt=install_weak_deps=0 --nodocs nginx \
+    && microdnf clean all \
+    && rm -f /etc/nginx/conf.d/*.conf \
+    && rm -rf /usr/share/nginx/html/* \
+    && mkdir -p /var/lib/nginx/tmp \
+    && chown -R nginx:nginx /var/lib/nginx
+RUN printf '%s\n' \
+      'pid /tmp/nginx.pid;' \
+      'error_log /dev/stderr warn;' \
+      'events { worker_connections 1024; }' \
+      'http {' \
+      '    include /etc/nginx/mime.types;' \
+      '    default_type application/octet-stream;' \
+      '    access_log /dev/stdout;' \
+      '    client_body_temp_path /var/lib/nginx/tmp/client_body;' \
+      '    proxy_temp_path /var/lib/nginx/tmp/proxy;' \
+      '    fastcgi_temp_path /var/lib/nginx/tmp/fastcgi;' \
+      '    uwsgi_temp_path /var/lib/nginx/tmp/uwsgi;' \
+      '    scgi_temp_path /var/lib/nginx/tmp/scgi;' \
+      '    include /etc/nginx/conf.d/*.conf;' \
+      '}' > /etc/nginx/nginx.conf
 
 COPY --from=frontend-build /app/wcc-frontend/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+USER nginx
 EXPOSE 80
 # Static index only, so it doesn't depend on the api/wcc upstreams being up.
-HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD wget -q --spider http://127.0.0.1/ || exit 1
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD curl -fsS -o /dev/null http://127.0.0.1/ || exit 1
+CMD ["nginx", "-g", "daemon off;"]
