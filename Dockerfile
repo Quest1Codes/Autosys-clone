@@ -136,6 +136,17 @@ RUN find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
 # upgrading setuptools alone clears those two as well.
 # Run through chroot into the install root (with resolv.conf borrowed for the
 # network) so the rpm database can be edited afterwards: see the rpm -e below.
+#
+# The install root has an empty /dev. A native build never notices, because
+# Python takes its startup randomness from the getrandom() syscall; under
+# amd64 emulation on an arm64 host (how release images are built on a Mac)
+# that call is unavailable, Python falls back to /dev/urandom, and dies with
+# "_Py_HashRandomization_Init: failed to get random numbers". Create the two
+# random nodes for the chroot steps (/dev/null is already there); they are
+# removed again before the install root becomes the runtime image, where the
+# container runtime supplies /dev.
+RUN mknod -m 666 /mnt/rootfs/dev/random c 1 8 \
+    && mknod -m 666 /mnt/rootfs/dev/urandom c 1 9
 RUN cp /etc/resolv.conf /mnt/rootfs/etc/resolv.conf \
     && chroot /mnt/rootfs sh -c 'cd /app && /opt/python/bin/python3 -m pip install --no-cache-dir --upgrade pip setuptools'
 # [pg] pulls in psycopg2-binary/asyncpg — the compose files point
@@ -186,7 +197,9 @@ RUN for p in systemd systemd-pam systemd-libs systemd-rpm-macros dbus dbus-broke
          for f in /usr/sbin/nginx /usr/bin/bash /usr/bin/grep /usr/bin/find \
                   $(find /opt/python /opt/pgsql -type f \( -name "*.so*" -o -perm -u+x \)); do \
            if ldd "$f" 2>/dev/null | grep -q "not found"; then echo "missing library for $f"; bad=1; fi; \
-         done; exit $bad'
+         done; exit $bad' \
+    # Last chroot step: drop the build-time device nodes created above.
+    && rm -f /mnt/rootfs/dev/random /mnt/rootfs/dev/urandom
 # After the library check: ncurses-base is terminfo data and pcre2-syntax is
 # documentation; both are data nothing reads at runtime.
 # glibc-common and glibc-minimal-langpack STAY: glibc-common owns the C.utf8
