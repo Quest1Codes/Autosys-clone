@@ -14,7 +14,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/reports/vuln"
 RAW="$OUT/raw"
 BASELINE_REF="${BASELINE_REF:-}"   # optional: git ref whose lockfiles count as the "before" state
-IMAGES=("autosys-clone:latest" "autosys-clone-web:latest" "autosys-postgres:16")
+IMAGES=("autosys-clone:latest" "autosys-clone-web:latest" "autosys-postgres:17")
 BUILD=0; SCAN_IMAGES=1
 for a in "$@"; do
   case "$a" in
