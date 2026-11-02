@@ -1,6 +1,6 @@
 {
- "generated": "2026-10-07T05:48:09Z",
- "baseline_note": "43cd715^",
+ "generated": "2026-11-02T08:28:12Z",
+ "baseline_note": "",
  "findings": [
   {
    "scope": "image",
@@ -89,6 +89,60 @@
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
+   "scope": "codebase",
+   "target": "/Users/Raghav/Quest1/autosys-astronomer/Autosys-2.0/Autosys-clone/uv.lock",
+   "component": "/Users/Raghav/Quest1/autosys-astronomer/Autosys-2.0/Autosys-clone/uv.lock",
+   "category": "PyPI",
+   "package": "certifi",
+   "installed": "2026.7.22",
+   "fixed_version": "2026.10.18",
+   "vuln_id": "PYSEC-2026-4320",
+   "aliases": [
+    "GHSA-6q48-6c7w-9gw2"
+   ],
+   "title": "certifi bundles emSign root CAs with compromised intermediate CA keys",
+   "description": "Certifi versions before 2026.10.18 include the `emSign ECC Root CA - G3` root certificate in their bundled CA store. Eight eMudhra intermediate CA certificates that chain to this root have compromised private keys and the CA has revoked them. \n\nAn attacker with one of the compromised keys can issue valid-looking certificates for any hostname. If the attacker is also on-path, they can intercept or modify TLS traffic from clients that trust the certifi bundle. Examples include `requests`, `urllib\u2026",
+   "severity": "CRITICAL",
+   "cvss": 9.1,
+   "url": "https://github.com/advisories/GHSA-6q48-6c7w-9gw2",
+   "cwe": [],
+   "tools": [
+    "osv-scanner"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|/Users/Raghav/Quest1/autosys-astronomer/Autosys-2.0/Autosys-clone/uv.lock|certifi@2026.7.22|PYSEC-2026-4320",
+   "id": 3,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "uv.lock",
+   "component": "uv.lock",
+   "category": "uv",
+   "package": "certifi",
+   "installed": "2026.7.22",
+   "fixed_version": "2026.10.18",
+   "vuln_id": "GHSA-6q48-6c7w-9gw2",
+   "aliases": [],
+   "title": "certifi bundles emSign root CAs with compromised intermediate CA keys",
+   "description": "Certifi versions before 2026.10.18 include the `emSign ECC Root CA - G3` root certificate in their bundled CA store. Eight eMudhra intermediate CA certificates that chain to this root have compromised private keys and the CA has revoked them. \n\nAn attacker with one of the compromised keys can issue valid-looking certificates for any hostname. If the attacker is also on-path, they can intercept or modify TLS traffic from clients that trust the certifi bundle. Examples include `requests`, `urllib\u2026",
+   "severity": "CRITICAL",
+   "cvss": null,
+   "url": "https://github.com/advisories/GHSA-6q48-6c7w-9gw2",
+   "cwe": [],
+   "tools": [
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|uv.lock|certifi@2026.7.22|GHSA-6q48-6c7w-9gw2",
+   "id": 4,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
    "scope": "image",
    "target": "autosys-clone:latest",
    "component": "autosys-clone:latest",
@@ -114,7 +168,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2026-16742",
-   "id": 3,
+   "id": 5,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -143,7 +197,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2026-16742",
-   "id": 4,
+   "id": 6,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -172,7 +226,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2026-16742",
-   "id": 5,
+   "id": 7,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -201,7 +255,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2026-16742",
-   "id": 6,
+   "id": 8,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -229,7 +283,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|setuptools@70.3.0|CVE-2025-47273",
-   "id": 7,
+   "id": 9,
    "fixed_on": "2026-10-07T05:17:21Z"
   },
   {
@@ -259,7 +313,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|source-map-js@1.2.1|GHSA-68fv-2mgg-jv7q",
-   "id": 8,
+   "id": 10,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -287,7 +341,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-74860",
-   "id": 9,
+   "id": 11,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -315,7 +369,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-74860",
-   "id": 10,
+   "id": 12,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -343,7 +397,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dirmngr@2.4.7-21+deb13u1+b5|CVE-2026-24882",
-   "id": 11,
+   "id": 13,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -371,7 +425,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg@2.4.7-21+deb13u1|CVE-2026-24882",
-   "id": 12,
+   "id": 14,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -399,7 +453,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg-l10n@2.4.7-21+deb13u1|CVE-2026-24882",
-   "id": 13,
+   "id": 15,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -427,7 +481,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg@2.4.7-21+deb13u1+b5|CVE-2026-24882",
-   "id": 14,
+   "id": 16,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -455,7 +509,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg-agent@2.4.7-21+deb13u1+b5|CVE-2026-24882",
-   "id": 15,
+   "id": 17,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -483,7 +537,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgconf@2.4.7-21+deb13u1+b5|CVE-2026-24882",
-   "id": 16,
+   "id": 18,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -511,7 +565,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgsm@2.4.7-21+deb13u1+b5|CVE-2026-24882",
-   "id": 17,
+   "id": 19,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -542,7 +596,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-x97p-jq2g-jp4f",
-   "id": 18,
+   "id": 20,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -573,7 +627,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-542g-h47m-68v8",
-   "id": 19,
+   "id": 21,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -604,7 +658,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-c29m-xwm3-cm6r",
-   "id": 20,
+   "id": 22,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -636,8 +690,103 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-mghh-pgcx-3jjj",
-   "id": 21,
+   "id": 23,
    "fixed_on": "2026-10-07T05:05:24Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "follow-redirects",
+   "installed": "1.16.0",
+   "fixed_version": "1.16.1",
+   "vuln_id": "GHSA-8r9p-f939-6h3c",
+   "aliases": [
+    "CVE-2026-111755"
+   ],
+   "title": "follow-redirects sensitiveHeaders regex escaping can expose credential headers",
+   "description": "### Summary\nfollow-redirects 1.16.0 introduced the `sensitiveHeaders` option (the fix for CVE-2026-40895 / GHSA-r4q5-vmmm-2653), which lets an application declare extra header names that must be removed when a redirect crosses to a different host or downgrades protocol. The filter is a single case-insensitive regular expression built by concatenating the declared header names into an alternation after passing each through `escapeRegex`. `escapeRegex` escapes only a partial set of metacharacters\u2026",
+   "severity": "HIGH",
+   "cvss": 8.2,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-111755",
+   "cwe": [
+    "CWE-185",
+    "CWE-200"
+   ],
+   "tools": [
+    "osv-scanner",
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|follow-redirects@1.16.0|GHSA-8r9p-f939-6h3c",
+   "id": 24,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "follow-redirects",
+   "installed": "1.16.0",
+   "fixed_version": "1.16.2",
+   "vuln_id": "GHSA-mrwp-f3q8-3g9p",
+   "aliases": [
+    "CVE-2026-116689"
+   ],
+   "title": "follow-redirects: Cross-realm sensitiveHeaders arrays are discarded and custom credentials can follow redirects",
+   "description": "### Summary\n\nfollow-redirects 1.16.0 and 1.16.1 validate the documented sensitiveHeaders option with instanceof Array. An array created in another JavaScript realm is silently replaced with an empty list, so a caller-declared custom credential header can be forwarded to an attacker-controlled cross-origin redirect destination.\n\n### Details\n\nAffected versions\n\nThe sensitiveHeaders option was introduced in 1.16.0. Published 1.16.0 and 1.16.1 both reproduced, giving a tested affected range of 1.16\u2026",
+   "severity": "HIGH",
+   "cvss": 8.2,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-116689",
+   "cwe": [
+    "CWE-201"
+   ],
+   "tools": [
+    "osv-scanner",
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|follow-redirects@1.16.0|GHSA-mrwp-f3q8-3g9p",
+   "id": 25,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "follow-redirects",
+   "installed": "1.16.0",
+   "fixed_version": "1.16.1",
+   "vuln_id": "GHSA-q3jh-wrc6-jgq8",
+   "aliases": [
+    "CVE-2026-111756"
+   ],
+   "title": "follow-redirects array-form headers bypass cross-origin credential stripping",
+   "description": "### Summary\nfollow-redirects removes sensitive credential headers (Authorization, Proxy-Authorization, Cookie, and any caller-declared `sensitiveHeaders`) before following a redirect that crosses to a different host or downgrades to a less secure protocol. The removal routine iterates the caller's headers container with `for...in` and matches header names against a filter. This assumes the headers container is a plain object keyed by header names. Node's underlying `http.request`, which follow-\u2026",
+   "severity": "HIGH",
+   "cvss": 8.2,
+   "url": "https://osv.dev/GHSA-q3jh-wrc6-jgq8",
+   "cwe": [
+    "CWE-200",
+    "CWE-212"
+   ],
+   "tools": [
+    "osv-scanner",
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|follow-redirects@1.16.0|GHSA-q3jh-wrc6-jgq8",
+   "id": 26,
+   "fixed_on": "2026-11-02T08:10:59Z"
   },
   {
    "scope": "codebase",
@@ -667,7 +816,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|nanoid@3.3.15|GHSA-28wg-ghj8-5hjv",
    "fixed_on": "baseline",
-   "id": 22
+   "id": 27
   },
   {
    "scope": "codebase",
@@ -697,7 +846,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|nanoid@3.3.15|GHSA-2v37-7h3g-55p8",
    "fixed_on": "baseline",
-   "id": 23
+   "id": 28
   },
   {
    "scope": "image",
@@ -724,7 +873,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-39821",
-   "id": 24,
+   "id": 29,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -752,7 +901,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39821",
-   "id": 25,
+   "id": 30,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -784,7 +933,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|vite@5.4.21|GHSA-fx2h-pf6j-xcff",
    "fixed_on": "baseline",
-   "id": 26
+   "id": 31
   },
   {
    "scope": "image",
@@ -811,7 +960,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-56858",
-   "id": 27,
+   "id": 32,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -839,7 +988,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-56858",
-   "id": 28,
+   "id": 33,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -867,7 +1016,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 29,
+   "id": 34,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -895,7 +1044,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 30,
+   "id": 35,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -923,7 +1072,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libblkid1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 31,
+   "id": 36,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -951,7 +1100,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libblkid1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 32,
+   "id": 37,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -979,7 +1128,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 33,
+   "id": 38,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1007,7 +1156,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 34,
+   "id": 39,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1035,7 +1184,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libmount1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 35,
+   "id": 40,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1063,7 +1212,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libmount1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 36,
+   "id": 41,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1091,7 +1240,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 37,
+   "id": 42,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1119,7 +1268,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 38,
+   "id": 43,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1147,7 +1296,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libuuid1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 39,
+   "id": 44,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1175,7 +1324,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libuuid1@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 40,
+   "id": 45,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1203,7 +1352,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 41,
+   "id": 46,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1231,7 +1380,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 42,
+   "id": 47,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1259,7 +1408,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|mount@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 43,
+   "id": 48,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1287,7 +1436,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|mount@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 44,
+   "id": 49,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1315,7 +1464,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|util-linux@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 45,
+   "id": 50,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1343,7 +1492,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|util-linux@2.41.5-0+deb13u1|CVE-2026-78408",
-   "id": 46,
+   "id": 51,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1371,7 +1520,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 47,
+   "id": 52,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1399,7 +1548,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 48,
+   "id": 53,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1427,7 +1576,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 49,
+   "id": 54,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1455,7 +1604,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 50,
+   "id": 55,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1483,7 +1632,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libblkid1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 51,
+   "id": 56,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1511,7 +1660,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libblkid1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 52,
+   "id": 57,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1539,7 +1688,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libblkid1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 53,
+   "id": 58,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1567,7 +1716,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libblkid1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 54,
+   "id": 59,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1595,7 +1744,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 55,
+   "id": 60,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1623,7 +1772,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 56,
+   "id": 61,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1651,7 +1800,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 57,
+   "id": 62,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1679,7 +1828,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 58,
+   "id": 63,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1707,7 +1856,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libmount1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 59,
+   "id": 64,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1735,7 +1884,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libmount1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 60,
+   "id": 65,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1763,7 +1912,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libmount1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 61,
+   "id": 66,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1791,7 +1940,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libmount1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 62,
+   "id": 67,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1820,7 +1969,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libncursesw6@6.5+20250216-2|CVE-2025-69720",
-   "id": 63,
+   "id": 68,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1849,7 +1998,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libncursesw6@6.5+20250216-2|CVE-2025-69720",
-   "id": 64,
+   "id": 69,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1877,7 +2026,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 65,
+   "id": 70,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1905,7 +2054,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 66,
+   "id": 71,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1933,7 +2082,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 67,
+   "id": 72,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1961,7 +2110,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 68,
+   "id": 73,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -1990,7 +2139,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libtinfo6@6.5+20250216-2|CVE-2025-69720",
-   "id": 69,
+   "id": 74,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2019,7 +2168,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libtinfo6@6.5+20250216-2|CVE-2025-69720",
-   "id": 70,
+   "id": 75,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2047,7 +2196,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libuuid1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 71,
+   "id": 76,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2075,7 +2224,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libuuid1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 72,
+   "id": 77,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2103,7 +2252,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libuuid1@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 73,
+   "id": 78,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2131,7 +2280,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libuuid1@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 74,
+   "id": 79,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2159,7 +2308,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86138",
-   "id": 75,
+   "id": 80,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2187,7 +2336,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86139",
-   "id": 76,
+   "id": 81,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2215,7 +2364,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86140",
-   "id": 77,
+   "id": 82,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2243,7 +2392,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86142",
-   "id": 78,
+   "id": 83,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2271,7 +2420,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86144",
-   "id": 79,
+   "id": 84,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2299,7 +2448,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86138",
-   "id": 80,
+   "id": 85,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2327,7 +2476,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86139",
-   "id": 81,
+   "id": 86,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2355,7 +2504,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86140",
-   "id": 82,
+   "id": 87,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2383,7 +2532,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86142",
-   "id": 83,
+   "id": 88,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2411,7 +2560,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86144",
-   "id": 84,
+   "id": 89,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2439,7 +2588,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 85,
+   "id": 90,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2467,7 +2616,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 86,
+   "id": 91,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2495,7 +2644,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 87,
+   "id": 92,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2523,7 +2672,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 88,
+   "id": 93,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2551,7 +2700,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|mount@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 89,
+   "id": 94,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2579,7 +2728,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|mount@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 90,
+   "id": 95,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2607,7 +2756,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|mount@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 91,
+   "id": 96,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2635,7 +2784,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|mount@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 92,
+   "id": 97,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2664,7 +2813,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|ncurses-base@6.5+20250216-2|CVE-2025-69720",
-   "id": 93,
+   "id": 98,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2693,7 +2842,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|ncurses-base@6.5+20250216-2|CVE-2025-69720",
-   "id": 94,
+   "id": 99,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2722,7 +2871,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|ncurses-bin@6.5+20250216-2|CVE-2025-69720",
-   "id": 95,
+   "id": 100,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2751,7 +2900,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|ncurses-bin@6.5+20250216-2|CVE-2025-69720",
-   "id": 96,
+   "id": 101,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2779,7 +2928,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39822",
-   "id": 97,
+   "id": 102,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -2807,7 +2956,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|util-linux@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 98,
+   "id": 103,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2835,7 +2984,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|util-linux@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 99,
+   "id": 104,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2863,7 +3012,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|util-linux@2.41.5-0+deb13u1|CVE-2026-76642",
-   "id": 100,
+   "id": 105,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2891,7 +3040,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|util-linux@2.41.5-0+deb13u1|CVE-2026-78410",
-   "id": 101,
+   "id": 106,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -2923,7 +3072,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-m8m8-qj5v-23w3",
-   "id": 102,
+   "id": 107,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -2955,7 +3104,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|browserslist@4.28.4|GHSA-73wf-gq98-2v4g",
    "fixed_on": "baseline",
-   "id": 103
+   "id": 108
   },
   {
    "scope": "codebase",
@@ -2985,7 +3134,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|browserslist@4.28.4|GHSA-c83g-rgw3-j3cx",
    "fixed_on": "baseline",
-   "id": 104
+   "id": 109
   },
   {
    "scope": "image",
@@ -3012,7 +3161,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libperl5.40@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 105,
+   "id": 110,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3040,7 +3189,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libperl5.40@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 106,
+   "id": 111,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3066,7 +3215,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|msgpack@1.1.2|GHSA-6v7p-g79w-8964",
-   "id": 107,
+   "id": 112,
    "fixed_on": "2026-10-07T05:17:21Z"
   },
   {
@@ -3094,7 +3243,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 108,
+   "id": 113,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3122,7 +3271,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 109,
+   "id": 114,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3150,7 +3299,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-base@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 110,
+   "id": 115,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3178,7 +3327,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-base@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 111,
+   "id": 116,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3206,7 +3355,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 112,
+   "id": 117,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3234,7 +3383,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2026-9538",
-   "id": 113,
+   "id": 118,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -3265,7 +3414,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|postcss@8.5.16|GHSA-r28c-9q8g-f849",
    "fixed_on": "baseline",
-   "id": 114
+   "id": 119
   },
   {
    "scope": "image",
@@ -3292,7 +3441,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-33818",
-   "id": 115,
+   "id": 120,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -3320,7 +3469,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-56853",
-   "id": 116,
+   "id": 121,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -3348,7 +3497,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-56859",
-   "id": 117,
+   "id": 122,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -3376,7 +3525,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-56860",
-   "id": 118,
+   "id": 123,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -3404,7 +3553,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|stdlib@v1.25.12|CVE-2026-56862",
-   "id": 119,
+   "id": 124,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -3432,7 +3581,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61726",
-   "id": 120,
+   "id": 125,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3460,7 +3609,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61729",
-   "id": 121,
+   "id": 126,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3489,7 +3638,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-25679",
-   "id": 122,
+   "id": 127,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3517,7 +3666,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-27145",
-   "id": 123,
+   "id": 128,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3545,7 +3694,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-32280",
-   "id": 124,
+   "id": 129,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3573,7 +3722,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-32281",
-   "id": 125,
+   "id": 130,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3602,7 +3751,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-32283",
-   "id": 126,
+   "id": 131,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3631,7 +3780,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-33811",
-   "id": 127,
+   "id": 132,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3660,7 +3809,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-33814",
-   "id": 128,
+   "id": 133,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3688,7 +3837,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-33818",
-   "id": 129,
+   "id": 134,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3717,7 +3866,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39820",
-   "id": 130,
+   "id": 135,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3745,7 +3894,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39836",
-   "id": 131,
+   "id": 136,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3773,7 +3922,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-42499",
-   "id": 132,
+   "id": 137,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3801,7 +3950,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-42504",
-   "id": 133,
+   "id": 138,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3829,7 +3978,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-56853",
-   "id": 134,
+   "id": 139,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3857,7 +4006,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-56859",
-   "id": 135,
+   "id": 140,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3885,7 +4034,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-56860",
-   "id": 136,
+   "id": 141,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3913,7 +4062,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-56862",
-   "id": 137,
+   "id": 142,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -3941,8 +4090,38 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|urllib3@2.7.0|CVE-2026-97689",
-   "id": 138,
+   "id": 143,
    "fixed_on": "2026-10-07T05:17:21Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "vite",
+   "installed": "6.4.3",
+   "fixed_version": "6.4.4",
+   "vuln_id": "GHSA-587h-7wmj-h5pm",
+   "aliases": [
+    "CVE-2026-112942"
+   ],
+   "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+   "description": "### Summary\n\n`launch-editor` checked `fs.existsSync(fileName)` before passing a supplied path to an editor command. On Windows, an attacker can bypass this check with a crafted path ending in `\\\\..:line:column`. This removes the requirement that the attacker be able to place a file with a malicious filename.\n\nCombined with the `%` escaping issue described in [GHSA-698v-4r3x-3vcv](https://github.com/vitejs/launch-editor/security/advisories/GHSA-698v-4r3x-3vcv), this bypass can lead to OS command\u2026",
+   "severity": "HIGH",
+   "cvss": 7.5,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-112942",
+   "cwe": [
+    "CWE-77"
+   ],
+   "tools": [
+    "osv-scanner"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|vite@6.4.3|GHSA-587h-7wmj-h5pm",
+   "id": 144,
+   "fixed_on": "2026-11-02T08:10:59Z"
   },
   {
    "scope": "image",
@@ -3970,7 +4149,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|urllib3@2.7.0|CVE-2026-97687",
-   "id": 139,
+   "id": 145,
    "fixed_on": "2026-10-07T05:17:21Z"
   },
   {
@@ -3998,7 +4177,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86143",
-   "id": 140,
+   "id": 146,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4026,7 +4205,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86143",
-   "id": 141,
+   "id": 147,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4054,7 +4233,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libacl1@2.3.2-2+b1|CVE-2026-54369",
-   "id": 142,
+   "id": 148,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4082,7 +4261,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libacl1@2.3.2-2+b1|CVE-2026-54369",
-   "id": 143,
+   "id": 149,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4113,7 +4292,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-3pq3-5fj3-cg6v",
-   "id": 144,
+   "id": 150,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -4145,7 +4324,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-r4gj-5m52-g5wh",
-   "id": 145,
+   "id": 151,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -4173,7 +4352,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 146,
+   "id": 152,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4201,7 +4380,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 147,
+   "id": 153,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4229,7 +4408,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libblkid1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 148,
+   "id": 154,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4257,7 +4436,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libblkid1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 149,
+   "id": 155,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4285,7 +4464,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 150,
+   "id": 156,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4313,7 +4492,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 151,
+   "id": 157,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4341,7 +4520,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libmount1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 152,
+   "id": 158,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4369,7 +4548,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libmount1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 153,
+   "id": 159,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4397,7 +4576,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 154,
+   "id": 160,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4425,7 +4604,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 155,
+   "id": 161,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4453,7 +4632,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libuuid1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 156,
+   "id": 162,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4481,7 +4660,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libuuid1@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 157,
+   "id": 163,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4509,7 +4688,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 158,
+   "id": 164,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4537,7 +4716,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 159,
+   "id": 165,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4565,7 +4744,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|mount@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 160,
+   "id": 166,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4593,7 +4772,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|mount@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 161,
+   "id": 167,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4621,7 +4800,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|util-linux@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 162,
+   "id": 168,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4649,7 +4828,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|util-linux@2.41.5-0+deb13u1|CVE-2026-78409",
-   "id": 163,
+   "id": 169,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4677,7 +4856,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|golang.org/x/crypto@v0.54.0|CVE-2026-56854",
-   "id": 164,
+   "id": 170,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -4703,8 +4882,34 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:22:32Z",
    "key": "codebase|deploy/postgres/Dockerfile|Dockerfile Security Check@|DS-0002",
-   "id": 165,
+   "id": 171,
    "fixed_on": "2026-10-07T05:27:28Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "Dockerfile",
+   "component": "Dockerfile",
+   "category": "Misconfiguration",
+   "package": "Dockerfile Security Check",
+   "installed": "",
+   "fixed_version": "",
+   "vuln_id": "DS-0019",
+   "aliases": [],
+   "title": "'dnf clean all' missing",
+   "description": "Cached package data should be cleaned after installation to reduce image size. Add 'dnf clean all' to Dockerfile",
+   "severity": "HIGH",
+   "cvss": null,
+   "url": "https://avd.aquasec.com/misconfig/ds-0019",
+   "cwe": [],
+   "tools": [
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|Dockerfile|Dockerfile Security Check@|DS-0019",
+   "id": 172,
+   "fixed_on": "2026-11-02T08:10:59Z"
   },
   {
    "scope": "image",
@@ -4731,7 +4936,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-32282",
-   "id": 166,
+   "id": 173,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -4759,7 +4964,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|gcc-14-base@14.2.0-19|CVE-2026-95619",
-   "id": 167,
+   "id": 174,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4787,7 +4992,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gcc-14-base@14.2.0-19|CVE-2026-95619",
-   "id": 168,
+   "id": 175,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4815,7 +5020,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgcc-s1@14.2.0-19|CVE-2026-95619",
-   "id": 169,
+   "id": 176,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4843,7 +5048,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgcc-s1@14.2.0-19|CVE-2026-95619",
-   "id": 170,
+   "id": 177,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4871,7 +5076,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libstdc++6@14.2.0-19|CVE-2026-95619",
-   "id": 171,
+   "id": 178,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4899,7 +5104,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libstdc++6@14.2.0-19|CVE-2026-95619",
-   "id": 172,
+   "id": 179,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -4927,7 +5132,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|github.com/Azure/go-ntlmssp@v0.1.0|CVE-2026-32952",
-   "id": 173,
+   "id": 180,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -4953,7 +5158,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-58183",
-   "id": 174,
+   "id": 181,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -4981,7 +5186,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-58187",
-   "id": 175,
+   "id": 182,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -5009,7 +5214,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-58188",
-   "id": 176,
+   "id": 183,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -5037,7 +5242,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61723",
-   "id": 177,
+   "id": 184,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -5063,7 +5268,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61725",
-   "id": 178,
+   "id": 185,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -5091,7 +5296,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61728",
-   "id": 179,
+   "id": 186,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -5119,7 +5324,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|gcc-14-base@14.2.0-19|CVE-2026-102010",
-   "id": 180,
+   "id": 187,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5147,7 +5352,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gcc-14-base@14.2.0-19|CVE-2026-102010",
-   "id": 181,
+   "id": 188,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5175,7 +5380,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 182,
+   "id": 189,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5203,7 +5408,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 183,
+   "id": 190,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5231,7 +5436,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 184,
+   "id": 191,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5259,7 +5464,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 185,
+   "id": 192,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5287,7 +5492,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 186,
+   "id": 193,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5315,7 +5520,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 187,
+   "id": 194,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5343,7 +5548,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 188,
+   "id": 195,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5371,7 +5576,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 189,
+   "id": 196,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5399,7 +5604,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 190,
+   "id": 197,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5427,7 +5632,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 191,
+   "id": 198,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5455,7 +5660,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 192,
+   "id": 199,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5483,7 +5688,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 193,
+   "id": 200,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5511,7 +5716,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgcc-s1@14.2.0-19|CVE-2026-102010",
-   "id": 194,
+   "id": 201,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5539,7 +5744,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgcc-s1@14.2.0-19|CVE-2026-102010",
-   "id": 195,
+   "id": 202,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5567,7 +5772,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libstdc++6@14.2.0-19|CVE-2026-102010",
-   "id": 196,
+   "id": 203,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5595,7 +5800,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libstdc++6@14.2.0-19|CVE-2026-102010",
-   "id": 197,
+   "id": 204,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5623,7 +5828,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 198,
+   "id": 205,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5651,7 +5856,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 199,
+   "id": 206,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5679,7 +5884,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-86805",
-   "id": 200,
+   "id": 207,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5707,7 +5912,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-95818",
-   "id": 201,
+   "id": 208,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5738,7 +5943,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-44g4-m2mj-wpvx",
-   "id": 202,
+   "id": 209,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -5771,7 +5976,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-4hqw-qxg8-jxx2",
-   "id": 203,
+   "id": 210,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -5802,7 +6007,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-9fr6-4gfg-395g",
-   "id": 204,
+   "id": 211,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -5834,7 +6039,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-j8rh-479h-cp32",
-   "id": 205,
+   "id": 212,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -5865,7 +6070,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|wcc-frontend/package-lock.json|axios@1.18.1|GHSA-vh66-26gq-q6x8",
-   "id": 206,
+   "id": 213,
    "fixed_on": "2026-10-07T05:05:24Z"
   },
   {
@@ -5897,7 +6102,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|react-router-dom@6.30.4|GHSA-jjmj-jmhj-qwj2",
    "fixed_on": "baseline",
-   "id": 207
+   "id": 214
   },
   {
    "scope": "image",
@@ -5924,7 +6129,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 208,
+   "id": 215,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5952,7 +6157,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 209,
+   "id": 216,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -5980,7 +6185,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 210,
+   "id": 217,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6008,7 +6213,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 211,
+   "id": 218,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6036,7 +6241,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 212,
+   "id": 219,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6064,7 +6269,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 213,
+   "id": 220,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6092,7 +6297,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 214,
+   "id": 221,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6120,7 +6325,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-19499",
-   "id": 215,
+   "id": 222,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6151,7 +6356,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|baseline-browser-mapping@2.10.42|GHSA-w5vr-8v7q-w6rv",
    "fixed_on": "baseline",
-   "id": 216
+   "id": 223
   },
   {
    "scope": "image",
@@ -6178,7 +6383,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 217,
+   "id": 224,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6206,7 +6411,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 218,
+   "id": 225,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6234,7 +6439,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 219,
+   "id": 226,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6262,7 +6467,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 220,
+   "id": 227,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6290,7 +6495,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 221,
+   "id": 228,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6318,7 +6523,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 222,
+   "id": 229,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6346,7 +6551,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 223,
+   "id": 230,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6374,7 +6579,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-6238",
-   "id": 224,
+   "id": 231,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6402,7 +6607,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61727",
-   "id": 225,
+   "id": 232,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -6428,7 +6633,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39825",
-   "id": 226,
+   "id": 233,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -6456,7 +6661,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libacl1@2.3.2-2+b1|CVE-2026-54370",
-   "id": 227,
+   "id": 234,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6484,7 +6689,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libacl1@2.3.2-2+b1|CVE-2026-54370",
-   "id": 228,
+   "id": 235,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6512,7 +6717,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libattr1@1:2.5.2-3|CVE-2026-54371",
-   "id": 229,
+   "id": 236,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6540,7 +6745,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libattr1@1:2.5.2-3|CVE-2026-54371",
-   "id": 230,
+   "id": 237,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6572,7 +6777,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|postcss@8.5.16|GHSA-fxqj-rqcc-2cmp",
    "fixed_on": "baseline",
-   "id": 231
+   "id": 238
   },
   {
    "scope": "codebase",
@@ -6603,7 +6808,98 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|vite@5.4.21|GHSA-4w7w-66w2-5vf9",
    "fixed_on": "baseline",
-   "id": 232
+   "id": 239
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "vite",
+   "installed": "6.4.3",
+   "fixed_version": "6.4.4",
+   "vuln_id": "GHSA-698v-4r3x-3vcv",
+   "aliases": [
+    "CVE-2026-112943"
+   ],
+   "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+   "description": "### Summary\n\n`launch-editor` did not escape `%` on Windows when passing an argument to `cmd`. When an environment variable contained a malicious value, it was possible that that content to be executed.\n\n### Impact\n\nOnly apps that match all of the following conditions are affected:\n\n- The user uses Windows\n- An attacker can place a file with the malicious filename containing `&` or `%`\n- Either of\n  - An attacker can inject an environment variable with a malicious value\n  - An attacker can add a\u2026",
+   "severity": "MEDIUM",
+   "cvss": 6.3,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-112943",
+   "cwe": [
+    "CWE-78"
+   ],
+   "tools": [
+    "osv-scanner"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|vite@6.4.3|GHSA-698v-4r3x-3vcv",
+   "id": 240,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "vite",
+   "installed": "6.4.3",
+   "fixed_version": "6.4.4",
+   "vuln_id": "GHSA-r825-w8mm-5pxw",
+   "aliases": [
+    "CVE-2026-112944"
+   ],
+   "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+   "description": "### Summary\n\n`launch-editor` forwarded file paths directly to editors without sanitization. If a path resembles a CLI flag, editors like Vim may interpret it as a command, potentially causing unintended file overwrites or command execution.\n\n### Impact\n\n#### Direct `launch-editor` users\n\nOnly apps that match all of the following conditions are affected:\n\n- The attacker is able to create a file system entry (e.g. a file or directory) starting with `+` or `-` in the working directory\n- The user u\u2026",
+   "severity": "MEDIUM",
+   "cvss": 6.3,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-112944",
+   "cwe": [
+    "CWE-88"
+   ],
+   "tools": [
+    "osv-scanner"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|vite@6.4.3|GHSA-r825-w8mm-5pxw",
+   "id": 241,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "vite",
+   "installed": "6.4.3",
+   "fixed_version": "6.4.4",
+   "vuln_id": "GHSA-rq7h-c2jc-7f22",
+   "aliases": [
+    "CVE-2026-112946"
+   ],
+   "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+   "description": "### Summary\n\nThe content of files outside `server.fs` setting can be returned to the browser if the project imports a file path concatenated with the `root`. For example, if the project references `<path-to-project-root>/etc/hosts`, the content of `/etc/hosts` was possible to be returned.\n\nThe content of files outside the `server.fs.allow` option can be returned to the browser when a project imports a file whose root-relative path matches an absolute path on the host. For example, referencing `\u2026",
+   "severity": "MEDIUM",
+   "cvss": 6.3,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-112946",
+   "cwe": [
+    "CWE-22",
+    "CWE-284"
+   ],
+   "tools": [
+    "osv-scanner"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|vite@6.4.3|GHSA-rq7h-c2jc-7f22",
+   "id": 242,
+   "fixed_on": "2026-11-02T08:10:59Z"
   },
   {
    "scope": "image",
@@ -6630,7 +6926,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libp11-kit0@0.25.5-3|CVE-2026-13757",
-   "id": 233,
+   "id": 243,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6658,7 +6954,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libp11-kit0@0.25.5-3|CVE-2026-18938",
-   "id": 234,
+   "id": 244,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6686,7 +6982,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86137",
-   "id": 235,
+   "id": 245,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6714,7 +7010,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86137",
-   "id": 236,
+   "id": 246,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6745,7 +7041,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|react-router@6.30.4|GHSA-337j-9hxr-rhxg",
    "fixed_on": "baseline",
-   "id": 237
+   "id": 247
   },
   {
    "scope": "image",
@@ -6773,7 +7069,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|setuptools@70.3.0|CVE-2026-59890",
-   "id": 238,
+   "id": 248,
    "fixed_on": "2026-10-07T05:17:21Z"
   },
   {
@@ -6801,7 +7097,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-27142",
-   "id": 239,
+   "id": 249,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -6829,7 +7125,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-32289",
-   "id": 240,
+   "id": 250,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -6857,7 +7153,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39823",
-   "id": 241,
+   "id": 251,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -6885,7 +7181,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-39826",
-   "id": 242,
+   "id": 252,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -6913,7 +7209,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dirmngr@2.4.7-21+deb13u1+b5|CVE-2025-68972",
-   "id": 243,
+   "id": 253,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6941,7 +7237,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg@2.4.7-21+deb13u1|CVE-2025-68972",
-   "id": 244,
+   "id": 254,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6969,7 +7265,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg-l10n@2.4.7-21+deb13u1|CVE-2025-68972",
-   "id": 245,
+   "id": 255,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -6997,7 +7293,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg@2.4.7-21+deb13u1+b5|CVE-2025-68972",
-   "id": 246,
+   "id": 256,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7025,7 +7321,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg-agent@2.4.7-21+deb13u1+b5|CVE-2025-68972",
-   "id": 247,
+   "id": 257,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7053,7 +7349,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgconf@2.4.7-21+deb13u1+b5|CVE-2025-68972",
-   "id": 248,
+   "id": 258,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7081,7 +7377,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgsm@2.4.7-21+deb13u1+b5|CVE-2025-68972",
-   "id": 249,
+   "id": 259,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7109,7 +7405,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 250,
+   "id": 260,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7137,7 +7433,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 251,
+   "id": 261,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7165,7 +7461,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 252,
+   "id": 262,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7193,7 +7489,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 253,
+   "id": 263,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7221,7 +7517,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 254,
+   "id": 264,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7249,7 +7545,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 255,
+   "id": 265,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7277,7 +7573,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 256,
+   "id": 266,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7305,7 +7601,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 257,
+   "id": 267,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7333,7 +7629,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 258,
+   "id": 268,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7361,7 +7657,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 259,
+   "id": 269,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7389,7 +7685,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 260,
+   "id": 270,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7417,7 +7713,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 261,
+   "id": 271,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7445,7 +7741,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 262,
+   "id": 272,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7473,7 +7769,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 263,
+   "id": 273,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7501,7 +7797,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 264,
+   "id": 274,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7529,7 +7825,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 265,
+   "id": 275,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7557,7 +7853,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 266,
+   "id": 276,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7585,7 +7881,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 267,
+   "id": 277,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7613,7 +7909,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 268,
+   "id": 278,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7641,7 +7937,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 269,
+   "id": 279,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7669,7 +7965,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 270,
+   "id": 280,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7697,7 +7993,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 271,
+   "id": 281,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7725,7 +8021,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 272,
+   "id": 282,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7753,7 +8049,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 273,
+   "id": 283,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7781,7 +8077,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 274,
+   "id": 284,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7809,7 +8105,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 275,
+   "id": 285,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7837,7 +8133,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 276,
+   "id": 286,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7865,7 +8161,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 277,
+   "id": 287,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7893,7 +8189,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-5435",
-   "id": 278,
+   "id": 288,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7921,7 +8217,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-6791",
-   "id": 279,
+   "id": 289,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7949,7 +8245,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-77117",
-   "id": 280,
+   "id": 290,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -7977,7 +8273,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-80489",
-   "id": 281,
+   "id": 291,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8007,7 +8303,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libperl5.40@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 282,
+   "id": 292,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8037,7 +8333,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libperl5.40@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 283,
+   "id": 293,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8067,7 +8363,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 284,
+   "id": 294,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8097,7 +8393,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 285,
+   "id": 295,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8127,7 +8423,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-base@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 286,
+   "id": 296,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8157,7 +8453,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-base@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 287,
+   "id": 297,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8187,7 +8483,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 288,
+   "id": 298,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8217,7 +8513,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2026-15534",
-   "id": 289,
+   "id": 299,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8245,7 +8541,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 290,
+   "id": 300,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8273,7 +8569,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 291,
+   "id": 301,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8301,7 +8597,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 292,
+   "id": 302,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8329,7 +8625,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 293,
+   "id": 303,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8357,7 +8653,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 294,
+   "id": 304,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8385,7 +8681,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 295,
+   "id": 305,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8413,7 +8709,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsqlite3-0@3.46.1-7+deb13u2|CVE-2026-50812",
-   "id": 296,
+   "id": 306,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8441,7 +8737,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsqlite3-0@3.46.1-7+deb13u2|CVE-2026-50813",
-   "id": 297,
+   "id": 307,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8469,7 +8765,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsqlite3-0@3.46.1-7+deb13u2|CVE-2026-50812",
-   "id": 298,
+   "id": 308,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8497,7 +8793,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsqlite3-0@3.46.1-7+deb13u2|CVE-2026-50813",
-   "id": 299,
+   "id": 309,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8526,7 +8822,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2026-15059",
-   "id": 300,
+   "id": 310,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8555,7 +8851,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2026-15059",
-   "id": 301,
+   "id": 311,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8584,7 +8880,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2026-15059",
-   "id": 302,
+   "id": 312,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8613,7 +8909,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2026-15059",
-   "id": 303,
+   "id": 313,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8641,7 +8937,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-76781",
-   "id": 304,
+   "id": 314,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8669,7 +8965,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-76781",
-   "id": 305,
+   "id": 315,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8697,7 +8993,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxslt1.1@1.1.35-1.2+deb13u3|CVE-2025-10911",
-   "id": 306,
+   "id": 316,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8725,7 +9021,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxslt1.1@1.1.35-1.2+deb13u3|CVE-2025-10911",
-   "id": 307,
+   "id": 317,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8753,7 +9049,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 308,
+   "id": 318,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8781,7 +9077,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-6368",
-   "id": 309,
+   "id": 319,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8809,7 +9105,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-32288",
-   "id": 310,
+   "id": 320,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -8837,7 +9133,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|tar@1.35+dfsg-3.1|CVE-2026-5704",
-   "id": 311,
+   "id": 321,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8865,7 +9161,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|tar@1.35+dfsg-3.1|CVE-2026-5704",
-   "id": 312,
+   "id": 322,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8897,7 +9193,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|vite@5.4.21|GHSA-v6wh-96g9-6wx3",
    "fixed_on": "baseline",
-   "id": 313
+   "id": 323
   },
   {
    "scope": "image",
@@ -8924,7 +9220,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|zlib1g@1:1.3.dfsg+really1.3.1-1+b1|CVE-2026-27171",
-   "id": 314,
+   "id": 324,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8952,7 +9248,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|zlib1g@1:1.3.dfsg+really1.3.1-1+b1|CVE-2026-27171",
-   "id": 315,
+   "id": 325,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -8980,7 +9276,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 316,
+   "id": 326,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9008,7 +9304,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bsdutils@1:2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 317,
+   "id": 327,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9037,7 +9333,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|esbuild@0.21.5|GHSA-67mh-4wv8-2f99",
    "fixed_on": "baseline",
-   "id": 318
+   "id": 328
   },
   {
    "scope": "image",
@@ -9064,7 +9360,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|golang.org/x/crypto@v0.54.0|CVE-2026-56855",
-   "id": 319,
+   "id": 329,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -9092,7 +9388,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|golang.org/x/crypto@v0.54.0|CVE-2026-78662",
-   "id": 320,
+   "id": 330,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -9120,7 +9416,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libblkid1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 321,
+   "id": 331,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9148,7 +9444,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libblkid1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 322,
+   "id": 332,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9176,7 +9472,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 323,
+   "id": 333,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9204,7 +9500,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 324,
+   "id": 334,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9232,7 +9528,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 325,
+   "id": 335,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9260,7 +9556,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 326,
+   "id": 336,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9288,7 +9584,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 327,
+   "id": 337,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9316,7 +9612,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 328,
+   "id": 338,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9344,7 +9640,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 329,
+   "id": 339,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9372,7 +9668,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblastlog2-2@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 330,
+   "id": 340,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9400,7 +9696,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libmount1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 331,
+   "id": 341,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9428,7 +9724,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libmount1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 332,
+   "id": 342,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9456,7 +9752,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 333,
+   "id": 343,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9484,7 +9780,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsmartcols1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 334,
+   "id": 344,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9512,7 +9808,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libuuid1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 335,
+   "id": 345,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9540,7 +9836,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libuuid1@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 336,
+   "id": 346,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9568,7 +9864,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 337,
+   "id": 347,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9596,7 +9892,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-8674",
-   "id": 338,
+   "id": 348,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9624,7 +9920,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 339,
+   "id": 349,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9652,7 +9948,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 340,
+   "id": 350,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9680,7 +9976,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|mount@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 341,
+   "id": 351,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9708,7 +10004,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|mount@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 342,
+   "id": 352,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9734,7 +10030,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-47912",
-   "id": 343,
+   "id": 353,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9762,7 +10058,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-58185",
-   "id": 344,
+   "id": 354,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9790,7 +10086,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-58189",
-   "id": 345,
+   "id": 355,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9818,7 +10114,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61724",
-   "id": 346,
+   "id": 356,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9844,7 +10140,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-61730",
-   "id": 347,
+   "id": 357,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9872,7 +10168,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-42505",
-   "id": 348,
+   "id": 358,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9898,7 +10194,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-42507",
-   "id": 349,
+   "id": 359,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -9926,7 +10222,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|urllib3@2.7.0|CVE-2026-97688",
-   "id": 350,
+   "id": 360,
    "fixed_on": "2026-10-07T05:17:21Z"
   },
   {
@@ -9954,7 +10250,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|util-linux@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 351,
+   "id": 361,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -9982,7 +10278,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|util-linux@2.41.5-0+deb13u1|CVE-2026-3184",
-   "id": 352,
+   "id": 362,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10013,7 +10309,7 @@
    "first_seen": null,
    "key": "codebase|wcc-frontend/package-lock.json|react-router@6.30.4|GHSA-wrjc-x8rr-h8h6",
    "fixed_on": "baseline",
-   "id": 353
+   "id": 363
   },
   {
    "scope": "image",
@@ -10040,7 +10336,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libbz2-1.0@1.0.8-6|CVE-2026-42250",
-   "id": 354,
+   "id": 364,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10068,7 +10364,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libbz2-1.0@1.0.8-6|CVE-2026-42250",
-   "id": 355,
+   "id": 365,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10096,7 +10392,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 356,
+   "id": 366,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10124,7 +10420,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 357,
+   "id": 367,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10152,7 +10448,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 358,
+   "id": 368,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10180,7 +10476,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 359,
+   "id": 369,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10208,7 +10504,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 360,
+   "id": 370,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10236,7 +10532,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 361,
+   "id": 371,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10264,7 +10560,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 362,
+   "id": 372,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10292,7 +10588,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-18374",
-   "id": 363,
+   "id": 373,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10320,7 +10616,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libpam-modules@1.7.0-5|CVE-2026-54411",
-   "id": 364,
+   "id": 374,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10348,7 +10644,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libpam-modules@1.7.0-5|CVE-2026-54411",
-   "id": 365,
+   "id": 375,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10376,7 +10672,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libpam-modules-bin@1.7.0-5|CVE-2026-54411",
-   "id": 366,
+   "id": 376,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10404,7 +10700,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libpam-modules-bin@1.7.0-5|CVE-2026-54411",
-   "id": 367,
+   "id": 377,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10432,7 +10728,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libpam-runtime@1.7.0-5|CVE-2026-54411",
-   "id": 368,
+   "id": 378,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10460,7 +10756,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libpam-runtime@1.7.0-5|CVE-2026-54411",
-   "id": 369,
+   "id": 379,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10488,7 +10784,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libpam0g@1.7.0-5|CVE-2026-54411",
-   "id": 370,
+   "id": 380,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10516,7 +10812,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libpam0g@1.7.0-5|CVE-2026-54411",
-   "id": 371,
+   "id": 381,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10544,7 +10840,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|tar@1.35+dfsg-3.1|CVE-2026-18477",
-   "id": 372,
+   "id": 382,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10572,7 +10868,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|tar@1.35+dfsg-3.1|CVE-2026-18508",
-   "id": 373,
+   "id": 383,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10600,7 +10896,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|tar@1.35+dfsg-3.1|CVE-2026-18477",
-   "id": 374,
+   "id": 384,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10628,7 +10924,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|tar@1.35+dfsg-3.1|CVE-2026-18508",
-   "id": 375,
+   "id": 385,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10656,7 +10952,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 376,
+   "id": 386,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10684,7 +10980,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 377,
+   "id": 387,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10712,7 +11008,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 378,
+   "id": 388,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10740,7 +11036,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 379,
+   "id": 389,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10768,7 +11064,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 380,
+   "id": 390,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10796,7 +11092,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 381,
+   "id": 391,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10824,7 +11120,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 382,
+   "id": 392,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10852,7 +11148,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 383,
+   "id": 393,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10880,7 +11176,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 384,
+   "id": 394,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10908,7 +11204,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 385,
+   "id": 395,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10936,7 +11232,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 386,
+   "id": 396,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10964,7 +11260,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 387,
+   "id": 397,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -10992,7 +11288,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 388,
+   "id": 398,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11020,7 +11316,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 389,
+   "id": 399,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11048,7 +11344,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-19542",
-   "id": 390,
+   "id": 400,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11076,8 +11372,60 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-89092",
-   "id": 391,
+   "id": 401,
    "fixed_on": "2026-10-07T05:45:13Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "Dockerfile",
+   "component": "Dockerfile",
+   "category": "Misconfiguration",
+   "package": "Dockerfile Security Check",
+   "installed": "",
+   "fixed_version": "",
+   "vuln_id": "DS-0001",
+   "aliases": [],
+   "title": "':latest' tag used",
+   "description": "When using a 'FROM' statement you should use a specific tag to avoid uncontrolled behavior when the image is updated. Add a tag to the image in the 'FROM' statement",
+   "severity": "MEDIUM",
+   "cvss": null,
+   "url": "https://avd.aquasec.com/misconfig/ds-0001",
+   "cwe": [],
+   "tools": [
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|Dockerfile|Dockerfile Security Check@|DS-0001",
+   "id": 402,
+   "fixed_on": "2026-11-02T08:10:59Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "Dockerfile",
+   "component": "Dockerfile",
+   "category": "Misconfiguration",
+   "package": "Dockerfile Security Check",
+   "installed": "",
+   "fixed_version": "",
+   "vuln_id": "DS-0013",
+   "aliases": [],
+   "title": "'RUN cd ...' to change directory",
+   "description": "Use WORKDIR instead of proliferating instructions like 'RUN cd \u2026 && do-something', which are hard to read, troubleshoot, and maintain. Use WORKDIR to change directory",
+   "severity": "MEDIUM",
+   "cvss": null,
+   "url": "https://avd.aquasec.com/misconfig/ds-0013",
+   "cwe": [],
+   "tools": [
+    "trivy"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|Dockerfile|Dockerfile Security Check@|DS-0013",
+   "id": 403,
+   "fixed_on": "2026-11-02T08:10:59Z"
   },
   {
    "scope": "image",
@@ -11104,7 +11452,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|zlib1g@1:1.3.dfsg+really1.3.1-1+b1|CVE-2026-85091",
-   "id": 392,
+   "id": 404,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11132,7 +11480,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|zlib1g@1:1.3.dfsg+really1.3.1-1+b1|CVE-2026-85091",
-   "id": 393,
+   "id": 405,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11158,7 +11506,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|tar@1.35+dfsg-3.1|CVE-2005-2541",
-   "id": 394,
+   "id": 406,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11184,7 +11532,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|tar@1.35+dfsg-3.1|CVE-2005-2541",
-   "id": 395,
+   "id": 407,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11212,7 +11560,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 396,
+   "id": 408,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11240,7 +11588,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 397,
+   "id": 409,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11268,7 +11616,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 398,
+   "id": 410,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11296,7 +11644,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 399,
+   "id": 411,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11324,7 +11672,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 400,
+   "id": 412,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11352,7 +11700,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 401,
+   "id": 413,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11380,7 +11728,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 402,
+   "id": 414,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11408,7 +11756,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2019-1010022",
-   "id": 403,
+   "id": 415,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11434,7 +11782,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 404,
+   "id": 416,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11460,7 +11808,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 405,
+   "id": 417,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11486,7 +11834,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 406,
+   "id": 418,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11512,7 +11860,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 407,
+   "id": 419,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11538,7 +11886,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 408,
+   "id": 420,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11564,7 +11912,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 409,
+   "id": 421,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11590,7 +11938,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 410,
+   "id": 422,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11616,7 +11964,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2019-1010023",
-   "id": 411,
+   "id": 423,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11645,7 +11993,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2025-1365",
-   "id": 412,
+   "id": 424,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11674,7 +12022,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2025-1372",
-   "id": 413,
+   "id": 425,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11702,7 +12050,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-11979",
-   "id": 414,
+   "id": 426,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11730,7 +12078,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-11979",
-   "id": 415,
+   "id": 427,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11758,7 +12106,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 416,
+   "id": 428,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11786,7 +12134,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 417,
+   "id": 429,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11814,7 +12162,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 418,
+   "id": 430,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11842,7 +12190,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 419,
+   "id": 431,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11870,7 +12218,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 420,
+   "id": 432,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11898,7 +12246,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 421,
+   "id": 433,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11926,7 +12274,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 422,
+   "id": 434,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11954,7 +12302,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 423,
+   "id": 435,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -11982,7 +12330,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 424,
+   "id": 436,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12010,7 +12358,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 425,
+   "id": 437,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12038,7 +12386,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 426,
+   "id": 438,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12066,7 +12414,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 427,
+   "id": 439,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12094,7 +12442,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2025-1352",
-   "id": 428,
+   "id": 440,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12122,7 +12470,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgcrypt20@1.11.0-7+deb13u1|CVE-2018-6829",
-   "id": 429,
+   "id": 441,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12150,7 +12498,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgcrypt20@1.11.0-7+deb13u1|CVE-2018-6829",
-   "id": 430,
+   "id": 442,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12178,7 +12526,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 431,
+   "id": 443,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12206,7 +12554,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 432,
+   "id": 444,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12234,7 +12582,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libk5crypto3@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 433,
+   "id": 445,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12262,7 +12610,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libk5crypto3@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 434,
+   "id": 446,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12290,7 +12638,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5-3@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 435,
+   "id": 447,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12318,7 +12666,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5-3@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 436,
+   "id": 448,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12346,7 +12694,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5support0@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 437,
+   "id": 449,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12374,7 +12722,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5support0@1.21.3-5+deb13u1|CVE-2018-5709",
-   "id": 438,
+   "id": 450,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12400,7 +12748,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libldap2@2.6.10+dfsg-1|CVE-2015-3276",
-   "id": 439,
+   "id": 451,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12428,7 +12776,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libldap2@2.6.10+dfsg-1|CVE-2017-17740",
-   "id": 440,
+   "id": 452,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12454,7 +12802,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libldap2@2.6.10+dfsg-1|CVE-2015-3276",
-   "id": 441,
+   "id": 453,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12482,7 +12830,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libldap2@2.6.10+dfsg-1|CVE-2017-17740",
-   "id": 442,
+   "id": 454,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12510,7 +12858,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsqlite3-0@3.46.1-7+deb13u2|CVE-2025-70873",
-   "id": 443,
+   "id": 455,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12538,7 +12886,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsqlite3-0@3.46.1-7+deb13u2|CVE-2025-70873",
-   "id": 444,
+   "id": 456,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12564,7 +12912,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxtables12@1.8.11-2|CVE-2012-2663",
-   "id": 445,
+   "id": 457,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12592,7 +12940,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 446,
+   "id": 458,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12620,7 +12968,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 447,
+   "id": 459,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12648,7 +12996,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2018-20796",
-   "id": 448,
+   "id": 460,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12676,7 +13024,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2019-9192",
-   "id": 449,
+   "id": 461,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12704,7 +13052,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|nginx@1.26.3-3+deb13u9|CVE-2013-0337",
-   "id": 450,
+   "id": 462,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12732,7 +13080,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|nginx-common@1.26.3-3+deb13u9|CVE-2013-0337",
-   "id": 451,
+   "id": 463,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12761,7 +13109,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libldap2@2.6.10+dfsg-1|CVE-2026-22185",
-   "id": 452,
+   "id": 464,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12790,7 +13138,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libldap2@2.6.10+dfsg-1|CVE-2026-22185",
-   "id": 453,
+   "id": 465,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12816,7 +13164,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|nginx@1.26.3-3+deb13u9|CVE-2009-4487",
-   "id": 454,
+   "id": 466,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12842,7 +13190,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|nginx-common@1.26.3-3+deb13u9|CVE-2009-4487",
-   "id": 455,
+   "id": 467,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12870,7 +13218,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dirmngr@2.4.7-21+deb13u1+b5|CVE-2022-3219",
-   "id": 456,
+   "id": 468,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12898,7 +13246,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg@2.4.7-21+deb13u1|CVE-2022-3219",
-   "id": 457,
+   "id": 469,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12926,7 +13274,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg-l10n@2.4.7-21+deb13u1|CVE-2022-3219",
-   "id": 458,
+   "id": 470,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12954,7 +13302,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg@2.4.7-21+deb13u1+b5|CVE-2022-3219",
-   "id": 459,
+   "id": 471,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -12982,7 +13330,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg-agent@2.4.7-21+deb13u1+b5|CVE-2022-3219",
-   "id": 460,
+   "id": 472,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13010,7 +13358,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgconf@2.4.7-21+deb13u1+b5|CVE-2022-3219",
-   "id": 461,
+   "id": 473,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13038,7 +13386,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgsm@2.4.7-21+deb13u1+b5|CVE-2022-3219",
-   "id": 462,
+   "id": 474,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13066,7 +13414,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|coreutils@9.7-3|CVE-2026-56391",
-   "id": 463,
+   "id": 475,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13094,7 +13442,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|coreutils@9.7-3|CVE-2026-56392",
-   "id": 464,
+   "id": 476,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13122,7 +13470,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|coreutils@9.7-3|CVE-2026-56391",
-   "id": 465,
+   "id": 477,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13150,7 +13498,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|coreutils@9.7-3|CVE-2026-56392",
-   "id": 466,
+   "id": 478,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13178,7 +13526,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgcrypt20@1.11.0-7+deb13u1|CVE-2024-2236",
-   "id": 467,
+   "id": 479,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13206,7 +13554,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgcrypt20@1.11.0-7+deb13u1|CVE-2024-2236",
-   "id": 468,
+   "id": 480,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13234,7 +13582,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 469,
+   "id": 481,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13262,7 +13610,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 470,
+   "id": 482,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13290,7 +13638,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 471,
+   "id": 483,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13318,7 +13666,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 472,
+   "id": 484,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13346,7 +13694,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libk5crypto3@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 473,
+   "id": 485,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13374,7 +13722,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libk5crypto3@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 474,
+   "id": 486,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13402,7 +13750,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libk5crypto3@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 475,
+   "id": 487,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13430,7 +13778,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libk5crypto3@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 476,
+   "id": 488,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13458,7 +13806,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5-3@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 477,
+   "id": 489,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13486,7 +13834,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5-3@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 478,
+   "id": 490,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13514,7 +13862,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5-3@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 479,
+   "id": 491,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13542,7 +13890,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5-3@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 480,
+   "id": 492,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13570,7 +13918,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5support0@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 481,
+   "id": 493,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13598,7 +13946,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5support0@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 482,
+   "id": 494,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13626,7 +13974,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5support0@1.21.3-5+deb13u1|CVE-2024-26458",
-   "id": 483,
+   "id": 495,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13654,7 +14002,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5support0@1.21.3-5+deb13u1|CVE-2024-26461",
-   "id": 484,
+   "id": 496,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13682,7 +14030,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bsdutils@1:2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 485,
+   "id": 497,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13710,7 +14058,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bsdutils@1:2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 486,
+   "id": 498,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13738,7 +14086,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|dash@0.5.12-12|CVE-2026-102473",
-   "id": 487,
+   "id": 499,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13766,7 +14114,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dash@0.5.12-12|CVE-2026-102473",
-   "id": 488,
+   "id": 500,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13794,7 +14142,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libblkid1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 489,
+   "id": 501,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13822,7 +14170,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libblkid1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 490,
+   "id": 502,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13851,7 +14199,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2025-1371",
-   "id": 491,
+   "id": 503,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13879,7 +14227,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2025-1377",
-   "id": 492,
+   "id": 504,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13907,7 +14255,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblastlog2-2@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 493,
+   "id": 505,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13935,7 +14283,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblastlog2-2@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 494,
+   "id": 506,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13963,7 +14311,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libmount1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 495,
+   "id": 507,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -13991,7 +14339,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libmount1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 496,
+   "id": 508,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14019,7 +14367,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsmartcols1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 497,
+   "id": 509,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14047,7 +14395,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsmartcols1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 498,
+   "id": 510,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14075,7 +14423,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libuuid1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 499,
+   "id": 511,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14103,7 +14451,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libuuid1@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 500,
+   "id": 512,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14131,7 +14479,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 501,
+   "id": 513,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14159,7 +14507,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login@1:4.16.0-2+really2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 502,
+   "id": 514,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14187,7 +14535,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|mount@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 503,
+   "id": 515,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14215,7 +14563,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|mount@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 504,
+   "id": 516,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14243,7 +14591,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|util-linux@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 505,
+   "id": 517,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14271,7 +14619,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|util-linux@2.41.5-0+deb13u1|CVE-2022-0563",
-   "id": 506,
+   "id": 518,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14299,7 +14647,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|diffutils@1:3.10-4|CVE-2026-53910",
-   "id": 507,
+   "id": 519,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14327,7 +14675,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|diffutils@1:3.10-4|CVE-2026-53910",
-   "id": 508,
+   "id": 520,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14355,7 +14703,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 509,
+   "id": 521,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14383,7 +14731,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 510,
+   "id": 522,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14411,7 +14759,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 511,
+   "id": 523,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14439,7 +14787,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 512,
+   "id": 524,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14467,7 +14815,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 513,
+   "id": 525,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14495,7 +14843,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 514,
+   "id": 526,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14523,7 +14871,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 515,
+   "id": 527,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14551,7 +14899,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 516,
+   "id": 528,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14579,7 +14927,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 517,
+   "id": 529,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14607,7 +14955,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 518,
+   "id": 530,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14635,7 +14983,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 519,
+   "id": 531,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14663,7 +15011,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 520,
+   "id": 532,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14691,7 +15039,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2023-31437",
-   "id": 521,
+   "id": 533,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14719,7 +15067,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2023-31438",
-   "id": 522,
+   "id": 534,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14747,7 +15095,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2023-31439",
-   "id": 523,
+   "id": 535,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14775,7 +15123,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2023-31437",
-   "id": 524,
+   "id": 536,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14803,7 +15151,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2023-31438",
-   "id": 525,
+   "id": 537,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14831,7 +15179,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2023-31439",
-   "id": 526,
+   "id": 538,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14859,7 +15207,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2023-31437",
-   "id": 527,
+   "id": 539,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14887,7 +15235,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2023-31438",
-   "id": 528,
+   "id": 540,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14915,7 +15263,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2023-31439",
-   "id": 529,
+   "id": 541,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14943,7 +15291,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2023-31437",
-   "id": 530,
+   "id": 542,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14971,7 +15319,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2023-31438",
-   "id": 531,
+   "id": 543,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -14999,7 +15347,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2023-31439",
-   "id": 532,
+   "id": 544,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15027,7 +15375,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxslt1.1@1.1.35-1.2+deb13u3|CVE-2015-9019",
-   "id": 533,
+   "id": 545,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15055,7 +15403,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxslt1.1@1.1.35-1.2+deb13u3|CVE-2015-9019",
-   "id": 534,
+   "id": 546,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15083,7 +15431,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 535,
+   "id": 547,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15111,7 +15459,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 536,
+   "id": 548,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15139,7 +15487,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2019-1010024",
-   "id": 537,
+   "id": 549,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15167,7 +15515,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2019-1010025",
-   "id": 538,
+   "id": 550,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15193,7 +15541,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2025-58186",
-   "id": 539,
+   "id": 551,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -15221,7 +15569,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 540,
+   "id": 552,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15249,7 +15597,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 541,
+   "id": 553,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15277,7 +15625,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 542,
+   "id": 554,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15305,7 +15653,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 543,
+   "id": 555,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15333,7 +15681,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 544,
+   "id": 556,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15361,7 +15709,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 545,
+   "id": 557,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15389,7 +15737,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 546,
+   "id": 558,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15417,7 +15765,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgssapi-krb5-2@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 547,
+   "id": 559,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15445,7 +15793,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libk5crypto3@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 548,
+   "id": 560,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15473,7 +15821,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libk5crypto3@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 549,
+   "id": 561,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15501,7 +15849,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5-3@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 550,
+   "id": 562,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15529,7 +15877,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5-3@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 551,
+   "id": 563,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15557,7 +15905,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libkrb5support0@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 552,
+   "id": 564,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15585,7 +15933,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libkrb5support0@1.21.3-5+deb13u1|CVE-2026-11850",
-   "id": 553,
+   "id": 565,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15613,7 +15961,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 554,
+   "id": 566,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15641,7 +15989,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2010-4756",
-   "id": 555,
+   "id": 567,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15669,7 +16017,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login.defs@1:4.17.4-2|CVE-2007-5686",
-   "id": 556,
+   "id": 568,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15697,7 +16045,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login.defs@1:4.17.4-2|CVE-2007-5686",
-   "id": 557,
+   "id": 569,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15725,7 +16073,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|passwd@1:4.17.4-2|CVE-2007-5686",
-   "id": 558,
+   "id": 570,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15753,7 +16101,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|passwd@1:4.17.4-2|CVE-2007-5686",
-   "id": 559,
+   "id": 571,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15781,7 +16129,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|coreutils@9.7-3|CVE-2017-18018",
-   "id": 560,
+   "id": 572,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15809,7 +16157,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|coreutils@9.7-3|CVE-2017-18018",
-   "id": 561,
+   "id": 573,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15837,7 +16185,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2025-1376",
-   "id": 562,
+   "id": 574,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15865,7 +16213,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libldap2@2.6.10+dfsg-1|CVE-2017-14159",
-   "id": 563,
+   "id": 575,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15893,7 +16241,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libldap2@2.6.10+dfsg-1|CVE-2017-14159",
-   "id": 564,
+   "id": 576,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15921,7 +16269,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|coreutils@9.7-3|CVE-2025-5278",
-   "id": 565,
+   "id": 577,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15949,7 +16297,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|coreutils@9.7-3|CVE-2025-5278",
-   "id": 566,
+   "id": 578,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -15977,7 +16325,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libgnutls30t64@3.8.9-3+deb13u4|CVE-2011-3389",
-   "id": 567,
+   "id": 579,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16005,7 +16353,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsqlite3-0@3.46.1-7+deb13u2|CVE-2021-45346",
-   "id": 568,
+   "id": 580,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16033,7 +16381,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsqlite3-0@3.46.1-7+deb13u2|CVE-2021-45346",
-   "id": 569,
+   "id": 581,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16061,7 +16409,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libldap2@2.6.10+dfsg-1|CVE-2020-15719",
-   "id": 570,
+   "id": 582,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16089,7 +16437,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libldap2@2.6.10+dfsg-1|CVE-2020-15719",
-   "id": 571,
+   "id": 583,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16117,7 +16465,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|dash@0.5.12-12|CVE-2026-102474",
-   "id": 572,
+   "id": 584,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16145,7 +16493,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dash@0.5.12-12|CVE-2026-102474",
-   "id": 573,
+   "id": 585,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16173,7 +16521,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libelf1t64@0.192-4|CVE-2024-25260",
-   "id": 574,
+   "id": 586,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16201,7 +16549,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|apt@3.0.3|CVE-2011-3374",
-   "id": 575,
+   "id": 587,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16229,7 +16577,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|apt@3.0.3|CVE-2011-3374",
-   "id": 576,
+   "id": 588,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16257,7 +16605,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libapt-pkg7.0@3.0.3|CVE-2011-3374",
-   "id": 577,
+   "id": 589,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16285,7 +16633,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libapt-pkg7.0@3.0.3|CVE-2011-3374",
-   "id": 578,
+   "id": 590,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16313,7 +16661,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-bin@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 579,
+   "id": 591,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16341,7 +16689,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-bin@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 580,
+   "id": 592,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16369,7 +16717,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc-l10n@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 581,
+   "id": 593,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16397,7 +16745,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc-l10n@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 582,
+   "id": 594,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16425,7 +16773,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libc6@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 583,
+   "id": 595,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16453,7 +16801,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libc6@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 584,
+   "id": 596,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16481,7 +16829,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libllvm19@1:19.1.7-3+b1|CVE-2024-7883",
-   "id": 585,
+   "id": 597,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16509,7 +16857,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libllvm19@1:19.1.7-3+b1|CVE-2024-7883",
-   "id": 586,
+   "id": 598,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16537,7 +16885,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|locales@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 587,
+   "id": 599,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16565,7 +16913,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|locales@2.41-12+deb13u4|CVE-2026-97399",
-   "id": 588,
+   "id": 600,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16593,7 +16941,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dirmngr@2.4.7-21+deb13u1+b5|CVE-2026-105712",
-   "id": 589,
+   "id": 601,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16621,7 +16969,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg@2.4.7-21+deb13u1|CVE-2026-105712",
-   "id": 590,
+   "id": 602,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16649,7 +16997,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg-l10n@2.4.7-21+deb13u1|CVE-2026-105712",
-   "id": 591,
+   "id": 603,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16677,7 +17025,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg@2.4.7-21+deb13u1+b5|CVE-2026-105712",
-   "id": 592,
+   "id": 604,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16705,7 +17053,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg-agent@2.4.7-21+deb13u1+b5|CVE-2026-105712",
-   "id": 593,
+   "id": 605,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16733,7 +17081,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgconf@2.4.7-21+deb13u1+b5|CVE-2026-105712",
-   "id": 594,
+   "id": 606,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16761,7 +17109,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgsm@2.4.7-21+deb13u1+b5|CVE-2026-105712",
-   "id": 595,
+   "id": 607,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16789,7 +17137,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login.defs@1:4.17.4-2|CVE-2024-56433",
-   "id": 596,
+   "id": 608,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16817,7 +17165,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login.defs@1:4.17.4-2|CVE-2024-56433",
-   "id": 597,
+   "id": 609,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16845,7 +17193,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|passwd@1:4.17.4-2|CVE-2024-56433",
-   "id": 598,
+   "id": 610,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16873,7 +17221,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|passwd@1:4.17.4-2|CVE-2024-56433",
-   "id": 599,
+   "id": 611,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16902,7 +17250,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libllvm19@1:19.1.7-3+b1|CVE-2026-13573",
-   "id": 600,
+   "id": 612,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16931,7 +17279,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libllvm19@1:19.1.7-3+b1|CVE-2026-13574",
-   "id": 601,
+   "id": 613,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16960,7 +17308,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libllvm19@1:19.1.7-3+b1|CVE-2026-13573",
-   "id": 602,
+   "id": 614,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -16989,7 +17337,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libllvm19@1:19.1.7-3+b1|CVE-2026-13574",
-   "id": 603,
+   "id": 615,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17018,7 +17366,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libncursesw6@6.5+20250216-2|CVE-2025-6141",
-   "id": 604,
+   "id": 616,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17047,7 +17395,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libncursesw6@6.5+20250216-2|CVE-2025-6141",
-   "id": 605,
+   "id": 617,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17075,7 +17423,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libperl5.40@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 606,
+   "id": 618,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17103,7 +17451,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libperl5.40@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 607,
+   "id": 619,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17131,7 +17479,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2013-4392",
-   "id": 608,
+   "id": 620,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17159,7 +17507,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libsystemd0@257.13-1~deb13u1|CVE-2026-40228",
-   "id": 609,
+   "id": 621,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17187,7 +17535,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2013-4392",
-   "id": 610,
+   "id": 622,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17215,7 +17563,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libsystemd0@257.13-1~deb13u1|CVE-2026-40228",
-   "id": 611,
+   "id": 623,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17244,7 +17592,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libtinfo6@6.5+20250216-2|CVE-2025-6141",
-   "id": 612,
+   "id": 624,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17273,7 +17621,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libtinfo6@6.5+20250216-2|CVE-2025-6141",
-   "id": 613,
+   "id": 625,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17301,7 +17649,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2013-4392",
-   "id": 614,
+   "id": 626,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17329,7 +17677,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libudev1@257.13-1~deb13u1|CVE-2026-40228",
-   "id": 615,
+   "id": 627,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17357,7 +17705,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2013-4392",
-   "id": 616,
+   "id": 628,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17385,7 +17733,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libudev1@257.13-1~deb13u1|CVE-2026-40228",
-   "id": 617,
+   "id": 629,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17413,7 +17761,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86141",
-   "id": 618,
+   "id": 630,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17441,7 +17789,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxml2@2.12.7+dfsg+really2.9.14-2.1+deb13u3|CVE-2026-86141",
-   "id": 619,
+   "id": 631,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17470,7 +17818,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|ncurses-base@6.5+20250216-2|CVE-2025-6141",
-   "id": 620,
+   "id": 632,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17499,7 +17847,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|ncurses-base@6.5+20250216-2|CVE-2025-6141",
-   "id": 621,
+   "id": 633,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17528,7 +17876,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|ncurses-bin@6.5+20250216-2|CVE-2025-6141",
-   "id": 622,
+   "id": 634,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17557,7 +17905,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|ncurses-bin@6.5+20250216-2|CVE-2025-6141",
-   "id": 623,
+   "id": 635,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17585,7 +17933,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 624,
+   "id": 636,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17613,7 +17961,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 625,
+   "id": 637,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17641,7 +17989,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-base@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 626,
+   "id": 638,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17669,7 +18017,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-base@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 627,
+   "id": 639,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17697,7 +18045,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 628,
+   "id": 640,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17725,7 +18073,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2011-4116",
-   "id": 629,
+   "id": 641,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17753,7 +18101,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libxslt1.1@1.1.35-1.2+deb13u3|CVE-2025-11731",
-   "id": 630,
+   "id": 642,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17781,7 +18129,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libxslt1.1@1.1.35-1.2+deb13u3|CVE-2025-11731",
-   "id": 631,
+   "id": 643,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17809,7 +18157,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|dirmngr@2.4.7-21+deb13u1+b5|CVE-2026-57062",
-   "id": 632,
+   "id": 644,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17837,7 +18185,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg@2.4.7-21+deb13u1|CVE-2026-57062",
-   "id": 633,
+   "id": 645,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17865,7 +18213,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gnupg-l10n@2.4.7-21+deb13u1|CVE-2026-57062",
-   "id": 634,
+   "id": 646,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17893,7 +18241,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg@2.4.7-21+deb13u1+b5|CVE-2026-57062",
-   "id": 635,
+   "id": 647,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17921,7 +18269,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpg-agent@2.4.7-21+deb13u1+b5|CVE-2026-57062",
-   "id": 636,
+   "id": 648,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17949,7 +18297,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgconf@2.4.7-21+deb13u1+b5|CVE-2026-57062",
-   "id": 637,
+   "id": 649,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -17977,7 +18325,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|gpgsm@2.4.7-21+deb13u1+b5|CVE-2026-57062",
-   "id": 638,
+   "id": 650,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18005,8 +18353,38 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|stdlib@v1.24.6|CVE-2026-27139",
-   "id": 639,
+   "id": 651,
    "fixed_on": "2026-10-07T05:22:32Z"
+  },
+  {
+   "scope": "codebase",
+   "target": "wcc-frontend/package-lock.json",
+   "component": "wcc-frontend/package-lock.json",
+   "category": "npm",
+   "package": "vite",
+   "installed": "6.4.3",
+   "fixed_version": "6.4.4",
+   "vuln_id": "GHSA-9jrq-w75r-8gcw",
+   "aliases": [
+    "CVE-2026-112945"
+   ],
+   "title": "Vite: Cross origin script execution through Vite custom middleware",
+   "description": "### Summary\n\nWhen accessing a malicious site while a dev server using Vite is running, that site was able to load scripts in a page served by the dev server.\n\n### Impact\n\nOnly apps that match the following conditions are affected:\n\n- the dev server passes an unchanged browser request URL to `server.transformIndexHtml`: this is normally used for `server.middlewareMode: true` or `appType: 'custom'`. The internal call for `appType: 'spa'` and `appType: 'mpa'` does not match this.\n- the transformed\u2026",
+   "severity": "LOW",
+   "cvss": 2.1,
+   "url": "https://nvd.nist.gov/vuln/detail/CVE-2026-112945",
+   "cwe": [
+    "CWE-80"
+   ],
+   "tools": [
+    "osv-scanner"
+   ],
+   "status": "fixed",
+   "fix_note": "gone since previous scan",
+   "first_seen": "2026-11-02T08:01:40Z",
+   "key": "codebase|wcc-frontend/package-lock.json|vite@6.4.3|GHSA-9jrq-w75r-8gcw",
+   "id": 652,
+   "fixed_on": "2026-11-02T08:10:59Z"
   },
   {
    "scope": "codebase",
@@ -18031,7 +18409,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:22:32Z",
    "key": "codebase|deploy/postgres/Dockerfile|Dockerfile Security Check@|DS-0026",
-   "id": 640,
+   "id": 653,
    "fixed_on": "2026-10-07T05:23:12Z"
   },
   {
@@ -18057,7 +18435,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "codebase|Dockerfile|Dockerfile Security Check@|DS-0026",
-   "id": 641,
+   "id": 654,
    "fixed_on": "2026-10-07T05:27:28Z"
   },
   {
@@ -18083,7 +18461,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|bash@5.2.37-2+b10|TEMP-0841856-B18BAF",
-   "id": 642,
+   "id": 655,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18109,7 +18487,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|bash@5.2.37-2+b10|TEMP-0841856-B18BAF",
-   "id": 643,
+   "id": 656,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18135,7 +18513,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|login.defs@1:4.17.4-2|TEMP-0628843-DBAD28",
-   "id": 644,
+   "id": 657,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18161,7 +18539,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|login.defs@1:4.17.4-2|TEMP-0628843-DBAD28",
-   "id": 645,
+   "id": 658,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18187,7 +18565,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|passwd@1:4.17.4-2|TEMP-0628843-DBAD28",
-   "id": 646,
+   "id": 659,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18213,7 +18591,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|passwd@1:4.17.4-2|TEMP-0628843-DBAD28",
-   "id": 647,
+   "id": 660,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18239,7 +18617,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|sysvinit-utils@3.14-4|TEMP-0517018-A83CE6",
-   "id": 648,
+   "id": 661,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18265,7 +18643,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|sysvinit-utils@3.14-4|TEMP-0517018-A83CE6",
-   "id": 649,
+   "id": 662,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18291,7 +18669,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|tar@1.35+dfsg-3.1|TEMP-0290435-0B57B5",
-   "id": 650,
+   "id": 663,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18317,7 +18695,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|tar@1.35+dfsg-3.1|TEMP-0290435-0B57B5",
-   "id": 651,
+   "id": 664,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18343,7 +18721,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|golang.org/x/crypto@v0.54.0|GO-2026-5932",
-   "id": 652,
+   "id": 665,
    "fixed_on": "2026-10-07T05:20:39Z"
   },
   {
@@ -18371,7 +18749,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|golang.org/x/sys@v0.1.0|CVE-2026-39824",
-   "id": 653,
+   "id": 666,
    "fixed_on": "2026-10-07T05:22:32Z"
   },
   {
@@ -18397,7 +18775,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|liblzma5@5.8.1-1+deb13u1|TEMP-1147318-639065",
-   "id": 654,
+   "id": 667,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18423,7 +18801,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|liblzma5@5.8.1-1+deb13u1|TEMP-1147318-639065",
-   "id": 655,
+   "id": 668,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18451,7 +18829,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|libperl5.40@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 656,
+   "id": 669,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18479,7 +18857,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|libperl5.40@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 657,
+   "id": 670,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18507,7 +18885,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 658,
+   "id": 671,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18535,7 +18913,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 659,
+   "id": 672,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18563,7 +18941,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-base@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 660,
+   "id": 673,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18591,7 +18969,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-base@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 661,
+   "id": 674,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18619,7 +18997,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-clone:latest|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 662,
+   "id": 675,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18647,7 +19025,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|perl-modules-5.40@5.40.1-6+deb13u1|CVE-2026-82560",
-   "id": 663,
+   "id": 676,
    "fixed_on": "2026-10-07T05:45:13Z"
   },
   {
@@ -18673,7 +19051,7 @@
    "fix_note": "gone since previous scan",
    "first_seen": "2026-10-07T05:02:40Z",
    "key": "image|autosys-postgres:16|xz-utils@5.8.1-1+deb13u1|TEMP-1147318-639065",
-   "id": 664,
+   "id": 677,
    "fixed_on": "2026-10-07T05:45:13Z"
   }
  ]
