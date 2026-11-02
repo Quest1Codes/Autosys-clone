@@ -390,6 +390,29 @@ class AssessmentCoverage(BaseModel):
     alarms_observed:            bool = False
 
 
+class AssessmentWorkload(BaseModel):
+    """
+    Workload timing measured from REAL run history (imported client export,
+    else this instance's own live runs; never simulated history), for sizing
+    the target platform. See analysis/workload_profile.py. When ``source`` is
+    None nothing could be measured and ``reason`` says what is needed.
+    """
+    source:                Optional[str] = None
+    reason:                str = ""
+    jobs_with_history:     int = 0
+    total_runs:            int = 0
+    days_observed:         int = 0
+    first_run:             Optional[datetime] = None
+    last_run:              Optional[datetime] = None
+    runs_per_job_per_day:  Optional[float] = None
+    avg_task_minutes:      Optional[float] = None
+    peak_hour:             Optional[int] = None
+    peak_hour_share:       Optional[float] = None
+    peak_concurrent_runs:  Optional[int] = None
+    peak_concurrency_at:   Optional[datetime] = None
+    sufficient_window:     bool = False
+
+
 class AssessmentReportResponse(BaseModel):
     """GET /api/v1/assessment/report — full T-shirt-size complexity report."""
     generated_at:   datetime
@@ -402,6 +425,7 @@ class AssessmentReportResponse(BaseModel):
     box_breakdown:  list[dict[str, Any]] = []
     summary:        AssessmentSummaryResponse
     ai_token_budget: Optional[AITokenBudgetResponse] = None
+    workload:       AssessmentWorkload = AssessmentWorkload()
 
 
 class EstateClearResponse(BaseModel):

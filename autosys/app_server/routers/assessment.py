@@ -5,7 +5,10 @@ GET  /api/v1/assessment/report               Full complexity report (JSON): T-sh
                                              operational risk, gap tags, the A1-A10 migration
                                              signals, and an Indicative Otto Token Budget. Risk
                                              for jobs with no run history is filled in by a
-                                             background dry-run simulation (see below).
+                                             background dry-run simulation (see below). Also
+                                             carries the workload measured from real run
+                                             history (run frequency, durations, peak
+                                             concurrency) for sizing the target platform.
 GET  /api/v1/assessment/migration-report     Same data plus a CSV export; always simulates and
                                              blocks until the simulation finishes.
 POST /api/v1/assessment/boxes/{box}/trace     Dry-run state-machine trace for one BOX.
@@ -41,6 +44,7 @@ from autosys.analysis.complexity import (
     build_report, compute_summary, export_csv, risk_mitigation,
 )
 from autosys.analysis.migration_signals import run_all_structural_analyses
+from autosys.analysis.workload_profile import compute_workload_profile
 from autosys.analysis.operational_risk import (
     MIN_OBSERVED_RUNS, MIN_OBSERVED_WINDOW_DAYS, fetch_run_stats,
 )
@@ -48,7 +52,7 @@ from autosys.app_server.deps    import get_session, get_current_user, CurrentUse
 from autosys.app_server.schemas import (
     AITokenBudgetResponse,
     AssessmentCoverage, AssessmentJobRecord, AssessmentReportResponse,
-    AssessmentSimulation, AssessmentSummaryResponse,
+    AssessmentSimulation, AssessmentSummaryResponse, AssessmentWorkload,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
 )
 from autosys.db.repository import jobs as job_repo
@@ -249,6 +253,16 @@ def get_report(
         simulate=simulate, wait_s=simulated_risk.default_wait_s(),
     )
     ai_budget = compute_token_budget(a.results)
+    # Measured over the same jobs the report covers, so a box-filtered report
+    # never carries the whole estate's workload. Boxes have no runs of their
+    # own, and file watchers' "runs" are waits that become sensors in Airflow,
+    # so neither belongs in task frequency, duration or concurrency.
+    # In dry-run mode this instance's own runs are stub dispatches, so only
+    # the client's imported history describes real timing.
+    workload = compute_workload_profile(
+        session, [r.job_name for r in a.results
+                  if (r.job_type or "").upper() not in ("BOX", "FILEWATCH")],
+        sources=("imported",) if a.mode == "dry_run" else ("imported", "live"))
 
     return AssessmentReportResponse(
         generated_at   = datetime.now(),
@@ -261,6 +275,7 @@ def get_report(
         box_breakdown  = box_effort_breakdown(a.results),
         summary        = _summary_response(a.summary),
         ai_token_budget = _ai_token_budget_response(ai_budget),
+        workload       = AssessmentWorkload(**workload.as_dict()),
     )
 
 
