@@ -369,6 +369,16 @@ const JobMonitor: React.FC = () => {
     </th>
   );
 
+  // Real imported run history never writes Status -- only the live
+  // scheduler does. Once an estate's risk is backed by real history, any
+  // SUCCESS/FAILURE still showing is a leftover from an earlier dry run
+  // (Run All Boxes is disabled from this point on, but it can't retroactively
+  // erase what it already wrote). That leftover reads as if it came from the
+  // real import, so the whole column drops out in 'real' mode rather than
+  // showing something that would be mistaken for real execution history.
+  const historyModeNow = coverage ? historyMode(coverage) : 'none';
+  const hideStatusColumn = historyModeNow === 'real';
+
   return (
     <div className="wcc-shell">
       <Header sseStatus={sseStatus} />
@@ -438,7 +448,7 @@ const JobMonitor: React.FC = () => {
           on. Shown even when it's "none" -- the point is always answering
           "where did this come from", not just flagging a problem state. */}
       {coverage && (() => {
-        const mode = historyMode(coverage);
+        const mode = historyModeNow;
         const MODE_INFO: Record<string, { label: string; color: string; bg: string; border: string }> = {
           real:     { label: `✓ Risk data is REAL — imported from ${coverage.jobs_with_imported_evidence} job(s)' run history`, color: '#00A650', bg: '#EEFBF3', border: '#B7E8C9' },
           dry_run:  { label: `⟳ Risk data is SIMULATED — from Run All Boxes / dry-run, covering ${coverage.jobs_with_dry_run_evidence} job(s)`, color: '#B8860B', bg: '#FFF8E8', border: '#F0C36D' },
@@ -507,7 +517,7 @@ const JobMonitor: React.FC = () => {
                 <tr>
                   <SortTh col="job_name" label="Job Name" />
                   <SortTh col="job_type" label="Type" />
-                  <SortTh col="status"   label="Status" />
+                  {!hideStatusColumn && <SortTh col="status" label="Status" />}
                   <th>Risk</th>
                   <SortTh col="machine"  label="Machine" />
                   <SortTh col="last_start" label="Last Start" />
@@ -522,13 +532,6 @@ const JobMonitor: React.FC = () => {
                   const isSim = rowRiskSource === 'simulated';
                   const flashClass = flashGroup === 'real' && isReal ? ' flash-real'
                     : flashGroup === 'sim' && isSim ? ' flash-sim' : '';
-                  // Status is never faked -- it's always the live scheduler's own
-                  // word. But when a job has real imported evidence and never
-                  // actually ran live (still INACTIVE), the badge is dimmed so it
-                  // visually recedes behind the Risk chip rather than reading as
-                  // "nothing happened" -- if the scheduler later does run this job
-                  // live, status changes and this dimming drops away on its own.
-                  const dimStatus = isReal && job.status === 'INACTIVE';
                   return (
                   <tr
                     key={job.job_name}
@@ -565,9 +568,9 @@ const JobMonitor: React.FC = () => {
                       </div>
                     </td>
                     <td>{job.job_type}</td>
-                    <td style={dimStatus ? { opacity: 0.45 } : undefined}>
-                      <StatusBadge status={job.status} />
-                    </td>
+                    {!hideStatusColumn && (
+                      <td><StatusBadge status={job.status} /></td>
+                    )}
                     <td><RiskCell risk={riskMap[job.job_name]} /></td>
                     <td>{job.machine || '—'}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: 10 }}>{job.last_start || '—'}</td>
