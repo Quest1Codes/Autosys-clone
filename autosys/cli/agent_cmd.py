@@ -141,8 +141,8 @@ def agent_start(poll_interval: float, machine: Optional[str]) -> None:
 @agent_group.command("serve")
 @click.option("--machine", "-m", required=True,
               help="Logical machine name (must match job machine: attributes).")
-@click.option("--host", "-H", default="0.0.0.0", show_default=True,
-              help="IP address to bind.")
+@click.option("--host", "-H", default="127.0.0.1", show_default=True,
+              help="IP address to bind (use 0.0.0.0 to accept remote scheduler connections).")
 @click.option("--port", "-p", default=7520, show_default=True,
               help="TCP port to listen on.")
 def agent_serve(machine: str, host: str, port: int) -> None:

@@ -37,6 +37,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import AlarmRow, JobRow
+from autosys.netutil import urlopen_http
 from autosys.db.connection import sync_session
 from autosys.notifications.config import NotificationConfig
 from autosys.notifications.snmp_notifier import SnmpNotifier
@@ -200,7 +201,7 @@ class Dispatcher:
                 if row and row.notification_type:
                     return str(row.notification_type).upper()
         except Exception:
-            pass
+            logger.opt(exception=True).debug("notification type lookup failed")
         return None
 
     # ------------------------------------------------------------------
@@ -350,7 +351,7 @@ def _default_http_post(url: str, payload: dict) -> bool:
         method  = "POST",
     )
     try:
-        with urllib.request.urlopen(request, timeout=10) as resp:
+        with urlopen_http(request, timeout=10) as resp:
             return 200 <= resp.status < 300
     except urllib.error.HTTPError as exc:
         logger.debug("HTTP POST %s → %d", url, exc.code)

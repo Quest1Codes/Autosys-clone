@@ -93,7 +93,7 @@ class AgentServer:
     def __init__(
         self,
         machine_name: str,
-        host:         str   = "0.0.0.0",
+        host:         str   = "127.0.0.1",
         port:         int   = 7520,
         db_url:       Optional[str] = None,
     ) -> None:
@@ -190,7 +190,7 @@ class AgentServer:
             try:
                 await writer.wait_closed()
             except Exception:
-                pass
+                logger.opt(exception=True).debug("closing agent connection failed")
 
     async def _route(self, msg: dict) -> bytes:
         """Dispatch *msg* to the correct handler and return wire bytes."""

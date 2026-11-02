@@ -772,7 +772,7 @@ def ingest_paths(
                     try:
                         session.rollback()      # discard the uncommitted batch cleanly
                     except Exception:
-                        pass
+                        logger.opt(exception=True).debug("rollback after lost connection failed")
                     summary.aborted = True
                     summary.abort_reason = f"{type(exc).__name__}: {exc}"
                     summary.files_committed = files_committed
@@ -938,7 +938,7 @@ def _apply_pending(session: Session, pending: list) -> int:
                               f"box {item.link_box!r} could not be linked: {type(exc).__name__}",
                               "warning")
                 except Exception:
-                    pass
+                    logger.opt(exception=True).debug("could not annotate unlinked box")
     return applied
 
 

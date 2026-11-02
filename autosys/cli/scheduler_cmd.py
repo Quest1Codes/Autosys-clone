@@ -260,8 +260,8 @@ def scheduler_status() -> None:
 @scheduler_group.command("serve")
 @click.option("--port", "-p", default=9000, show_default=True,
               help="Port for the REST API server.")
-@click.option("--host", "-H", default="0.0.0.0", show_default=True,
-              help="Host to bind the REST API server to.")
+@click.option("--host", "-H", default="127.0.0.1", show_default=True,
+              help="Host to bind the REST API server to (containers pass 0.0.0.0).")
 @click.option("--poll-interval", default=1.0, show_default=True,
               help="EPS tick interval in seconds.")
 @click.option("--dry-run", is_flag=True, default=False,
@@ -350,7 +350,7 @@ def scheduler_serve(port: int, host: str, poll_interval: float, dry_run: bool,
 # ---------------------------------------------------------------------------
 
 @scheduler_group.command("wcc")
-@click.option("--host", default="0.0.0.0", show_default=True, help="Bind host.")
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind host (containers pass 0.0.0.0).")
 @click.option("--port", default=8080, show_default=True, help="WCC HTTP port.")
 def scheduler_wcc(host: str, port: int) -> None:
     """

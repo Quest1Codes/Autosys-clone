@@ -24,17 +24,18 @@ from __future__ import annotations
 import os
 import socket
 import struct
-import subprocess
+import subprocess  # nosec B404  # REMOTECMD job type shells out to ssh
 import threading
 import time
 import urllib.request
 import urllib.error
-import ftplib
+import ftplib  # nosec B402  # FTP job type is a product feature; credentials come from the job definition
 from typing import Optional, Callable
 
 from loguru import logger
 
 from autosys.agent.runner import LocalJobRunner, OutputCallback
+from autosys.netutil import urlopen_http
 from autosys.db.schema import JobRow
 
 
@@ -150,7 +151,7 @@ class FtpJobRunner:
             self.ftp_src, self.ftp_dest,
         )
         try:
-            ftp = ftplib.FTP(self.ftp_server, timeout=30)
+            ftp = ftplib.FTP(self.ftp_server, timeout=30)  # nosec B321  # plain FTP is what an FTP job asks for
             ftp.login(self.ftp_user, self.ftp_password)
 
             if self.ftp_type == "GET":
@@ -268,7 +269,7 @@ class RemoteCmdJobRunner:
             "[agent] REMOTECMD %r  host=%s  cmd=%r",
             self.job_name, self.host, self.command[:80],
         )
-        self._proc = subprocess.Popen(
+        self._proc = subprocess.Popen(  # nosec B603  # argument list, no shell; host/command come from the job definition
             ssh_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -277,7 +278,8 @@ class RemoteCmdJobRunner:
         self.pid = self._proc.pid
 
         line_no = 0
-        assert self._proc.stdout is not None
+        if self._proc.stdout is None:
+            raise RuntimeError("process has no stdout pipe")
         for raw_line in self._proc.stdout:
             content = raw_line.rstrip("\n")
             line_no += 1
@@ -285,7 +287,7 @@ class RemoteCmdJobRunner:
                 try:
                     self.output_callback(self.run_id, line_no, "stdout", content)
                 except Exception:
-                    pass
+                    logger.opt(exception=True).debug("output callback failed")
 
         self.exit_code = self._proc.wait()
         logger.info(
@@ -405,7 +407,7 @@ class WebserviceJobRunner:
                 self.url, method=self.method, headers=self.headers,
                 data=self.body,
             )
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urlopen_http(req, timeout=self.timeout) as resp:
                 status_code = resp.getcode()
                 logger.info(
                     "[agent] WEBSERVICE %r — HTTP %d", self.job_name, status_code,

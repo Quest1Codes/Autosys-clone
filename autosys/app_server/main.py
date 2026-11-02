@@ -290,7 +290,7 @@ def _register_auth_routes(app: FastAPI) -> None:
         token = encode_token(body.username, user["role"])
         return TokenResponse(
             access_token = token,
-            token_type   = "bearer",
+            token_type   = "bearer",  # nosec B106  # OAuth token type name, not a secret
             expires_in   = _JWT_TTL,
         )
 

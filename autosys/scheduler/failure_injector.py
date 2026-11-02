@@ -25,7 +25,7 @@ class FailureInjector:
     """
 
     def __init__(self, seed: int = 42) -> None:
-        self._rng = random.Random(seed)
+        self._rng = random.Random(seed)  # nosec B311  # seeded simulation noise, not security
 
     def should_fail(self, row: JobRow) -> bool:
         """Return True if this job should fail in the current cycle."""

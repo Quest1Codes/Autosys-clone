@@ -17,6 +17,7 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from autosys.db.schema import ExternalInstanceRow
+from autosys.netutil import urlopen_http
 from autosys.db.repository import xinsts as xinst_repo
 
 
@@ -63,7 +64,7 @@ class RemoteInstanceClient:
 def _default_http_get(url: str) -> dict:
     """Default HTTP GET using urllib."""
     try:
-        with urllib.request.urlopen(url, timeout=10) as resp:
+        with urlopen_http(url, timeout=10) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
         logger.debug("xinst HTTP GET %s → %d", url, exc.code)
