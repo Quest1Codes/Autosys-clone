@@ -53,6 +53,19 @@ dependencies = [
 
     # Logging
     "loguru",
+
+    # OIDC sign-in (Cognito): verifies RS256 ID/access tokens against the
+    # pool's JWKS. [crypto] pulls in the cryptography backend PyJWT needs
+    # for RS256 (plain PyJWT only ships the HS* algorithms).
+    # Pinned to match shinro/apps/api's pin (A1: one CVE report for the two
+    # packages Shinro and this simulator both ship, not two).
+    "pyjwt[crypto] >= 2.8.0",
+
+    # Async HTTP client for the server-side OIDC code exchange
+    # (auth.py talks to Cognito's /oauth2/token and JWKS endpoints).
+    # Promoted from dev-only to runtime now that auth.py needs it directly;
+    # pinned exactly to match shinro/apps/api's pin (A1).
+    "httpx == 0.28.1",
 ]
 
 [project.optional-dependencies]
@@ -62,8 +75,6 @@ dev = [
     "pytest-cov",
     "ruff",
     "black",
-    "httpx",               # async HTTP client, used by tests/test_phase12.py only --
-                           # never imported by the shipped autosys/ package (dependency audit, Oct 2026).
 ]
 pg = [
     "asyncpg",
