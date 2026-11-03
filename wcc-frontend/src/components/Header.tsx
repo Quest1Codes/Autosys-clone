@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useExecutionMode } from '../contexts/ExecutionModeContext';
 import { useToast } from '../contexts/ToastContext';
@@ -13,7 +13,6 @@ interface Props {
 
 const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
   const { username, logout } = useAuth();
-  const navigate = useNavigate();
   const { dryRun, dryRunOnly } = useExecutionMode();
   const { showToast } = useToast();
   const [downloading, setDownloading] = useState(false);
@@ -31,8 +30,8 @@ const Header: React.FC<Props> = ({ sseStatus = 'connecting' }) => {
   };
 
   const handleLogout = () => {
+    // logout() navigates the browser to Cognito's own logout URL itself.
     logout();
-    navigate('/login');
   };
 
   return (

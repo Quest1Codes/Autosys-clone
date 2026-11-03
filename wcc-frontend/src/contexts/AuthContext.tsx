@@ -1,65 +1,54 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
-import axios from 'axios';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { api } from '../api/client';
 
 interface AuthState {
-  token: string | null;
   username: string | null;
   role: string | null;
+  loaded: boolean;
 }
 
 interface AuthContextValue extends AuthState {
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** JWTs are signed, not encrypted — the payload is safe to read client-side. */
-function decodeRole(token: string | null): string | null {
-  if (!token) return null;
-  try {
-    const payload = token.split('.')[1];
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(json).role ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<AuthState>(() => {
-    const token = localStorage.getItem('wcc_token');
-    return {
-      token,
-      username: localStorage.getItem('wcc_user'),
-      role: decodeRole(token),
-    };
-  });
+  const [state, setState] = useState<AuthState>({ username: null, role: null, loaded: false });
 
-  const login = useCallback(async (username: string, password: string) => {
-    const res = await axios.post('/api/v1/auth/token', { username, password });
-    const { access_token } = res.data;
-    localStorage.setItem('wcc_token', access_token);
-    localStorage.setItem('wcc_user', username);
-    setState({ token: access_token, username, role: decodeRole(access_token) });
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/auth/me')
+      .then((res) => {
+        if (!cancelled) setState({ username: res.data.username, role: res.data.role, loaded: true });
+      })
+      .catch(() => {
+        // A 401 here already sends the browser to Cognito (api/client.ts's
+        // response interceptor); any other failure just leaves auth
+        // unresolved rather than forcing a sign-in redirect of its own.
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('wcc_token');
-    localStorage.removeItem('wcc_user');
-    setState({ token: null, username: null, role: null });
+  const logout = useCallback(async () => {
+    const res = await api.post('/auth/logout');
+    window.location.href = res.data.logout_url;
   }, []);
 
   return (
-    <AuthContext.Provider value={{
-      ...state,
-      login,
-      logout,
-      isAuthenticated: !!state.token,
-      isAdmin: state.role === 'admin',
-    }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        logout,
+        isAuthenticated: !!state.username,
+        isAdmin: state.role === 'admin',
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

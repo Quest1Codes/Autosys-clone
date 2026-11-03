@@ -1,19 +1,5 @@
-import { api } from './client';
-import axios from 'axios';
+import { api, wccApi } from './client';
 import type { Job, EventType } from '../types';
-
-const wccApi = axios.create({
-  baseURL: '/api/wcc',
-  headers: { 'Content-Type': 'application/json' },
-});
-
-wccApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('wcc_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 export const fetchJobs = async (params?: {
   status?: string;
@@ -30,8 +16,8 @@ export const fetchJob = async (name: string): Promise<Job> => {
 
 // Goes through `api` (baseURL /api/v1, port 9000), not `wccApi` -- sendevent
 // lives on the main app server, not the WCC read-only dashboard backend.
-// Requires the "operator" or "admin" role server-side (V2); `api`'s request
-// interceptor already attaches the logged-in user's bearer token.
+// Requires the "operator" or "admin" role server-side (V2); the signed-in
+// user's session cookie goes along with it like any other same-origin call.
 export const sendEvent = async (
   jobName: string,
   eventType: EventType,

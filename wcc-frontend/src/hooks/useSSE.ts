@@ -17,11 +17,9 @@ export const useSSE = (
     let reconnectTimer: ReturnType<typeof setTimeout>;
 
     const connect = () => {
-      // EventSource cannot send an Authorization header, so the stream takes
-      // the login token as a query parameter (the server accepts ?token= on
-      // stream routes only).
-      const token = localStorage.getItem('wcc_token') ?? '';
-      es = new EventSource(`/api/sse/jobs?token=${encodeURIComponent(token)}`);
+      // Same-origin, so the browser attaches the wcc_session cookie on its
+      // own -- no token to pass here.
+      es = new EventSource('/api/sse/jobs');
 
       es.onopen = () => setSseStatus('live');
 
