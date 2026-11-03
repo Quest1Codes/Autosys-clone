@@ -4,7 +4,7 @@ AutoSys Application Server (SSA) — FastAPI entry point.
 Responsibilities
 ----------------
 1. Mount all REST routers under /api/v1/
-2. Expose /api/v1/auth/token (JWT login)
+2. Expose /api/v1/auth/{login,callback,logout,me} (Cognito OIDC sign-in)
 3. Expose /api/v1/ws/events  (WebSocket live status feed)
 4. Expose /health endpoints
 5. Optionally start the Event Processor as a background asyncio task
@@ -24,22 +24,23 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import hmac
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from loguru import logger
 
 from autosys.analysis import simulated_risk
 from autosys.app_server.broadcaster import EventBroadcaster
-from autosys.app_server.deps        import get_session, get_current_user, CurrentUser
-from autosys.app_server.schemas     import (
-    TokenRequest, TokenResponse, HealthResponse,
-    ExecutionModeResponse,
+from autosys.app_server.deps        import (
+    get_session, get_current_user, user_from_m2m_token, user_from_session_cookie, CurrentUser,
 )
+from autosys.app_server.schemas     import HealthResponse, ExecutionModeResponse
 from autosys.app_server.routers     import jobs, events, runs, machines, globals as globals_router, jil as jil_router, alarms as alarms_router, assessment, metrics as metrics_router, history as history_router, estate as estate_router
 from autosys.db.connection          import sync_session
 
@@ -261,38 +262,137 @@ def create_app(
 # Auth routes
 # ---------------------------------------------------------------------------
 
+def _only_same_origin_path(next_path: Optional[str]) -> str:
+    """
+    Keep ``?next=`` inside this app. Anything that isn't an absolute path
+    starting with exactly one ``/`` is replaced with the WCC home page --
+    this is the one input in the whole login round trip that arrives
+    before any token has been checked, so it must not be trusted as a
+    redirect target (an open redirect could point a signed-in session at
+    an attacker's page immediately after a real Cognito login).
+    """
+    if next_path and next_path.startswith("/") and not next_path.startswith("//"):
+        return next_path
+    return "/"
+
+
 def _register_auth_routes(app: FastAPI) -> None:
 
-    @app.post("/api/v1/auth/token", response_model=TokenResponse, tags=["auth"])
-    def login(body: TokenRequest):
+    @app.get("/api/v1/auth/login", tags=["auth"])
+    def login(next: Optional[str] = None):
         """
-        Exchange username + password for a JWT access token.
-
-        Users are configured via the AUTOSYS_USERS environment variable
-        (JSON object) -- there is no baked-in default any more.
+        Start a Cognito sign-in. Mints state/nonce/PKCE values, stashes them
+        in a short-lived signed cookie (this app keeps no server-side
+        session store), and redirects the browser to Cognito's hosted UI.
         """
-        from autosys.app_server.auth import authenticate, encode_token, is_auth_enabled, _JWT_TTL
-        if not is_auth_enabled():
-            # Defense in depth: with auth off, get_current_user() already
-            # hands out anonymous-admin to everyone, so a minted token here
-            # would be meaningless at best. Refuse rather than mint one.
-            raise HTTPException(
-                status_code = status.HTTP_409_CONFLICT,
-                detail      = "Auth is disabled on this server; no token is needed or issued.",
-            )
-        user = authenticate(body.username, body.password)
-        if user is None:
-            raise HTTPException(
-                status_code = status.HTTP_401_UNAUTHORIZED,
-                detail      = "Invalid username or password",
-                headers     = {"WWW-Authenticate": "Bearer"},
-            )
-        token = encode_token(body.username, user["role"])
-        return TokenResponse(
-            access_token = token,
-            token_type   = "bearer",  # nosec B106  # OAuth token type name, not a secret
-            expires_in   = _JWT_TTL,
+        import secrets as _secrets
+        from autosys.app_server.auth import (
+            authorization_url, encode_state_token, generate_pkce_pair, oidc_settings,
         )
+
+        cfg = oidc_settings()
+        state = _secrets.token_urlsafe(32)
+        nonce = _secrets.token_urlsafe(32)
+        code_verifier, code_challenge = generate_pkce_pair()
+        redirect_uri = f"{cfg.public_url}/api/v1/auth/callback"
+
+        response = RedirectResponse(
+            authorization_url(
+                cfg, redirect_uri=redirect_uri, state=state, nonce=nonce, code_challenge=code_challenge,
+            )
+        )
+        response.set_cookie(
+            "wcc_oidc",
+            encode_state_token(
+                state=state, nonce=nonce, code_verifier=code_verifier,
+                next_path=_only_same_origin_path(next),
+            ),
+            max_age    = 600,
+            httponly   = True,
+            secure     = not cfg.public_url.startswith("http://localhost"),
+            samesite   = "lax",
+            path       = "/api/v1/auth",
+        )
+        return response
+
+    @app.get("/api/v1/auth/callback", tags=["auth"])
+    async def callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+        """
+        Finish the Cognito round trip: check state, exchange the code for
+        tokens (PKCE, no client secret -- this is a public client), verify
+        the ID token, and map the user's Cognito groups to a simulator
+        role. No simulator group -> 403, not a session: this app's roles
+        are opt-in per group, never implied by any other access the user
+        might have.
+        """
+        from autosys.app_server.auth import (
+            _JWT_TTL, decode_state_token, encode_session_token, exchange_code_for_tokens,
+            oidc_settings, role_from_groups, verify_id_token,
+        )
+
+        if error or not code or not state:
+            raise HTTPException(status_code=400, detail=f"Sign-in failed: {error or 'missing code/state'}")
+
+        raw_state = request.cookies.get("wcc_oidc")
+        if not raw_state:
+            raise HTTPException(status_code=400, detail="Sign-in session expired -- please try again")
+        try:
+            saved = decode_state_token(raw_state)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Sign-in session invalid: {exc}")
+        if not hmac.compare_digest(saved["state"], state):
+            raise HTTPException(status_code=400, detail="State mismatch")
+
+        cfg = oidc_settings()
+        redirect_uri = f"{cfg.public_url}/api/v1/auth/callback"
+        try:
+            tokens = await exchange_code_for_tokens(
+                cfg, code=code, redirect_uri=redirect_uri, code_verifier=saved["code_verifier"],
+            )
+            claims = verify_id_token(cfg, tokens["id_token"], expected_nonce=saved["nonce"])
+        except Exception as exc:
+            raise HTTPException(status_code=401, detail=f"Sign-in failed: {exc}")
+
+        role = role_from_groups(claims.get("cognito:groups", []))
+        if role is None:
+            no_access_html = (
+                "<h1>No simulator access</h1>"
+                "<p>Your account signed in, but is not a member of any simulator group "
+                "(simulator-admin, simulator-operator or simulator-viewer). "
+                "Ask your administrator to add you to one.</p>"
+            )
+            response = HTMLResponse(status_code=403, content=no_access_html)
+            response.delete_cookie("wcc_oidc", path="/api/v1/auth")
+            return response
+
+        username = claims.get("email") or claims.get("sub")
+        response = RedirectResponse(saved["next"])
+        response.set_cookie(
+            "wcc_session",
+            encode_session_token(username, role),
+            max_age    = _JWT_TTL,
+            httponly   = True,
+            secure     = not cfg.public_url.startswith("http://localhost"),
+            samesite   = "lax",
+            path       = "/",
+        )
+        response.delete_cookie("wcc_oidc", path="/api/v1/auth")
+        return response
+
+    @app.post("/api/v1/auth/logout", tags=["auth"])
+    def logout():
+        """Clear the session cookie and hand back Cognito's own logout URL."""
+        from autosys.app_server.auth import logout_url, oidc_settings
+
+        cfg = oidc_settings()
+        response = JSONResponse({"logout_url": logout_url(cfg, redirect_uri=cfg.public_url + "/")})
+        response.delete_cookie("wcc_session", path="/")
+        return response
+
+    @app.get("/api/v1/auth/me", tags=["auth"])
+    def me(user: CurrentUser = Depends(get_current_user)):
+        """What the SPA shows instead of decoding a JWT client-side."""
+        return {"username": user.username, "role": user.role}
 
 
 # ---------------------------------------------------------------------------
@@ -312,21 +412,31 @@ def _register_ws_routes(app: FastAPI) -> None:
             {"type": "STATUS_CHANGE", "job_name": "...", "old": "RUNNING",
              "new": "SUCCESS", "ts": "2024-01-15T06:00:00"}
 
-        Connect with any WebSocket client::
+        Connect with any WebSocket client, cookie jar attached::
 
-            wscat -c "ws://localhost:9000/api/v1/ws/events?token=<JWT>"
+            wscat --header "Cookie: wcc_session=<token>" -c "ws://localhost:9000/api/v1/ws/events"
         """
-        # Same login as the REST API (audit SEC-03): token in the query string
-        # (?token=) or an Authorization header. Rejected before accepting.
-        from fastapi import HTTPException
-        from autosys.app_server.deps import user_from_token
-        auth = ws.headers.get("authorization", "")
-        token = ws.query_params.get("token") or (auth[7:] if auth.lower().startswith("bearer ") else None)
-        try:
-            user_from_token(token)
-        except HTTPException:
-            await ws.close(code=1008)   # policy violation
-            return
+        # Same sign-in as the REST API (audit SEC-03): the wcc_session cookie
+        # for a human, or a Bearer header for Shinro's worker. Rejected
+        # before accepting -- no more ?token= (audit SEC-03 originally
+        # closed that gap for query-string tokens; a session cookie in a URL
+        # would be the same mistake over again).
+        from autosys.app_server.auth import is_auth_enabled
+
+        if is_auth_enabled():
+            auth = ws.headers.get("authorization", "")
+            bearer = auth[7:] if auth.lower().startswith("bearer ") else None
+            try:
+                if bearer:
+                    user_from_m2m_token(bearer)
+                else:
+                    session = ws.cookies.get("wcc_session")
+                    if not session:
+                        raise HTTPException(status_code=401, detail="Not signed in")
+                    user_from_session_cookie(session)
+            except HTTPException:
+                await ws.close(code=1008)   # policy violation
+                return
         broadcaster: EventBroadcaster = app.state.broadcaster
         await broadcaster.connect(ws)
         try:

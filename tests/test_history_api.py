@@ -26,13 +26,9 @@ def client(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def auth_client(tmp_path, monkeypatch):
+def auth_client(tmp_path, oidc_env, monkeypatch):
     """Like `client`, but with real auth on -- for the role-check tests."""
     monkeypatch.setenv("AUTOSYS_DB_URL", f"sqlite:///{tmp_path / 'api_auth.db'}")
-    monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
-    monkeypatch.setenv("AUTOSYS_JWT_SECRET", "test-secret-not-the-insecure-default")
-    monkeypatch.setenv("AUTOSYS_USERS", '{"op": {"password": "x", "role": "operator"},'
-                                        ' "view": {"password": "x", "role": "viewer"}}')
     from autosys.db import connection
     from autosys.db.migrations import create_all_sync
     from autosys.app_server.main import create_app
@@ -151,14 +147,14 @@ def test_oversized_content_length_is_rejected_before_reading(client):
 
 
 class TestRoleEnforcement:
-    def _token(self, role: str) -> str:
-        from autosys.app_server.auth import encode_token
-        return encode_token("u", role)
+    def _session_cookie(self, role: str) -> str:
+        from autosys.app_server.auth import encode_session_token
+        return encode_session_token("u", role)
 
     def test_viewer_cannot_import(self, auth_client):
-        headers = {"Authorization": f"Bearer {self._token('viewer')}"}
+        cookies = {"wcc_session": self._session_cookie("viewer")}
         r = auth_client.post("/api/v1/history/import", files={"file": ("r.csv", CSV, "text/csv")},
-                            headers=headers)
+                            cookies=cookies)
         assert r.status_code == 403
 
     def test_operator_can_import(self, auth_client):
@@ -167,15 +163,15 @@ class TestRoleEnforcement:
         with sync_session() as s:
             s.add(JobRow(job_name="a", job_type="CMD"))
             s.commit()
-        headers = {"Authorization": f"Bearer {self._token('operator')}"}
+        cookies = {"wcc_session": self._session_cookie("operator")}
         r = auth_client.post("/api/v1/history/import", files={"file": ("r.csv", CSV, "text/csv")},
-                            headers=headers)
+                            cookies=cookies)
         assert r.status_code == 200
         assert r.json()["status"] == "OK"
 
     def test_viewer_can_read_coverage(self, auth_client):
-        headers = {"Authorization": f"Bearer {self._token('viewer')}"}
-        r = auth_client.get("/api/v1/history/coverage", headers=headers)
+        cookies = {"wcc_session": self._session_cookie("viewer")}
+        r = auth_client.get("/api/v1/history/coverage", cookies=cookies)
         assert r.status_code == 200
 
     def test_no_token_is_rejected(self, auth_client):

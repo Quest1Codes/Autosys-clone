@@ -99,7 +99,17 @@ def app_server(isolated_db, monkeypatch):
     # config a real deployment would supply.
     env["AUTOSYS_AUTH_ENABLED"] = "true"
     env["AUTOSYS_JWT_SECRET"] = "test-only-secret-not-for-real-use"
-    env["AUTOSYS_USERS"] = '{"admin": {"password": "admin", "role": "admin"}}'
+    # This test can't drive a real Cognito login from inside a subprocess,
+    # so it mints its own session cookie, signed with this same secret, in
+    # the test process below -- startup still requires these OIDC settings
+    # to be present even though this test never exercises the login route.
+    env["AUTOSYS_OIDC_REGION"] = "us-east-1"
+    env["AUTOSYS_OIDC_USER_POOL_ID"] = "us-east-1_TESTPOOL"
+    env["AUTOSYS_OIDC_CLIENT_ID"] = "wcc-test-client"
+    env["AUTOSYS_PUBLIC_URL"] = f"http://127.0.0.1:{port}"
+    # Mint the matching session cookie from this process (below), which
+    # needs the same secret in its own environment.
+    monkeypatch.setenv("AUTOSYS_JWT_SECRET", env["AUTOSYS_JWT_SECRET"])
     # This test is the one deliberate exception to the real-execution gate:
     # it starts `serve` without --dry-run and rewrites every JIL command: to
     # `sleep 0.1` (below) precisely so that *real* subprocess dispatch through
@@ -160,11 +170,14 @@ def test_phase12_end_to_end(agent_1, agent_2, app_server):
     # 1. Register the two agent machines pointing to our test fixtures
     client = httpx.Client(base_url=app_server)
 
-    # Auth is on for this subprocess (see app_server fixture) -- log in once
-    # and attach the token to every request this client makes from here on.
-    login = client.post("/api/v1/auth/token", json={"username": "admin", "password": "admin"})
-    assert login.status_code == 200, login.text
-    client.headers["Authorization"] = f"Bearer {login.json()['access_token']}"
+    # Auth is on for this subprocess (see app_server fixture). There is no
+    # password login to drive from here any more -- sign-in goes through a
+    # real Cognito round trip this test can't perform -- so it mints its
+    # own session cookie directly, signed with the secret the subprocess
+    # was given the same value of, and attaches it to every request this
+    # client makes from here on.
+    from autosys.app_server.auth import encode_session_token
+    client.cookies.set("wcc_session", encode_session_token("admin", "admin"))
 
     r = client.post("/api/v1/machines", json={
         "machine_name": agent_1.name,

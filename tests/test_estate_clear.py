@@ -28,12 +28,8 @@ def client(tmp_path, monkeypatch):
 
 
 @pytest.fixture()
-def auth_client(tmp_path, monkeypatch):
+def auth_client(tmp_path, oidc_env, monkeypatch):
     monkeypatch.setenv("AUTOSYS_DB_URL", f"sqlite:///{tmp_path / 'api_auth.db'}")
-    monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
-    monkeypatch.setenv("AUTOSYS_JWT_SECRET", "test-secret-not-the-insecure-default")
-    monkeypatch.setenv("AUTOSYS_USERS", '{"op": {"password": "x", "role": "operator"},'
-                                        ' "adm": {"password": "x", "role": "admin"}}')
     from autosys.db import connection
     from autosys.db.migrations import create_all_sync
     from autosys.app_server.main import create_app
@@ -114,26 +110,26 @@ class TestAPI:
 
 class TestRoleEnforcement:
     def _token(self, role: str) -> str:
-        from autosys.app_server.auth import encode_token
-        return encode_token("u", role)
+        from autosys.app_server.auth import encode_session_token
+        return encode_session_token("u", role)
 
     def test_operator_cannot_clear(self, auth_client):
         _seed(5)
-        headers = {"Authorization": f"Bearer {self._token('operator')}"}
-        r = auth_client.delete("/api/v1/estate", params={"confirm_job_count": 5}, headers=headers)
+        cookies = {"wcc_session": self._token("operator")}
+        r = auth_client.delete("/api/v1/estate", params={"confirm_job_count": 5}, cookies=cookies)
         assert r.status_code == 403
-        assert len(auth_client.get("/api/v1/jobs", headers=headers).json()) == 5
+        assert len(auth_client.get("/api/v1/jobs", cookies=cookies).json()) == 5
 
     def test_viewer_cannot_clear(self, auth_client):
         _seed(5)
-        headers = {"Authorization": f"Bearer {self._token('viewer')}"}
-        r = auth_client.delete("/api/v1/estate", params={"confirm_job_count": 5}, headers=headers)
+        cookies = {"wcc_session": self._token("viewer")}
+        r = auth_client.delete("/api/v1/estate", params={"confirm_job_count": 5}, cookies=cookies)
         assert r.status_code == 403
 
     def test_admin_can_clear(self, auth_client):
         _seed(5)
-        headers = {"Authorization": f"Bearer {self._token('admin')}"}
-        r = auth_client.delete("/api/v1/estate", params={"confirm_job_count": 5}, headers=headers)
+        cookies = {"wcc_session": self._token("admin")}
+        r = auth_client.delete("/api/v1/estate", params={"confirm_job_count": 5}, cookies=cookies)
         assert r.status_code == 200
         assert r.json()["jobs_removed"] == 5
 

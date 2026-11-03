@@ -31,17 +31,21 @@ from sqlalchemy import select
 
 from autosys.analysis.condition_refs import condition_job_refs
 from autosys.db.connection import sync_session
-from autosys.app_server.deps import get_current_user, get_current_user_for_stream
+from autosys.app_server.deps import get_current_user
 
 from autosys.db.schema import JobRow, JobRunRow, AlarmRow, JobOutputRow
 from autosys.models.job import JobStatus
 
-# Every data and stream route needs the same login as the API (same JWT
-# secret). The static SPA -- including its login page -- stays public. These
-# routes used to be open to anyone who could reach the Ingress: every job
-# name, hostname, owner and dependency in the estate (audit SEC-03).
+# Every data and stream route needs the same sign-in as the API: the
+# wcc_session cookie set by the OIDC login round trip. These routes used to
+# be open to anyone who could reach the Ingress: every job name, hostname,
+# owner and dependency in the estate (audit SEC-03). The stream route no
+# longer needs its own variant -- a same-origin EventSource sends cookies
+# like any other same-origin request, so there is no more ?token= fallback
+# to carry a credential through the URL (and into logs, browser history,
+# Referer headers, …).
 _REQUIRE_LOGIN = Depends(get_current_user)
-_REQUIRE_LOGIN_STREAM = Depends(get_current_user_for_stream)
+_REQUIRE_LOGIN_STREAM = _REQUIRE_LOGIN
 
 
 # ---------------------------------------------------------------------------

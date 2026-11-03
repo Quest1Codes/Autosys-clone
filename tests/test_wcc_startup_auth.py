@@ -26,7 +26,6 @@ def isolated_db(tmp_path, monkeypatch):
 def test_wcc_refuses_with_no_secret_configured(monkeypatch):
     monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
     monkeypatch.delenv("AUTOSYS_JWT_SECRET", raising=False)
-    monkeypatch.delenv("AUTOSYS_USERS", raising=False)
     from autosys.cli.scheduler_cmd import scheduler_group
     res = CliRunner().invoke(scheduler_group, ["wcc"])
     assert res.exit_code == 1, res.output
@@ -45,8 +44,21 @@ def test_wcc_refuses_with_insecure_default_secret(monkeypatch):
     from autosys.app_server.auth import _INSECURE_DEFAULT_SECRET
     monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTOSYS_JWT_SECRET", _INSECURE_DEFAULT_SECRET)
-    monkeypatch.setenv("AUTOSYS_USERS", '{"admin": {"password": "x", "role": "admin"}}')
     from autosys.cli.scheduler_cmd import scheduler_group
     res = CliRunner().invoke(scheduler_group, ["wcc"])
     assert res.exit_code == 1, res.output
     assert "Refusing to start" in res.output
+
+
+def test_wcc_refuses_without_oidc_settings(monkeypatch):
+    """A real secret alone is not enough any more -- this app verifies
+    sign-ins against Cognito, not a local account list, so it also refuses
+    to start without a pool, client and public URL to check them against."""
+    monkeypatch.setenv("AUTOSYS_AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTOSYS_JWT_SECRET", "a-real-secret-0123456789abcdef")
+    for var in ("AUTOSYS_OIDC_REGION", "AUTOSYS_OIDC_USER_POOL_ID", "AUTOSYS_OIDC_CLIENT_ID", "AUTOSYS_PUBLIC_URL"):
+        monkeypatch.delenv(var, raising=False)
+    from autosys.cli.scheduler_cmd import scheduler_group
+    res = CliRunner().invoke(scheduler_group, ["wcc"])
+    assert res.exit_code == 1, res.output
+    assert "AUTOSYS_OIDC_REGION" in res.output
