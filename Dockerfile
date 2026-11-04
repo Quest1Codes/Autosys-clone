@@ -58,17 +58,17 @@ ARG FLEX_SHA256=e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995
 RUN dnf install -y --setopt=install_weak_deps=false gcc gcc-c++ make tar bzip2 xz \
         openssl-devel zlib-devel diffutils findutils perl perl-FindBin perl-File-Compare perl-File-Copy perl-File-Basename perl-Getopt-Long perl-Data-Dumper perl-Time-HiRes perl-IPC-Cmd m4 \
     && dnf clean all \
-    && curl -fsSL -o /tmp/bison.tar.xz https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 -o /tmp/bison.tar.xz https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz \
     && echo "${BISON_SHA256}  /tmp/bison.tar.xz" | sha256sum -c - \
     && tar -C /tmp -xJf /tmp/bison.tar.xz \
-    && curl -fsSL -o /tmp/flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 -o /tmp/flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz \
     && echo "${FLEX_SHA256}  /tmp/flex.tar.gz" | sha256sum -c - \
     && tar -C /tmp -xzf /tmp/flex.tar.gz
 WORKDIR /tmp/bison-3.8.2
 RUN ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
 WORKDIR /tmp/flex-2.6.4
 RUN ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
-RUN curl -fsSL -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
+RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
     && echo "${PG_SHA256}  /tmp/pg.tar.bz2" | sha256sum -c - \
     && tar -C /tmp -xjf /tmp/pg.tar.bz2
 WORKDIR /tmp/postgresql-${PG_VERSION}
@@ -140,6 +140,13 @@ RUN find autosys -name '__pycache__' -type d -prune -exec rm -rf '{}' + ; \
 # upgrading setuptools alone clears those two as well.
 # Run through chroot into the install root (with resolv.conf borrowed for the
 # network) so the rpm database can be edited afterwards: see the rpm -e below.
+# Python needs /dev/urandom even for `pip` (hash randomisation, TLS); a bare install root has no
+# /dev nodes, and not every build host lets it fall back to getrandom(). Create the three
+# nodes for the build and delete them again at the end of this stage (the runtime provides /dev).
+RUN mkdir -p /mnt/rootfs/dev \
+    && mknod -m 666 /mnt/rootfs/dev/null c 1 3 \
+    && mknod -m 666 /mnt/rootfs/dev/random c 1 8 \
+    && mknod -m 666 /mnt/rootfs/dev/urandom c 1 9
 RUN cp /etc/resolv.conf /mnt/rootfs/etc/resolv.conf \
     && chroot /mnt/rootfs sh -c 'cd /app && /opt/python/bin/python3 -m pip install --no-cache-dir --upgrade pip setuptools'
 # [pg] pulls in psycopg2-binary/asyncpg — the compose files point
@@ -204,7 +211,8 @@ RUN for p in ncurses-base pcre2-syntax; do \
       rpm --root /mnt/rootfs -ql "$p" | while read -r f; do \
         if [ -f "/mnt/rootfs$f" ] || [ -L "/mnt/rootfs$f" ]; then echo "$f"; fi; done >> /mnt/rootfs/.removed-files; \
       rpm --root /mnt/rootfs -e --nodeps "$p"; \
-    done
+    done \
+    && rm -f /mnt/rootfs/dev/null /mnt/rootfs/dev/random /mnt/rootfs/dev/urandom
 
 FROM registry.access.redhat.com/ubi10/ubi-micro:10.2 AS runtime
 COPY --from=rootfs /mnt/rootfs/ /
