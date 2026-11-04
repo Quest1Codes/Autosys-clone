@@ -16,6 +16,8 @@
 # `pg_dump -Fc` and restore with `pg_restore` into the new volume.
 
 FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pgbuild
+# pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG PG_VERSION=17.11
 ARG PG_SHA256=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979
 # bison and flex are build-time only (this stage never reaches the image). UBI's
@@ -50,6 +52,8 @@ RUN ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readl
     && test -x /opt/pgsql/bin/initdb
 
 FROM registry.access.redhat.com/ubi10/ubi:10.2 AS rootfs
+# pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN mkdir -p /mnt/rootfs && rpm --root /mnt/rootfs --initdb \
     && dnf install -y --installroot /mnt/rootfs --releasever 10 \
          --setopt=install_weak_deps=false --setopt=tsflags=nodocs \
@@ -74,6 +78,6 @@ RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 VOLUME ["/var/lib/postgresql/data"]
 USER 26:26
 EXPOSE 5432
-HEALTHCHECK --interval=10s --timeout=5s --retries=10 CMD pg_isready -U "${POSTGRES_USER:-postgres}" || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 CMD ["/bin/bash", "-c", "pg_isready -U \"${POSTGRES_USER:-postgres}\""]
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["postgres"]

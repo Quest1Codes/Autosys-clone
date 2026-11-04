@@ -18,7 +18,8 @@ _LAZY = {
 def __getattr__(name: str):
     if name in _LAZY:
         import importlib
-        return getattr(importlib.import_module(_LAZY[name]), name)
+        # module path comes from the fixed _LAZY table above, never from the caller
+        return getattr(importlib.import_module(_LAZY[name]), name)  # nosemgrep: python.lang.security.audit.non-literal-import.non-literal-import
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
