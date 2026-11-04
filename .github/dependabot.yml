@@ -1,24 +1,36 @@
 # Weekly update PRs so patched versions arrive without anyone having to look.
 # Security updates (a CVE with a fix) are opened immediately regardless.
+# cooldown: a brand-new release waits 7 days before a version-update PR, so a
+# compromised or yanked release has time to be caught (security updates skip it).
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /wcc-frontend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: pip
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: docker
     directory: /deploy/postgres
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7

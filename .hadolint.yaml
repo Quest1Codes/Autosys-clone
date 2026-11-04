@@ -1,0 +1,6 @@
+# DL3041: dnf packages are deliberately unpinned. The base images are pinned to a
+# minor release (ubi10:10.2) and `dnf update`/install pull the patched builds Red
+# Hat has already released; pinning exact RPM versions would block security fixes
+# until someone bumped them by hand.
+ignored:
+  - DL3041

@@ -23,6 +23,22 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from jilcommon import decode, lenient, lost_lines, norm_newlines, LENIENT_ENCODINGS  # noqa: E402
 
+
+_IDENT_RE = re.compile(r'[A-Za-z_][A-Za-z0-9_]*\Z')
+
+
+def _ident(name):
+    """Table/column names come from the corpus manifest, so they are validated and
+    quoted before they go into SQL; values always go through bound parameters."""
+    if not isinstance(name, str) or not _IDENT_RE.match(name):
+        raise ValueError(f'unsafe SQL identifier in manifest: {name!r}')
+    return '"' + name + '"'
+
+
+def _in_clause(n):
+    """'?,?,...' for n bound parameters (placeholders only, never values)."""
+    return ','.join('?' * n)
+
 DISPS = ('LOADED', 'LOADED_WITH_WARNINGS', 'ARCHIVE_ONLY', 'QUARANTINED', 'DUPLICATE')
 CLASS_DISP = {
     'clean': {'LOADED'}, 'warn': {'LOADED_WITH_WARNINGS'}, 'archive_only': {'ARCHIVE_ONLY'},
@@ -232,8 +248,9 @@ def main():
             batch, jobq[:] = jobq[:900], jobq[900:]
             names = list({b[0] for b in batch})
             q = ('SELECT job_name, job_type, command, machine, owner, box_name, condition, start_times '
-                 'FROM ujo_job WHERE job_name IN (%s)' % ','.join('?' * len(names)))
-            got = {r[0]: r for r in cur.execute(q, names)}
+                 'FROM ujo_job WHERE job_name IN (' + _in_clause(len(names)) + ')')
+            # only '?' placeholders are built into the text; the names are bound parameters
+            got = {r[0]: r for r in cur.execute(q, names)}  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
             for name, mode, exp, ctx in batch:
                 r = got.get(name)
                 if mode == 'exist':
@@ -276,8 +293,10 @@ def main():
         for (tbl, col), lst in list(tabq.items()):
             while len(lst) >= 900 or (force and lst):
                 batch, lst[:] = lst[:900], lst[900:]
-                have = {r[0] for r in cur.execute(
-                    f'SELECT {col} FROM {tbl} WHERE {col} IN (%s)' % ','.join('?' * len(batch)), [b[0] for b in batch])}
+                qcol, qtbl = _ident(col), _ident(tbl)   # validated + quoted: they come from the manifest
+                q = 'SELECT ' + qcol + ' FROM ' + qtbl + ' WHERE ' + qcol + ' IN (' + _in_clause(len(batch)) + ')'
+                # values are bound parameters; identifiers were validated above
+                have = {r[0] for r in cur.execute(q, [b[0] for b in batch])}  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
                 for nm, ctx in batch:
                     stats['typed_row_checked'] += 1
                     if nm not in have:

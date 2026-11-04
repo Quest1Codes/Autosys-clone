@@ -1,0 +1,10 @@
+# Reviewed false positives. Each line is a gitleaks fingerprint (commit:file:rule:line, or file:rule:line for a working-tree scan).
+#
+# scripts/jil_stress/pdf_examples.json:32 -- xkey_to_manager in a sample JIL stanza copied from the vendor
+# documentation; a documentation example, not a credential for anything.
+# docs/02-astronomer-guide.md:693 -- "-u admin:admin" curl example. The docs line is now a placeholder, but
+# the old line stays in commit f08f879f (history is not rewritten), so its fingerprint is listed here.
+docs/02-astronomer-guide.md:curl-auth-user:693
+eb131cdbbca461a73865fb65ec1bda4f8500d5bc:scripts/jil_stress/pdf_examples.json:generic-api-key:32
+f08f879ffaf4e11b635072974ff6e150427c37bd:docs/02-astronomer-guide.md:curl-auth-user:693
+scripts/jil_stress/pdf_examples.json:generic-api-key:32

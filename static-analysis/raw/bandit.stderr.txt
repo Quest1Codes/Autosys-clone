@@ -1,0 +1,2 @@
+[tester]	WARNING	nosec encountered (B607), but no failed test on file autosys/engine/monitor_evaluator.py:157
+[tester]	WARNING	nosec encountered (B603), but no failed test on file autosys/engine/monitor_evaluator.py:157

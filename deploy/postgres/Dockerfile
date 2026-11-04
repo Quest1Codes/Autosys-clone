@@ -16,6 +16,8 @@
 # `pg_dump -Fc` and restore with `pg_restore` into the new volume.
 
 FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pgbuild
+# pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG PG_VERSION=17.11
 ARG PG_SHA256=dd27f2b3c59e73ed14aa3324901242bf69a032a6347805f274e6260322d42979
 # bison and flex are build-time only (this stage never reaches the image). UBI's
@@ -26,17 +28,17 @@ ARG FLEX_SHA256=e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995
 RUN dnf install -y --setopt=install_weak_deps=false gcc gcc-c++ make tar bzip2 xz \
         openssl-devel zlib-devel diffutils findutils perl perl-FindBin perl-File-Compare perl-File-Copy perl-File-Basename perl-Getopt-Long perl-Data-Dumper perl-Time-HiRes perl-IPC-Cmd m4 \
     && dnf clean all \
-    && curl -fsSL -o /tmp/bison.tar.xz https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 -o /tmp/bison.tar.xz https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz \
     && echo "${BISON_SHA256}  /tmp/bison.tar.xz" | sha256sum -c - \
     && tar -C /tmp -xJf /tmp/bison.tar.xz \
-    && curl -fsSL -o /tmp/flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz \
+    && curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 -o /tmp/flex.tar.gz https://github.com/westes/flex/releases/download/v2.6.4/flex-2.6.4.tar.gz \
     && echo "${FLEX_SHA256}  /tmp/flex.tar.gz" | sha256sum -c - \
     && tar -C /tmp -xzf /tmp/flex.tar.gz
 WORKDIR /tmp/bison-3.8.2
 RUN ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
 WORKDIR /tmp/flex-2.6.4
 RUN ./configure --prefix=/usr/local >/dev/null && make -j"$(nproc)" >/dev/null && make install >/dev/null
-RUN curl -fsSL -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
+RUN curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 -o /tmp/pg.tar.bz2 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" \
     && echo "${PG_SHA256}  /tmp/pg.tar.bz2" | sha256sum -c - \
     && tar -C /tmp -xjf /tmp/pg.tar.bz2
 WORKDIR /tmp/postgresql-${PG_VERSION}
@@ -50,6 +52,8 @@ RUN ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readl
     && test -x /opt/pgsql/bin/initdb
 
 FROM registry.access.redhat.com/ubi10/ubi:10.2 AS rootfs
+# pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN mkdir -p /mnt/rootfs && rpm --root /mnt/rootfs --initdb \
     && dnf install -y --installroot /mnt/rootfs --releasever 10 \
          --setopt=install_weak_deps=false --setopt=tsflags=nodocs \
@@ -74,6 +78,6 @@ RUN chmod 755 /usr/local/bin/docker-entrypoint.sh
 VOLUME ["/var/lib/postgresql/data"]
 USER 26:26
 EXPOSE 5432
-HEALTHCHECK --interval=10s --timeout=5s --retries=10 CMD pg_isready -U "${POSTGRES_USER:-postgres}" || exit 1
+HEALTHCHECK --interval=10s --timeout=5s --retries=10 CMD ["/bin/bash", "-c", "pg_isready -U \"${POSTGRES_USER:-postgres}\""]
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["postgres"]

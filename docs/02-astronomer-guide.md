@@ -693,7 +693,7 @@ with DAG("consumer_dag", schedule=[sales_dataset]) as dag:
 curl -X POST \
   http://airflow-host:8080/api/v1/dags/my_dag/dagRuns \
   -H "Content-Type: application/json" \
-  -u admin:admin \
+  -u "$AIRFLOW_USER:$AIRFLOW_PASSWORD" \
   -d '{"conf": {"business_date": "2024-01-15"}}'
 ```
 
