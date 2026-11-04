@@ -1,0 +1,2594 @@
+{
+  "SchemaVersion": 2,
+  "Trivy": {
+    "Version": "0.74.0"
+  },
+  "ReportID": "01a1a19f-a2a8-703a-9434-e87942b15c20",
+  "CreatedAt": "2026-11-03T19:05:56.072016+05:30",
+  "ArtifactID": "sha256:9bd73866a1e5a491786d46e32dfa3f6626c946f34602b7dad68e57361d4ffc8b",
+  "ArtifactName": ".",
+  "ArtifactType": "repository",
+  "Metadata": {
+    "RepoURL": "https://github.com/Raghav-Quest1/Autosys-clone.git",
+    "Branch": "ubi10-and-sast-fixes",
+    "Commit": "3ee68259433cd9a3fcbff34adde0ee52077452ea",
+    "CommitMsg": "Build the Postgres image from source on UBI 10\n\nReplace postgres:16-alpine with PostgreSQL 17.11 built from the checksum-pinned\nsource tarball on ubi10/ubi:10.2, with its own entrypoint. Update the compose\nfile and vuln_scan.sh to match. Data volumes from the old image need a\npg_dump/pg_restore.",
+    "Author": "Raghav \u003cRaghav@Mac.lan\u003e",
+    "Committer": "Raghav \u003cRaghav@Mac.lan\u003e"
+  },
+  "Results": [
+    {
+      "Target": "uv.lock",
+      "Class": "lang-pkgs",
+      "Type": "uv",
+      "Packages": [
+        {
+          "ID": "autosys-clone@0.1.0",
+          "Name": "autosys-clone",
+          "Identifier": {
+            "PURL": "pkg:pypi/autosys-clone@0.1.0",
+            "UID": "4d690c07ecc09e08"
+          },
+          "Version": "0.1.0",
+          "Relationship": "root",
+          "DependsOn": [
+            "aiosqlite@0.22.1",
+            "asyncpg@0.32.0",
+            "black@26.10.1",
+            "click@8.3.3",
+            "fastapi@0.138.0",
+            "httpx@0.28.1",
+            "loguru@0.7.3",
+            "msgpack@1.2.3",
+            "psycopg2-binary@2.9.13",
+            "pydantic@2.11.5",
+            "pytest-asyncio@1.4.0",
+            "pytest-cov@7.1.0",
+            "pytest@9.1.1",
+            "python-multipart@0.0.31",
+            "rich@14.0.0",
+            "ruff@0.17.0",
+            "sqlalchemy@2.0.41",
+            "uvicorn@0.34.3"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "aiosqlite@0.22.1",
+          "Name": "aiosqlite",
+          "Identifier": {
+            "PURL": "pkg:pypi/aiosqlite@0.22.1",
+            "UID": "ad382ddf9eca5f11"
+          },
+          "Version": "0.22.1",
+          "Relationship": "direct",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "asyncpg@0.32.0",
+          "Name": "asyncpg",
+          "Identifier": {
+            "PURL": "pkg:pypi/asyncpg@0.32.0",
+            "UID": "5d90274d14287071"
+          },
+          "Version": "0.32.0",
+          "Relationship": "direct",
+          "DependsOn": [
+            "async-timeout@5.0.1"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "black@26.10.1",
+          "Name": "black",
+          "Identifier": {
+            "PURL": "pkg:pypi/black@26.10.1",
+            "UID": "b807df42fb9ac021"
+          },
+          "Version": "26.10.1",
+          "Relationship": "direct",
+          "DependsOn": [
+            "click@8.3.3",
+            "mypy-extensions@1.1.0",
+            "packaging@26.3",
+            "pathspec@1.1.1",
+            "platformdirs@4.13.0",
+            "pytokens@0.4.1",
+            "tomli@2.5.0",
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "click@8.3.3",
+          "Name": "click",
+          "Identifier": {
+            "PURL": "pkg:pypi/click@8.3.3",
+            "UID": "fd32f953d4e266c0"
+          },
+          "Version": "8.3.3",
+          "Relationship": "direct",
+          "DependsOn": [
+            "colorama@0.4.6"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "fastapi@0.138.0",
+          "Name": "fastapi",
+          "Identifier": {
+            "PURL": "pkg:pypi/fastapi@0.138.0",
+            "UID": "54be5e88e334d949"
+          },
+          "Version": "0.138.0",
+          "Relationship": "direct",
+          "DependsOn": [
+            "annotated-doc@0.0.5",
+            "pydantic@2.11.5",
+            "starlette@1.7.0",
+            "typing-extensions@4.16.0",
+            "typing-inspection@0.4.4"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "httpx@0.28.1",
+          "Name": "httpx",
+          "Identifier": {
+            "PURL": "pkg:pypi/httpx@0.28.1",
+            "UID": "64af2f62f71b9699"
+          },
+          "Version": "0.28.1",
+          "Relationship": "direct",
+          "DependsOn": [
+            "anyio@4.15.1",
+            "certifi@2026.10.23",
+            "httpcore@1.0.9",
+            "idna@3.20"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "loguru@0.7.3",
+          "Name": "loguru",
+          "Identifier": {
+            "PURL": "pkg:pypi/loguru@0.7.3",
+            "UID": "a52b03c708bbb965"
+          },
+          "Version": "0.7.3",
+          "Relationship": "direct",
+          "DependsOn": [
+            "colorama@0.4.6",
+            "win32-setctime@1.2.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "msgpack@1.2.3",
+          "Name": "msgpack",
+          "Identifier": {
+            "PURL": "pkg:pypi/msgpack@1.2.3",
+            "UID": "d757c0a499fca015"
+          },
+          "Version": "1.2.3",
+          "Relationship": "direct",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "psycopg2-binary@2.9.13",
+          "Name": "psycopg2-binary",
+          "Identifier": {
+            "PURL": "pkg:pypi/psycopg2-binary@2.9.13",
+            "UID": "a43f7d7792f41e7b"
+          },
+          "Version": "2.9.13",
+          "Relationship": "direct",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pydantic@2.11.5",
+          "Name": "pydantic",
+          "Identifier": {
+            "PURL": "pkg:pypi/pydantic@2.11.5",
+            "UID": "c64aeb2a0f8ec6ab"
+          },
+          "Version": "2.11.5",
+          "Relationship": "direct",
+          "DependsOn": [
+            "annotated-types@0.8.0",
+            "pydantic-core@2.33.2",
+            "typing-extensions@4.16.0",
+            "typing-inspection@0.4.4"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pytest@9.1.1",
+          "Name": "pytest",
+          "Identifier": {
+            "PURL": "pkg:pypi/pytest@9.1.1",
+            "UID": "3d335cf54223ad83"
+          },
+          "Version": "9.1.1",
+          "Relationship": "direct",
+          "DependsOn": [
+            "colorama@0.4.6",
+            "exceptiongroup@1.3.1",
+            "iniconfig@2.3.1",
+            "packaging@26.3",
+            "pluggy@1.6.0",
+            "pygments@2.21.0",
+            "tomli@2.5.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pytest-asyncio@1.4.0",
+          "Name": "pytest-asyncio",
+          "Identifier": {
+            "PURL": "pkg:pypi/pytest-asyncio@1.4.0",
+            "UID": "c8d92fa75a5bad6a"
+          },
+          "Version": "1.4.0",
+          "Relationship": "direct",
+          "DependsOn": [
+            "backports-asyncio-runner@1.2.0",
+            "pytest@9.1.1",
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pytest-cov@7.1.0",
+          "Name": "pytest-cov",
+          "Identifier": {
+            "PURL": "pkg:pypi/pytest-cov@7.1.0",
+            "UID": "7fe8e3001719cc5a"
+          },
+          "Version": "7.1.0",
+          "Relationship": "direct",
+          "DependsOn": [
+            "coverage@7.16.2",
+            "pluggy@1.6.0",
+            "pytest@9.1.1"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "python-multipart@0.0.31",
+          "Name": "python-multipart",
+          "Identifier": {
+            "PURL": "pkg:pypi/python-multipart@0.0.31",
+            "UID": "6d4505eed9b9395a"
+          },
+          "Version": "0.0.31",
+          "Relationship": "direct",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "rich@14.0.0",
+          "Name": "rich",
+          "Identifier": {
+            "PURL": "pkg:pypi/rich@14.0.0",
+            "UID": "c70a8cb56568d6e5"
+          },
+          "Version": "14.0.0",
+          "Relationship": "direct",
+          "DependsOn": [
+            "markdown-it-py@4.2.0",
+            "pygments@2.21.0",
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "ruff@0.17.0",
+          "Name": "ruff",
+          "Identifier": {
+            "PURL": "pkg:pypi/ruff@0.17.0",
+            "UID": "7784742e645ee1a5"
+          },
+          "Version": "0.17.0",
+          "Relationship": "direct",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "sqlalchemy@2.0.41",
+          "Name": "sqlalchemy",
+          "Identifier": {
+            "PURL": "pkg:pypi/sqlalchemy@2.0.41",
+            "UID": "f996228fa45d438f"
+          },
+          "Version": "2.0.41",
+          "Relationship": "direct",
+          "DependsOn": [
+            "greenlet@3.5.6",
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "uvicorn@0.34.3",
+          "Name": "uvicorn",
+          "Identifier": {
+            "PURL": "pkg:pypi/uvicorn@0.34.3",
+            "UID": "7342635910bfe107"
+          },
+          "Version": "0.34.3",
+          "Relationship": "direct",
+          "DependsOn": [
+            "click@8.3.3",
+            "colorama@0.4.6",
+            "h11@0.16.0",
+            "httptools@0.9.0",
+            "python-dotenv@1.2.4",
+            "pyyaml@6.0.3",
+            "typing-extensions@4.16.0",
+            "uvloop@0.23.0",
+            "watchfiles@1.3.0",
+            "websockets@17.2"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "annotated-doc@0.0.5",
+          "Name": "annotated-doc",
+          "Identifier": {
+            "PURL": "pkg:pypi/annotated-doc@0.0.5",
+            "UID": "789160a1e6bce043"
+          },
+          "Version": "0.0.5",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "annotated-types@0.8.0",
+          "Name": "annotated-types",
+          "Identifier": {
+            "PURL": "pkg:pypi/annotated-types@0.8.0",
+            "UID": "628450cec6fe2976"
+          },
+          "Version": "0.8.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "anyio@4.15.1",
+          "Name": "anyio",
+          "Identifier": {
+            "PURL": "pkg:pypi/anyio@4.15.1",
+            "UID": "4539532bd188db2a"
+          },
+          "Version": "4.15.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "exceptiongroup@1.3.1",
+            "idna@3.20",
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "async-timeout@5.0.1",
+          "Name": "async-timeout",
+          "Identifier": {
+            "PURL": "pkg:pypi/async-timeout@5.0.1",
+            "UID": "65fa7b1e9f9bee91"
+          },
+          "Version": "5.0.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "backports-asyncio-runner@1.2.0",
+          "Name": "backports-asyncio-runner",
+          "Identifier": {
+            "PURL": "pkg:pypi/backports-asyncio-runner@1.2.0",
+            "UID": "cb907291edb0e91e"
+          },
+          "Version": "1.2.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "certifi@2026.10.23",
+          "Name": "certifi",
+          "Identifier": {
+            "PURL": "pkg:pypi/certifi@2026.10.23",
+            "UID": "10e96f8e9c1b6146"
+          },
+          "Version": "2026.10.23",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "colorama@0.4.6",
+          "Name": "colorama",
+          "Identifier": {
+            "PURL": "pkg:pypi/colorama@0.4.6",
+            "UID": "a9b0f41cf3bb79cc"
+          },
+          "Version": "0.4.6",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "coverage@7.16.2",
+          "Name": "coverage",
+          "Identifier": {
+            "PURL": "pkg:pypi/coverage@7.16.2",
+            "UID": "9956c84acd01868b"
+          },
+          "Version": "7.16.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "tomli@2.5.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "exceptiongroup@1.3.1",
+          "Name": "exceptiongroup",
+          "Identifier": {
+            "PURL": "pkg:pypi/exceptiongroup@1.3.1",
+            "UID": "ca1f868969d97f3a"
+          },
+          "Version": "1.3.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "greenlet@3.5.6",
+          "Name": "greenlet",
+          "Identifier": {
+            "PURL": "pkg:pypi/greenlet@3.5.6",
+            "UID": "29e974093cc1194d"
+          },
+          "Version": "3.5.6",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "h11@0.16.0",
+          "Name": "h11",
+          "Identifier": {
+            "PURL": "pkg:pypi/h11@0.16.0",
+            "UID": "d50a8db9ed31c7b5"
+          },
+          "Version": "0.16.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "httpcore@1.0.9",
+          "Name": "httpcore",
+          "Identifier": {
+            "PURL": "pkg:pypi/httpcore@1.0.9",
+            "UID": "3f30896f9f1da6c5"
+          },
+          "Version": "1.0.9",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "certifi@2026.10.23",
+            "h11@0.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "httptools@0.9.0",
+          "Name": "httptools",
+          "Identifier": {
+            "PURL": "pkg:pypi/httptools@0.9.0",
+            "UID": "cdfbafd18a74a15f"
+          },
+          "Version": "0.9.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "idna@3.20",
+          "Name": "idna",
+          "Identifier": {
+            "PURL": "pkg:pypi/idna@3.20",
+            "UID": "c64541044456d7da"
+          },
+          "Version": "3.20",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "iniconfig@2.3.1",
+          "Name": "iniconfig",
+          "Identifier": {
+            "PURL": "pkg:pypi/iniconfig@2.3.1",
+            "UID": "2ff8fa9660602baf"
+          },
+          "Version": "2.3.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "markdown-it-py@4.2.0",
+          "Name": "markdown-it-py",
+          "Identifier": {
+            "PURL": "pkg:pypi/markdown-it-py@4.2.0",
+            "UID": "df54c05291b54b31"
+          },
+          "Version": "4.2.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "mdurl@0.1.2"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "mdurl@0.1.2",
+          "Name": "mdurl",
+          "Identifier": {
+            "PURL": "pkg:pypi/mdurl@0.1.2",
+            "UID": "9dc632b33acb56d1"
+          },
+          "Version": "0.1.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "mypy-extensions@1.1.0",
+          "Name": "mypy-extensions",
+          "Identifier": {
+            "PURL": "pkg:pypi/mypy-extensions@1.1.0",
+            "UID": "5d0c5240f9f8304e"
+          },
+          "Version": "1.1.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "packaging@26.3",
+          "Name": "packaging",
+          "Identifier": {
+            "PURL": "pkg:pypi/packaging@26.3",
+            "UID": "281e14bb06db5be"
+          },
+          "Version": "26.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pathspec@1.1.1",
+          "Name": "pathspec",
+          "Identifier": {
+            "PURL": "pkg:pypi/pathspec@1.1.1",
+            "UID": "5461a91c92013aeb"
+          },
+          "Version": "1.1.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "platformdirs@4.12.4",
+          "Name": "platformdirs",
+          "Identifier": {
+            "PURL": "pkg:pypi/platformdirs@4.12.4",
+            "UID": "66030d361a3a2af1"
+          },
+          "Version": "4.12.4",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "platformdirs@4.13.0",
+          "Name": "platformdirs",
+          "Identifier": {
+            "PURL": "pkg:pypi/platformdirs@4.13.0",
+            "UID": "49719d91b2d416f8"
+          },
+          "Version": "4.13.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pluggy@1.6.0",
+          "Name": "pluggy",
+          "Identifier": {
+            "PURL": "pkg:pypi/pluggy@1.6.0",
+            "UID": "fb8af1ba97572ef7"
+          },
+          "Version": "1.6.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pydantic-core@2.33.2",
+          "Name": "pydantic-core",
+          "Identifier": {
+            "PURL": "pkg:pypi/pydantic-core@2.33.2",
+            "UID": "99adb7034f37cc83"
+          },
+          "Version": "2.33.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pygments@2.21.0",
+          "Name": "pygments",
+          "Identifier": {
+            "PURL": "pkg:pypi/pygments@2.21.0",
+            "UID": "2c187de8ce1ac8e"
+          },
+          "Version": "2.21.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "python-dotenv@1.2.4",
+          "Name": "python-dotenv",
+          "Identifier": {
+            "PURL": "pkg:pypi/python-dotenv@1.2.4",
+            "UID": "6de80cc64e8b9be2"
+          },
+          "Version": "1.2.4",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pytokens@0.4.1",
+          "Name": "pytokens",
+          "Identifier": {
+            "PURL": "pkg:pypi/pytokens@0.4.1",
+            "UID": "ec41f501d1e09128"
+          },
+          "Version": "0.4.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "pyyaml@6.0.3",
+          "Name": "pyyaml",
+          "Identifier": {
+            "PURL": "pkg:pypi/pyyaml@6.0.3",
+            "UID": "691cc315a4054d72"
+          },
+          "Version": "6.0.3",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "starlette@1.7.0",
+          "Name": "starlette",
+          "Identifier": {
+            "PURL": "pkg:pypi/starlette@1.7.0",
+            "UID": "78bbc96718f72e0d"
+          },
+          "Version": "1.7.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "anyio@4.15.1",
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "tomli@2.5.0",
+          "Name": "tomli",
+          "Identifier": {
+            "PURL": "pkg:pypi/tomli@2.5.0",
+            "UID": "f313d56876043266"
+          },
+          "Version": "2.5.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "typing-extensions@4.16.0",
+          "Name": "typing-extensions",
+          "Identifier": {
+            "PURL": "pkg:pypi/typing-extensions@4.16.0",
+            "UID": "23fd9c45aea880bf"
+          },
+          "Version": "4.16.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "typing-inspection@0.4.4",
+          "Name": "typing-inspection",
+          "Identifier": {
+            "PURL": "pkg:pypi/typing-inspection@0.4.4",
+            "UID": "cd0e447ca908db0d"
+          },
+          "Version": "0.4.4",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "typing-extensions@4.16.0"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "uvloop@0.23.0",
+          "Name": "uvloop",
+          "Identifier": {
+            "PURL": "pkg:pypi/uvloop@0.23.0",
+            "UID": "ac67715322ce2a2b"
+          },
+          "Version": "0.23.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "watchfiles@1.3.0",
+          "Name": "watchfiles",
+          "Identifier": {
+            "PURL": "pkg:pypi/watchfiles@1.3.0",
+            "UID": "bf42d296e6b22b23"
+          },
+          "Version": "1.3.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "anyio@4.15.1"
+          ],
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "websockets@16.1.1",
+          "Name": "websockets",
+          "Identifier": {
+            "PURL": "pkg:pypi/websockets@16.1.1",
+            "UID": "78c8a5a53687701f"
+          },
+          "Version": "16.1.1",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "websockets@17.2",
+          "Name": "websockets",
+          "Identifier": {
+            "PURL": "pkg:pypi/websockets@17.2",
+            "UID": "d10a286a034c806a"
+          },
+          "Version": "17.2",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        },
+        {
+          "ID": "win32-setctime@1.2.0",
+          "Name": "win32-setctime",
+          "Identifier": {
+            "PURL": "pkg:pypi/win32-setctime@1.2.0",
+            "UID": "8cd7957ae8f8938d"
+          },
+          "Version": "1.2.0",
+          "Indirect": true,
+          "Relationship": "indirect",
+          "AnalyzedBy": "uv"
+        }
+      ]
+    },
+    {
+      "Target": "wcc-frontend/package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm",
+      "Packages": [
+        {
+          "ID": "axios@1.20.0",
+          "Name": "axios",
+          "Identifier": {
+            "PURL": "pkg:npm/axios@1.20.0",
+            "UID": "d2cc9082ad91f3c9"
+          },
+          "Version": "1.20.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "follow-redirects@1.16.2",
+            "form-data@4.0.6",
+            "https-proxy-agent@5.0.1",
+            "proxy-from-env@2.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1468,
+              "EndLine": 1479
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3@7.9.0",
+          "Name": "d3",
+          "Identifier": {
+            "PURL": "pkg:npm/d3@7.9.0",
+            "UID": "b5945d0cceb8aa42"
+          },
+          "Version": "7.9.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "d3-array@3.2.4",
+            "d3-axis@3.0.0",
+            "d3-brush@3.0.0",
+            "d3-chord@3.0.1",
+            "d3-color@3.1.0",
+            "d3-contour@4.0.2",
+            "d3-delaunay@6.0.4",
+            "d3-dispatch@3.0.1",
+            "d3-drag@3.0.0",
+            "d3-dsv@3.0.1",
+            "d3-ease@3.0.1",
+            "d3-fetch@3.0.1",
+            "d3-force@3.0.0",
+            "d3-format@3.1.2",
+            "d3-geo@3.1.1",
+            "d3-hierarchy@3.1.2",
+            "d3-interpolate@3.0.1",
+            "d3-path@3.1.0",
+            "d3-polygon@3.0.1",
+            "d3-quadtree@3.0.1",
+            "d3-random@3.0.1",
+            "d3-scale-chromatic@3.1.0",
+            "d3-scale@4.0.2",
+            "d3-selection@3.0.0",
+            "d3-shape@3.2.0",
+            "d3-time-format@4.1.0",
+            "d3-time@3.1.0",
+            "d3-timer@3.0.1",
+            "d3-transition@3.0.1",
+            "d3-zoom@3.0.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1599,
+              "EndLine": 1637
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react@18.3.1",
+          "Name": "react",
+          "Identifier": {
+            "PURL": "pkg:npm/react@18.3.1",
+            "UID": "45ba2e7a5caa247f"
+          },
+          "Version": "18.3.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "loose-envify@1.4.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2413,
+              "EndLine": 2422
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react-dom@18.3.1",
+          "Name": "react-dom",
+          "Identifier": {
+            "PURL": "pkg:npm/react-dom@18.3.1",
+            "UID": "1f234830fa1ea0be"
+          },
+          "Version": "18.3.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "loose-envify@1.4.0",
+            "react@18.3.1",
+            "scheduler@0.23.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2423,
+              "EndLine": 2433
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react-router-dom@7.18.4",
+          "Name": "react-router-dom",
+          "Identifier": {
+            "PURL": "pkg:npm/react-router-dom@7.18.4",
+            "UID": "dba8fbe2d76c50ab"
+          },
+          "Version": "7.18.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "Relationship": "direct",
+          "DependsOn": [
+            "react-dom@18.3.1",
+            "react-router@7.18.4",
+            "react@18.3.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2464,
+              "EndLine": 2479
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "agent-base@6.0.2",
+          "Name": "agent-base",
+          "Identifier": {
+            "PURL": "pkg:npm/agent-base@6.0.2",
+            "UID": "a1f553e7310a004f"
+          },
+          "Version": "6.0.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "debug@4.4.3"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1454,
+              "EndLine": 1463
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "asynckit@0.4.0",
+          "Name": "asynckit",
+          "Identifier": {
+            "PURL": "pkg:npm/asynckit@0.4.0",
+            "UID": "13ad59fee5a2176f"
+          },
+          "Version": "0.4.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1464,
+              "EndLine": 1467
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "call-bind-apply-helpers@1.0.2",
+          "Name": "call-bind-apply-helpers",
+          "Identifier": {
+            "PURL": "pkg:npm/call-bind-apply-helpers@1.0.2",
+            "UID": "5c4b7a6ef11574d7"
+          },
+          "Version": "1.0.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "es-errors@1.3.0",
+            "function-bind@1.1.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1527,
+              "EndLine": 1537
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "combined-stream@1.0.8",
+          "Name": "combined-stream",
+          "Identifier": {
+            "PURL": "pkg:npm/combined-stream@1.0.8",
+            "UID": "30924a4651483b95"
+          },
+          "Version": "1.0.8",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "delayed-stream@1.0.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1559,
+              "EndLine": 1568
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "commander@7.2.0",
+          "Name": "commander",
+          "Identifier": {
+            "PURL": "pkg:npm/commander@7.2.0",
+            "UID": "d4ab845c93d8d566"
+          },
+          "Version": "7.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1569,
+              "EndLine": 1575
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "cookie@1.1.1",
+          "Name": "cookie",
+          "Identifier": {
+            "PURL": "pkg:npm/cookie@1.1.1",
+            "UID": "8488d121f1d94373"
+          },
+          "Version": "1.1.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1581,
+              "EndLine": 1593
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-array@3.2.4",
+          "Name": "d3-array",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-array@3.2.4",
+            "UID": "14fe8417ea3227af"
+          },
+          "Version": "3.2.4",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "internmap@2.0.3"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1638,
+              "EndLine": 1647
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-axis@3.0.0",
+          "Name": "d3-axis",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-axis@3.0.0",
+            "UID": "f4a3156cc7d3538"
+          },
+          "Version": "3.0.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1648,
+              "EndLine": 1654
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-brush@3.0.0",
+          "Name": "d3-brush",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-brush@3.0.0",
+            "UID": "2fdf83b774effcb3"
+          },
+          "Version": "3.0.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-dispatch@3.0.1",
+            "d3-drag@3.0.0",
+            "d3-interpolate@3.0.1",
+            "d3-selection@3.0.0",
+            "d3-transition@3.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1655,
+              "EndLine": 1668
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-chord@3.0.1",
+          "Name": "d3-chord",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-chord@3.0.1",
+            "UID": "bfa16635d5886290"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-path@3.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1669,
+              "EndLine": 1678
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-color@3.1.0",
+          "Name": "d3-color",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-color@3.1.0",
+            "UID": "eba18aaf91453955"
+          },
+          "Version": "3.1.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1679,
+              "EndLine": 1685
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-contour@4.0.2",
+          "Name": "d3-contour",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-contour@4.0.2",
+            "UID": "fcd59ac17fc47883"
+          },
+          "Version": "4.0.2",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-array@3.2.4"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1686,
+              "EndLine": 1695
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-delaunay@6.0.4",
+          "Name": "d3-delaunay",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-delaunay@6.0.4",
+            "UID": "d7bbc2361a6c5399"
+          },
+          "Version": "6.0.4",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "delaunator@5.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1696,
+              "EndLine": 1705
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-dispatch@3.0.1",
+          "Name": "d3-dispatch",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-dispatch@3.0.1",
+            "UID": "959a27d7cf843882"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1706,
+              "EndLine": 1712
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-drag@3.0.0",
+          "Name": "d3-drag",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-drag@3.0.0",
+            "UID": "18a420aea14371eb"
+          },
+          "Version": "3.0.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-dispatch@3.0.1",
+            "d3-selection@3.0.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1713,
+              "EndLine": 1723
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-dsv@3.0.1",
+          "Name": "d3-dsv",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-dsv@3.0.1",
+            "UID": "5af08df6c4915c6a"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "commander@7.2.0",
+            "iconv-lite@0.6.3",
+            "rw@1.3.3"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1724,
+              "EndLine": 1746
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-ease@3.0.1",
+          "Name": "d3-ease",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-ease@3.0.1",
+            "UID": "e760cbd9382fe990"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1747,
+              "EndLine": 1753
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-fetch@3.0.1",
+          "Name": "d3-fetch",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-fetch@3.0.1",
+            "UID": "fdb657885e227b13"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-dsv@3.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1754,
+              "EndLine": 1763
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-force@3.0.0",
+          "Name": "d3-force",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-force@3.0.0",
+            "UID": "b2b6aca7182ef1ba"
+          },
+          "Version": "3.0.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-dispatch@3.0.1",
+            "d3-quadtree@3.0.1",
+            "d3-timer@3.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1764,
+              "EndLine": 1775
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-format@3.1.2",
+          "Name": "d3-format",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-format@3.1.2",
+            "UID": "265d56c319113cce"
+          },
+          "Version": "3.1.2",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1776,
+              "EndLine": 1782
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-geo@3.1.1",
+          "Name": "d3-geo",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-geo@3.1.1",
+            "UID": "3a2f29d2ab332fe9"
+          },
+          "Version": "3.1.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-array@3.2.4"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1783,
+              "EndLine": 1792
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-hierarchy@3.1.2",
+          "Name": "d3-hierarchy",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-hierarchy@3.1.2",
+            "UID": "989ef57b1f8cf7d2"
+          },
+          "Version": "3.1.2",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1793,
+              "EndLine": 1799
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-interpolate@3.0.1",
+          "Name": "d3-interpolate",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-interpolate@3.0.1",
+            "UID": "51438892c54c0509"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-color@3.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1800,
+              "EndLine": 1809
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-path@3.1.0",
+          "Name": "d3-path",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-path@3.1.0",
+            "UID": "f9c521bc5b0975c9"
+          },
+          "Version": "3.1.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1810,
+              "EndLine": 1816
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-polygon@3.0.1",
+          "Name": "d3-polygon",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-polygon@3.0.1",
+            "UID": "5460631985a4a823"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1817,
+              "EndLine": 1823
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-quadtree@3.0.1",
+          "Name": "d3-quadtree",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-quadtree@3.0.1",
+            "UID": "c20cc19e2346ad76"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1824,
+              "EndLine": 1830
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-random@3.0.1",
+          "Name": "d3-random",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-random@3.0.1",
+            "UID": "d9197b498a570f68"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1831,
+              "EndLine": 1837
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-scale@4.0.2",
+          "Name": "d3-scale",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-scale@4.0.2",
+            "UID": "a910da930b43a579"
+          },
+          "Version": "4.0.2",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-array@3.2.4",
+            "d3-format@3.1.2",
+            "d3-interpolate@3.0.1",
+            "d3-time-format@4.1.0",
+            "d3-time@3.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1838,
+              "EndLine": 1851
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-scale-chromatic@3.1.0",
+          "Name": "d3-scale-chromatic",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-scale-chromatic@3.1.0",
+            "UID": "72b2d1c837843a35"
+          },
+          "Version": "3.1.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-color@3.1.0",
+            "d3-interpolate@3.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1852,
+              "EndLine": 1862
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-selection@3.0.0",
+          "Name": "d3-selection",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-selection@3.0.0",
+            "UID": "e4dc804eaa3e5f2f"
+          },
+          "Version": "3.0.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1863,
+              "EndLine": 1869
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-shape@3.2.0",
+          "Name": "d3-shape",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-shape@3.2.0",
+            "UID": "63604da186eee6c3"
+          },
+          "Version": "3.2.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-path@3.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1870,
+              "EndLine": 1879
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-time@3.1.0",
+          "Name": "d3-time",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-time@3.1.0",
+            "UID": "62ef1ea1c1ca6a59"
+          },
+          "Version": "3.1.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-array@3.2.4"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1880,
+              "EndLine": 1889
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-time-format@4.1.0",
+          "Name": "d3-time-format",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-time-format@4.1.0",
+            "UID": "68dbc1d1ce164bc5"
+          },
+          "Version": "4.1.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-time@3.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1890,
+              "EndLine": 1899
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-timer@3.0.1",
+          "Name": "d3-timer",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-timer@3.0.1",
+            "UID": "2207cf2edaee0f4a"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1900,
+              "EndLine": 1906
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-transition@3.0.1",
+          "Name": "d3-transition",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-transition@3.0.1",
+            "UID": "cbdb61f43b7dd446"
+          },
+          "Version": "3.0.1",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-color@3.1.0",
+            "d3-dispatch@3.0.1",
+            "d3-ease@3.0.1",
+            "d3-interpolate@3.0.1",
+            "d3-selection@3.0.0",
+            "d3-timer@3.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1907,
+              "EndLine": 1923
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "d3-zoom@3.0.0",
+          "Name": "d3-zoom",
+          "Identifier": {
+            "PURL": "pkg:npm/d3-zoom@3.0.0",
+            "UID": "786da34507290849"
+          },
+          "Version": "3.0.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "d3-dispatch@3.0.1",
+            "d3-drag@3.0.0",
+            "d3-interpolate@3.0.1",
+            "d3-selection@3.0.0",
+            "d3-transition@3.0.1"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1924,
+              "EndLine": 1937
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "debug@4.4.3",
+          "Name": "debug",
+          "Identifier": {
+            "PURL": "pkg:npm/debug@4.4.3",
+            "UID": "99277128140f89d"
+          },
+          "Version": "4.4.3",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "ms@2.1.3"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1938,
+              "EndLine": 1952
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "delaunator@5.1.0",
+          "Name": "delaunator",
+          "Identifier": {
+            "PURL": "pkg:npm/delaunator@5.1.0",
+            "UID": "588215f23f8b6be5"
+          },
+          "Version": "5.1.0",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "robust-predicates@3.0.3"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1953,
+              "EndLine": 1959
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "delayed-stream@1.0.0",
+          "Name": "delayed-stream",
+          "Identifier": {
+            "PURL": "pkg:npm/delayed-stream@1.0.0",
+            "UID": "d680f0e506170d82"
+          },
+          "Version": "1.0.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1960,
+              "EndLine": 1966
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "dunder-proto@1.0.1",
+          "Name": "dunder-proto",
+          "Identifier": {
+            "PURL": "pkg:npm/dunder-proto@1.0.1",
+            "UID": "bc3612062f67a72b"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "call-bind-apply-helpers@1.0.2",
+            "es-errors@1.3.0",
+            "gopd@1.2.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 1967,
+              "EndLine": 1978
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "es-define-property@1.0.1",
+          "Name": "es-define-property",
+          "Identifier": {
+            "PURL": "pkg:npm/es-define-property@1.0.1",
+            "UID": "36a5808340c08c15"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1986,
+              "EndLine": 1992
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "es-errors@1.3.0",
+          "Name": "es-errors",
+          "Identifier": {
+            "PURL": "pkg:npm/es-errors@1.3.0",
+            "UID": "616c3fae78a247c0"
+          },
+          "Version": "1.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 1993,
+              "EndLine": 1999
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "es-object-atoms@1.1.2",
+          "Name": "es-object-atoms",
+          "Identifier": {
+            "PURL": "pkg:npm/es-object-atoms@1.1.2",
+            "UID": "4dc98b946af0689"
+          },
+          "Version": "1.1.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "es-errors@1.3.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2000,
+              "EndLine": 2009
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "es-set-tostringtag@2.1.0",
+          "Name": "es-set-tostringtag",
+          "Identifier": {
+            "PURL": "pkg:npm/es-set-tostringtag@2.1.0",
+            "UID": "70d9038a7fb429e8"
+          },
+          "Version": "2.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "es-errors@1.3.0",
+            "get-intrinsic@1.3.0",
+            "has-tostringtag@1.0.2",
+            "hasown@2.0.4"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2010,
+              "EndLine": 2022
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "follow-redirects@1.16.2",
+          "Name": "follow-redirects",
+          "Identifier": {
+            "PURL": "pkg:npm/follow-redirects@1.16.2",
+            "UID": "f0df82049e5e1792"
+          },
+          "Version": "1.16.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2093,
+              "EndLine": 2112
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "form-data@4.0.6",
+          "Name": "form-data",
+          "Identifier": {
+            "PURL": "pkg:npm/form-data@4.0.6",
+            "UID": "6aabc2d44cbd5ec8"
+          },
+          "Version": "4.0.6",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "asynckit@0.4.0",
+            "combined-stream@1.0.8",
+            "es-set-tostringtag@2.1.0",
+            "hasown@2.0.4",
+            "mime-types@2.1.35"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2113,
+              "EndLine": 2126
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "function-bind@1.1.2",
+          "Name": "function-bind",
+          "Identifier": {
+            "PURL": "pkg:npm/function-bind@1.1.2",
+            "UID": "5c190e8eea7dc361"
+          },
+          "Version": "1.1.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2139,
+              "EndLine": 2145
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "get-intrinsic@1.3.0",
+          "Name": "get-intrinsic",
+          "Identifier": {
+            "PURL": "pkg:npm/get-intrinsic@1.3.0",
+            "UID": "422432a00367e649"
+          },
+          "Version": "1.3.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "call-bind-apply-helpers@1.0.2",
+            "es-define-property@1.0.1",
+            "es-errors@1.3.0",
+            "es-object-atoms@1.1.2",
+            "function-bind@1.1.2",
+            "get-proto@1.0.1",
+            "gopd@1.2.0",
+            "has-symbols@1.1.0",
+            "hasown@2.0.4",
+            "math-intrinsics@1.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2154,
+              "EndLine": 2175
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "get-proto@1.0.1",
+          "Name": "get-proto",
+          "Identifier": {
+            "PURL": "pkg:npm/get-proto@1.0.1",
+            "UID": "e66ce377365beda"
+          },
+          "Version": "1.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "dunder-proto@1.0.1",
+            "es-object-atoms@1.1.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2176,
+              "EndLine": 2186
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "gopd@1.2.0",
+          "Name": "gopd",
+          "Identifier": {
+            "PURL": "pkg:npm/gopd@1.2.0",
+            "UID": "da430a5cb115ed62"
+          },
+          "Version": "1.2.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2187,
+              "EndLine": 2196
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "has-symbols@1.1.0",
+          "Name": "has-symbols",
+          "Identifier": {
+            "PURL": "pkg:npm/has-symbols@1.1.0",
+            "UID": "ef3a1f886f97cedc"
+          },
+          "Version": "1.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2197,
+              "EndLine": 2206
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "has-tostringtag@1.0.2",
+          "Name": "has-tostringtag",
+          "Identifier": {
+            "PURL": "pkg:npm/has-tostringtag@1.0.2",
+            "UID": "fc7503e9ccef1c3d"
+          },
+          "Version": "1.0.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "has-symbols@1.1.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2207,
+              "EndLine": 2219
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "hasown@2.0.4",
+          "Name": "hasown",
+          "Identifier": {
+            "PURL": "pkg:npm/hasown@2.0.4",
+            "UID": "549feeee6b32335c"
+          },
+          "Version": "2.0.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "function-bind@1.1.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2220,
+              "EndLine": 2229
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "https-proxy-agent@5.0.1",
+          "Name": "https-proxy-agent",
+          "Identifier": {
+            "PURL": "pkg:npm/https-proxy-agent@5.0.1",
+            "UID": "e0228909d2b8fd78"
+          },
+          "Version": "5.0.1",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "agent-base@6.0.2",
+            "debug@4.4.3"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2230,
+              "EndLine": 2240
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "iconv-lite@0.6.3",
+          "Name": "iconv-lite",
+          "Identifier": {
+            "PURL": "pkg:npm/iconv-lite@0.6.3",
+            "UID": "2a21e2d9ff69f144"
+          },
+          "Version": "0.6.3",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "safer-buffer@2.1.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2241,
+              "EndLine": 2250
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "internmap@2.0.3",
+          "Name": "internmap",
+          "Identifier": {
+            "PURL": "pkg:npm/internmap@2.0.3",
+            "UID": "e64a37be2c4429f1"
+          },
+          "Version": "2.0.3",
+          "Licenses": [
+            "ISC"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2251,
+              "EndLine": 2257
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "js-tokens@4.0.0",
+          "Name": "js-tokens",
+          "Identifier": {
+            "PURL": "pkg:npm/js-tokens@4.0.0",
+            "UID": "83eea0bbe27b227"
+          },
+          "Version": "4.0.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2258,
+              "EndLine": 2261
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "loose-envify@1.4.0",
+          "Name": "loose-envify",
+          "Identifier": {
+            "PURL": "pkg:npm/loose-envify@1.4.0",
+            "UID": "cae974beb0e30806"
+          },
+          "Version": "1.4.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "js-tokens@4.0.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2284,
+              "EndLine": 2293
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "math-intrinsics@1.1.0",
+          "Name": "math-intrinsics",
+          "Identifier": {
+            "PURL": "pkg:npm/math-intrinsics@1.1.0",
+            "UID": "9d6403969d9882ad"
+          },
+          "Version": "1.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2302,
+              "EndLine": 2308
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "mime-db@1.52.0",
+          "Name": "mime-db",
+          "Identifier": {
+            "PURL": "pkg:npm/mime-db@1.52.0",
+            "UID": "1164e0092e67c11"
+          },
+          "Version": "1.52.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2309,
+              "EndLine": 2315
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "mime-types@2.1.35",
+          "Name": "mime-types",
+          "Identifier": {
+            "PURL": "pkg:npm/mime-types@2.1.35",
+            "UID": "617eb2fce2cbc3a6"
+          },
+          "Version": "2.1.35",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "mime-db@1.52.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2316,
+              "EndLine": 2325
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "ms@2.1.3",
+          "Name": "ms",
+          "Identifier": {
+            "PURL": "pkg:npm/ms@2.1.3",
+            "UID": "ed209362eac49e28"
+          },
+          "Version": "2.1.3",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2326,
+              "EndLine": 2329
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "proxy-from-env@2.1.0",
+          "Name": "proxy-from-env",
+          "Identifier": {
+            "PURL": "pkg:npm/proxy-from-env@2.1.0",
+            "UID": "9fb6b0242b1994a4"
+          },
+          "Version": "2.1.0",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2406,
+              "EndLine": 2412
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "react-router@7.18.4",
+          "Name": "react-router",
+          "Identifier": {
+            "PURL": "pkg:npm/react-router@7.18.4",
+            "UID": "a648b6470a2be582"
+          },
+          "Version": "7.18.4",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "cookie@1.1.1",
+            "react-dom@18.3.1",
+            "react@18.3.1",
+            "set-cookie-parser@2.7.2"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2442,
+              "EndLine": 2463
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "robust-predicates@3.0.3",
+          "Name": "robust-predicates",
+          "Identifier": {
+            "PURL": "pkg:npm/robust-predicates@3.0.3",
+            "UID": "47676c83a71bcee"
+          },
+          "Version": "3.0.3",
+          "Licenses": [
+            "Unlicense"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2480,
+              "EndLine": 2483
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "rw@1.3.3",
+          "Name": "rw",
+          "Identifier": {
+            "PURL": "pkg:npm/rw@1.3.3",
+            "UID": "8af44843f3688646"
+          },
+          "Version": "1.3.3",
+          "Licenses": [
+            "BSD-3-Clause"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2527,
+              "EndLine": 2530
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "safer-buffer@2.1.2",
+          "Name": "safer-buffer",
+          "Identifier": {
+            "PURL": "pkg:npm/safer-buffer@2.1.2",
+            "UID": "19b4df335a135e18"
+          },
+          "Version": "2.1.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2531,
+              "EndLine": 2534
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "scheduler@0.23.2",
+          "Name": "scheduler",
+          "Identifier": {
+            "PURL": "pkg:npm/scheduler@0.23.2",
+            "UID": "df93813627a722b1"
+          },
+          "Version": "0.23.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "DependsOn": [
+            "loose-envify@1.4.0"
+          ],
+          "Locations": [
+            {
+              "StartLine": 2535,
+              "EndLine": 2541
+            }
+          ],
+          "AnalyzedBy": "npm"
+        },
+        {
+          "ID": "set-cookie-parser@2.7.2",
+          "Name": "set-cookie-parser",
+          "Identifier": {
+            "PURL": "pkg:npm/set-cookie-parser@2.7.2",
+            "UID": "6fcdf5810b8b41c3"
+          },
+          "Version": "2.7.2",
+          "Licenses": [
+            "MIT"
+          ],
+          "Indirect": true,
+          "Relationship": "indirect",
+          "Locations": [
+            {
+              "StartLine": 2550,
+              "EndLine": 2555
+            }
+          ],
+          "AnalyzedBy": "npm"
+        }
+      ]
+    },
+    {
+      "Target": "Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    },
+    {
+      "Target": "deploy/postgres/Dockerfile",
+      "Class": "config",
+      "Type": "dockerfile",
+      "MisconfSummary": {
+        "Successes": 27,
+        "Failures": 0
+      }
+    }
+  ]
+}
