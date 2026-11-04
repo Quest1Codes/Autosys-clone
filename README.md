@@ -195,7 +195,7 @@ autosys-clone/
 │   │
 │   ├── app_server/                  # FastAPI REST API (SSA)
 │   │   ├── main.py                  # FastAPI app factory + lifespan
-│   │   ├── auth.py                  # JWT middleware
+│   │   ├── auth.py                  # Cognito OIDC sign-in + session/M2M tokens
 │   │   ├── broadcaster.py           # WebSocket status broadcast
 │   │   ├── schemas.py               # Pydantic request/response schemas
 │   │   └── routers/
@@ -279,7 +279,10 @@ default secret (see [Configuration Reference](#configuration-reference)):
 ```bash
 # Terminal 1 — set real auth, then start the scheduler + REST API server
 export AUTOSYS_JWT_SECRET="$(python -c 'import secrets; print(secrets.token_hex(32))')"
-export AUTOSYS_USERS='{"admin":{"password":"change-me","role":"admin"}}'
+export AUTOSYS_OIDC_REGION=us-east-1
+export AUTOSYS_OIDC_USER_POOL_ID=us-east-1_XXXXXXXXX    # the same pool Shinro signs into
+export AUTOSYS_OIDC_CLIENT_ID=your_wcc_app_client_id    # this console's own app client
+export AUTOSYS_PUBLIC_URL=http://localhost:8000
 autosys scheduler serve --port 8000 --host 127.0.0.1
 #   → API at http://localhost:8000
 #   → Docs at http://localhost:8000/docs
@@ -405,22 +408,23 @@ docker build --target runtime --build-arg DRY_RUN_ONLY=true -t autosys-clone:dry
 
 ```bash
 cp .env.example .env
-# Edit .env: set AUTOSYS_JWT_SECRET to a real secret, and AUTOSYS_USERS to at
-# least one account. See .env.example's own comments for the exact format.
+# Edit .env: set AUTOSYS_JWT_SECRET to a real secret, and the AUTOSYS_OIDC_*/
+# AUTOSYS_PUBLIC_URL settings to the Cognito pool Shinro itself signs into.
+# See .env.example's own comments for the exact format.
 
 docker compose build
 docker compose up -d
-#   → WCC dashboard: http://localhost:8080  (log in with a user from AUTOSYS_USERS)
+#   → WCC dashboard: http://localhost:8080  (sign in through Cognito)
 #   → REST API:      http://localhost:9000
 ```
 
-Three variants exist:
+Two variants exist:
 - `docker-compose.yml` — builds from this source tree. Use this for local dev.
 - `docker-compose.dist.yml` — pulls a pre-built image from the registry (`docker compose -f docker-compose.dist.yml pull && up -d`). No source tree needed.
-- `docker-compose.offline.yml` — same, but from a `docker load`-ed tarball, no registry needed.
 
-All three need the same `.env` (`AUTOSYS_JWT_SECRET`, `AUTOSYS_USERS`) — the
-`api` container refuses to start without it, regardless of which file you use.
+Both need the same `.env` (`AUTOSYS_JWT_SECRET` plus the `AUTOSYS_OIDC_*`/
+`AUTOSYS_PUBLIC_URL` settings) — the `api` container refuses to start
+without them, regardless of which file you use.
 
 A fourth file, `docker-compose.shinro.yml`, is an optional override (not a
 standalone variant) — layer it on top of `docker-compose.yml` to join
@@ -1419,14 +1423,19 @@ The event processor publishes a `{job_name, old_status, new_status, ts}`
 message every time a job status changes. The WCC dashboard subscribes to this
 feed for live updates.
 
-#### JWT authentication (`autosys/app_server/auth.py`)
+#### Authentication (`autosys/app_server/auth.py`)
 
-Real AutoSys uses CA EEM (Embedded Entitlements Manager) for auth. We
-implement a simplified JWT-based scheme:
+Real AutoSys uses CA EEM (Embedded Entitlements Manager) for auth. People
+sign in through the same Cognito pool Shinro itself uses:
 
-- `POST /api/auth/login` with `{username, password}` → returns `{access_token, expires_in}`
-- All other endpoints require `Authorization: Bearer <token>`
-- Roles: `viewer` (GET only), `operator` (can enqueue events), `admin` (everything)
+- `GET /api/v1/auth/login` starts the Cognito round trip; `GET /api/v1/auth/callback`
+  finishes it and sets an HttpOnly session cookie
+- All other human-facing endpoints read that session cookie
+- Shinro's worker instead presents a Cognito client-credentials access token
+  as `Authorization: Bearer <token>`
+- Roles come from Cognito groups (`simulator-viewer`/`simulator-operator`/`simulator-admin`),
+  mapped to `viewer` (GET only), `operator` (can enqueue events, import JIL/history),
+  `admin` (everything, including clearing the estate)
 
 #### `autosys scheduler start` CLI
 
@@ -1929,9 +1938,15 @@ All configuration is via environment variables (12-factor app style).
 | `AUTOSYS_POLL_INTERVAL` | `1.0` | EPS tick interval in seconds |
 | `AUTOSYS_AUTH_ENABLED` | `true` | Real auth is on by default. `autosys scheduler serve` refuses to start with it off — see [Quick Start](#quick-start) |
 | `WCC_CORS_ORIGINS` | *(unset)* | Comma-separated origins allowed to call the WCC API cross-origin. Unset means no CORS at all, which is correct for every layout this repo ships (nginx or the Vite dev proxy keep the browser same-origin). |
-| `AUTOSYS_JWT_SECRET` | — (required) | Secret key for JWT signing (Phase 8). Must be set, and must not be the well-known placeholder value `dev-secret-change-in-production` — `serve` checks for and rejects that exact string |
-| `AUTOSYS_USERS` | — (required) | JSON map of `username -> {password, role}`, role is `viewer`/`operator`/`admin`. No accounts are baked in; `serve` refuses to start with none configured. Example: `{"admin":{"password":"...","role":"admin"}}` |
-| `AUTOSYS_JWT_TTL` | `3600` | JWT expiry in seconds |
+| `AUTOSYS_JWT_SECRET` | — (required) | Secret key signing this app's own session and OIDC-state cookies. Must be set, and must not be the well-known placeholder value `dev-secret-change-in-production` — `serve` checks for and rejects that exact string. Never shared with another service. |
+| `AUTOSYS_OIDC_REGION` | — (required) | Region of the Cognito user pool people sign into -- the SAME pool Shinro itself uses, for single sign-on. |
+| `AUTOSYS_OIDC_USER_POOL_ID` | — (required) | That pool's ID. |
+| `AUTOSYS_OIDC_DOMAIN` | *(derived)* | That pool's hosted-UI domain. Derived from the region/pool ID if left unset. |
+| `AUTOSYS_OIDC_CLIENT_ID` | — (required) | This console's own app client in that pool (public, no secret) -- separate from Shinro's own client. |
+| `AUTOSYS_PUBLIC_URL` | — (required) | This console's own externally-reachable origin. Builds the Cognito redirect/logout URLs and rejects cross-origin requests. |
+| `AUTOSYS_M2M_CLIENT_IDS` | — | Comma-separated Cognito app client ID(s) trusted for the machine-to-machine (client-credentials) grant -- Shinro's worker. |
+| `AUTOSYS_M2M_SCOPE` | `autosys-simulator/read` | The scope a machine caller's token must carry. |
+| `AUTOSYS_JWT_TTL` | `3600` | Session cookie lifetime in seconds |
 | `NSM_WEBHOOK_URL` | — | NSM webhook endpoint for alarms (Phase 10) |
 | `SLACK_WEBHOOK_URL` | — | Slack incoming webhook URL (Phase 10) |
 | `PD_ROUTING_KEY` | — | PagerDuty Events API routing key (Phase 10) |

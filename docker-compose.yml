@@ -9,8 +9,6 @@
 # Other ways to run this project with Docker:
 #   docker-compose.dist.yml     — same 3-container layout, pulls prebuilt
 #                                  images from GHCR instead of building.
-#   docker-compose.offline.yml  — same layout again, from `docker load`-ed
-#                                  local images (no registry/source needed).
 #   `docker run <image>` (no command, no compose file at all) — the single
 #                                  all-in-one container built from the
 #                                  `runtime` Dockerfile stage; see
@@ -62,20 +60,25 @@ services:
       - autosys-data:/app/data
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
-      # No working default for either of these two -- `autosys scheduler serve`
+      # No working default for the secret -- `autosys scheduler serve`
       # (startup_check_errors() in app_server/auth.py) refuses to start
-      # without a real secret and at least one user. The JWT secret default
-      # below must stay exactly in sync with auth.py's _INSECURE_DEFAULT_SECRET
-      # constant -- that's the literal string the startup check rejects; any
-      # other placeholder string would silently pass as "real". AUTOSYS_USERS
-      # has no default at all on purpose (not even an obviously-fake one):
-      # startup_check_errors() only checks it's non-empty, not that it's
-      # non-default, so a baked-in admin/admin-style map here would actually
-      # boot successfully instead of being rejected. Put real values in a
-      # `.env` file next to this compose file; see .env.example.
+      # without a real one, plus every AUTOSYS_OIDC_*/AUTOSYS_PUBLIC_URL
+      # setting below: this server verifies sign-ins against Cognito, not a
+      # local account list, so it has nothing to check anyone against
+      # without them. The JWT secret default below must stay exactly in
+      # sync with auth.py's _INSECURE_DEFAULT_SECRET constant -- that's the
+      # literal string the startup check rejects; any other placeholder
+      # string would silently pass as "real". Put real values in a `.env`
+      # file next to this compose file; see .env.example.
       AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
-      AUTOSYS_USERS: ${AUTOSYS_USERS:-}
+      AUTOSYS_OIDC_REGION: ${AUTOSYS_OIDC_REGION:-}
+      AUTOSYS_OIDC_USER_POOL_ID: ${AUTOSYS_OIDC_USER_POOL_ID:-}
+      AUTOSYS_OIDC_DOMAIN: ${AUTOSYS_OIDC_DOMAIN:-}
+      AUTOSYS_OIDC_CLIENT_ID: ${AUTOSYS_OIDC_CLIENT_ID:-}
+      AUTOSYS_PUBLIC_URL: ${AUTOSYS_PUBLIC_URL:-http://localhost:8080}
+      AUTOSYS_M2M_CLIENT_IDS: ${AUTOSYS_M2M_CLIENT_IDS:-}
+      AUTOSYS_M2M_SCOPE: ${AUTOSYS_M2M_SCOPE:-autosys-simulator/read}
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,25 +95,31 @@ services:
     environment:
       AUTOSYS_DB_URL: postgresql://${AUTOSYS_DB_USER:-autosys}:${AUTOSYS_DB_PASSWORD:-autosys}@postgres:5432/${AUTOSYS_DB_NAME:-autosys}
       # Must be the SAME secret as api's, below -- this service verifies the
-      # exact JWT /api/v1/auth/token (served by api) mints, via the same
+      # exact session cookie api's OIDC callback mints, via the same
       # auth.py module (autosys/wcc/app.py's _REQUIRE_LOGIN). Left out
       # before, this service booted anyway (now it won't -- see
       # cli/scheduler_cmd.py's scheduler_wcc) with no secret configured at
-      # all, so every real token failed verification here: every
+      # all, so every real session failed verification here: every
       # /api/wcc/* and /api/sse/* call 401'd, which is what made the job
       # grid show "No jobs found" / DISCONNECTED regardless of how much JIL
       # or run history had actually been imported through api.
       AUTOSYS_JWT_SECRET: ${AUTOSYS_JWT_SECRET:-dev-secret-change-in-production}
       AUTOSYS_AUTH_ENABLED: ${AUTOSYS_AUTH_ENABLED:-true}
-      # startup_check_errors() (auth.py) requires this set too, not just the
-      # secret -- even though wcc only ever verifies an already-issued JWT
-      # and never authenticates a username/password itself (that's api's
-      # /api/v1/auth/token alone). Narrowing the check to skip AUTOSYS_USERS
-      # for a verify-only service would be more precise, but duplicating
-      # api's exact config here is simpler to reason about and costs nothing
-      # -- both read the same ${AUTOSYS_USERS} value, so there is nothing to
-      # keep in sync.
-      AUTOSYS_USERS: ${AUTOSYS_USERS:-}
+      # startup_check_errors() (auth.py) requires these set too -- even
+      # though wcc never runs the OIDC login routes itself (those are api's
+      # alone), it verifies the same Cognito-issued M2M bearer tokens
+      # (region/pool/M2M settings) and needs AUTOSYS_PUBLIC_URL for the
+      # same-origin check on cookie-authenticated requests. Duplicating
+      # api's exact config here is simpler to reason about and costs
+      # nothing -- both read the same values, so there is nothing to keep
+      # in sync.
+      AUTOSYS_OIDC_REGION: ${AUTOSYS_OIDC_REGION:-}
+      AUTOSYS_OIDC_USER_POOL_ID: ${AUTOSYS_OIDC_USER_POOL_ID:-}
+      AUTOSYS_OIDC_DOMAIN: ${AUTOSYS_OIDC_DOMAIN:-}
+      AUTOSYS_OIDC_CLIENT_ID: ${AUTOSYS_OIDC_CLIENT_ID:-}
+      AUTOSYS_PUBLIC_URL: ${AUTOSYS_PUBLIC_URL:-http://localhost:8080}
+      AUTOSYS_M2M_CLIENT_IDS: ${AUTOSYS_M2M_CLIENT_IDS:-}
+      AUTOSYS_M2M_SCOPE: ${AUTOSYS_M2M_SCOPE:-autosys-simulator/read}
     depends_on:
       postgres:
         condition: service_healthy
