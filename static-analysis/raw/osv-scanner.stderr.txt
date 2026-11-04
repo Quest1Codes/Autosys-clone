@@ -1,0 +1,5 @@
+Scanning dir .
+Starting filesystem walk for root: /
+Scanned /Users/Raghav/Quest1/autosys-astronomer/Autosys-2.0/Autosys-clone/uv.lock file and found 56 packages
+Scanned /Users/Raghav/Quest1/autosys-astronomer/Autosys-2.0/Autosys-clone/wcc-frontend/package-lock.json file and found 219 packages
+End status: 353 dirs visited, 1987 inodes visited, 2 Extract calls, 133.271458ms elapsed, 133.272ms wall time
