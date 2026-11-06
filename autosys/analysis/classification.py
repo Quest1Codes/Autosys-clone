@@ -65,6 +65,17 @@ _RULES_PATH = Path(__file__).parent / "data" / "classification_rules.json"
 # `source` are shell builtins that load another script into the current
 # shell; the loaded script's effect, not the builtin itself, is evidence.
 _SHELL_WRAPPERS = frozenset({".", "source", "env", "sudo", "su", "nohup", "exec", "time", "command"})
+# Flags that take a separate value token, keyed by wrapper -- found missing
+# while testing this fix: "sudo -u svc cmd" resolved to "svc" (the flag's
+# value), because a flag-skipping loop that only checks "does this token
+# itself start with '-'" has no way to know "-u" consumes the *next* token
+# too. Only the common, well-known cases are covered; an unlisted flag that
+# happens to take a value would still resolve wrong -- a documented gap,
+# not a silent guess either way.
+_WRAPPER_VALUE_FLAGS: dict[str, frozenset[str]] = {
+    "sudo": frozenset({"-u", "-g", "-r", "-t", "-h", "-p"}),
+}
+_SU_DASH_C = re.compile(r"""^\s*su\b.*?-c\s+(['"])(.*)\1\s*$""")
 
 
 def _basename(tok: str) -> str:
@@ -82,6 +93,12 @@ def executable(command: str | None) -> str:
     text = (command or "").strip()
     if not text:
         return ""
+    # "su ... -c 'quoted command' [user]": the real work is inside the
+    # quotes, not whatever comes after unwrapping flag-by-flag (which
+    # would land on a quoted string with spaces in it, not one token).
+    su_c = _SU_DASH_C.match(text)
+    if su_c:
+        text = su_c.group(2).strip()
     # A heredoc body (`<<EOF ... EOF`) can itself contain ';'/'&&' with no
     # relation to shell statement boundaries (found while testing this fix
     # against "direct -s <<EOF submit file=/x; EOF" -- splitting on that
@@ -106,9 +123,13 @@ def executable(command: str | None) -> str:
         # Skip the wrapper and any flags (-u svc, -E, ...) up to the next
         # non-flag token, which is either the real executable or another
         # wrapper (sudo env /app/bin/x keeps unwrapping).
+        value_flags = _WRAPPER_VALUE_FLAGS.get(base, frozenset())
         i += 1
         while i < len(toks) and toks[i].startswith("-"):
+            took_value_flag = toks[i] in value_flags
             i += 1
+            if took_value_flag and i < len(toks):
+                i += 1  # also skip this flag's own value token (e.g. "-u" then "svc")
     return ""
 
 

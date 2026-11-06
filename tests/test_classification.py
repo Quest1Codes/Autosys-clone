@@ -97,6 +97,18 @@ class TestExecutable:
         assert executable(None) == ""
         assert executable("") == ""
 
+    def test_sudo_dash_u_value_is_skipped_not_returned(self):
+        # Found while building T17 (size_model.py): the flag-skipping loop
+        # only checked "does this token start with '-'", so "-u svc" left
+        # "svc" (the flag's value) as the next token, and that's what got
+        # returned instead of the real executable.
+        assert executable("sudo -u svc /app/bin/x.sh") == "x.sh"
+        assert executable("sudo -u svc -g grp /app/bin/x.sh") == "x.sh"
+
+    def test_su_dash_c_quoted_command(self):
+        assert executable("su - svcuser -c '/app/bin/run.sh arg'") == "run.sh"
+        assert executable('su -c "/app/bin/run.sh" svcuser') == "run.sh"
+
 
 class TestScopeFix:
     """9 any-scope tokens misclassified a plain command whose destination
