@@ -1,0 +1,28 @@
+{
+ "oss": [
+  {"id":"metadata_db","reusable":true},
+  {"id":"executor_workers","reusable":true},
+  {"id":"dag_delivery","reusable":true},
+  {"id":"log_storage","reusable":true},
+  {"id":"secrets_backend","reusable":true},
+  {"id":"auth_roles","reusable":true},
+  {"id":"environments_ci","reusable":true},
+  {"id":"monitoring","reusable":true},
+  {"id":"upgrade_patch_process","reusable":true},
+  {"id":"backup_recovery","reusable":true},
+  {"id":"hosting_build","when":"new_host"},
+  {"id":"network_paths","when":"network"},
+  {"id":"windows_path","when":"windows"}
+ ],
+ "astro": [
+  {"id":"deployments_environments","reusable":true},
+  {"id":"environments_ci","reusable":true},
+  {"id":"auth_roles","reusable":true},
+  {"id":"secrets_backend","reusable":true},
+  {"id":"monitoring","reusable":true},
+  {"id":"runtime_upgrade_process","reusable":true},
+  {"id":"network_paths","when":"network"},
+  {"id":"remote_execution","when":"remote_execution"},
+  {"id":"windows_path","when":"windows"}
+ ]
+}
