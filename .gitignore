@@ -138,6 +138,10 @@ commands.md
 plan.md
 IMPROVEMENTS.md
 
+# Sample JIL files used for local testing and research (never commit real or
+# real-shaped estate data)
+jil_samples/
+
 # ---------------------------------------------------------------------------
 # Binary assets (kept locally, not in git)
 # ---------------------------------------------------------------------------
