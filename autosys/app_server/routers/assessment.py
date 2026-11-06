@@ -109,10 +109,14 @@ def _assess(
     # observations with FailureInjector fiction would be worse than reporting
     # NO_DATA, and would make risk_source flip from observed to simulated as
     # a client sends *more* data, which is backwards.
+    # Dict built once: the `next(r for r in rows if ...)` this replaced rescanned
+    # all of `rows` per name, making this whole comprehension O(n^2) in job count
+    # (108s at 29,988 jobs; measured during the task13 assessment-report research).
+    job_type_by_name = {r.job_name: r.job_type for r in rows}
     uncovered = [
         name for name in job_names
         if name not in observed
-        and (next(r for r in rows if r.job_name == name).job_type or "").upper() != "BOX"
+        and (job_type_by_name[name] or "").upper() != "BOX"
     ]
 
     sim_stats: dict = {}

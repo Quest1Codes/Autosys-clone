@@ -81,6 +81,26 @@ def _seed_fanout_box(session, box_name="fan_box"):
         job_repo.upsert(session, c)
 
 
+def _seed_flat_jobs(session, count: int):
+    """`count` independent, unobserved CMD jobs with no box, no dependencies.
+
+    Built as JobRow objects directly rather than through job_repo.upsert
+    (one SELECT-by-PK per call) so seeding this many rows for a performance
+    test doesn't itself dominate the wall-clock time being measured.
+    """
+    from autosys.db.repository import _job_to_row_kwargs
+    from autosys.db.schema import JobRow
+    from autosys.models.job import parse_job
+
+    rows = [
+        JobRow(**_job_to_row_kwargs(parse_job({
+            "job_name": f"flat_{i}", "job_type": "CMD", "command": "echo hi", "machine": "m1",
+        })))
+        for i in range(count)
+    ]
+    session.add_all(rows)
+
+
 def _seed_chain_box(session, box_name: str, depth: int):
     """box -> d1 -> d2 -> ... -> d{depth}, a strictly sequential chain."""
     from autosys.db.repository import jobs as job_repo
@@ -713,6 +733,53 @@ class TestAssessmentReportAPI:
         assert r.status_code == 200
         names = {j["job_name"] for j in r.json()["jobs"]}
         assert names == {"seq_box", "a", "b", "c"}
+
+    def test_report_box_jobs_never_force_simulation(self, ssa_client, isolated_db):
+        """A BOX job never has run rows of its own (`_assess`'s `uncovered`
+        filter excludes it), so a file with only a BOX and fully-observed
+        children needs no simulation. This is the behaviour the job-type
+        lookup fix (replacing a per-name linear scan of `rows`) must
+        preserve exactly."""
+        from autosys.db.connection import sync_session
+        from autosys.models.enums import JobStatus
+
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            for name in ("a", "b", "c"):
+                _seed_run(session, name, JobStatus.SUCCESS.value)
+            session.commit()
+
+        r = ssa_client.get("/api/v1/assessment/report", params={"simulate": "true"})
+        assert r.status_code == 200
+        assert r.json()["simulation"]["status"] == "not_needed"
+
+    def test_assess_uncovered_lookup_is_not_quadratic(self, ssa_client, isolated_db):
+        """Regression for the `next(r for r in rows if r.job_name == name)`
+        scan that made `_assess`'s uncovered-jobs filter O(n^2) in job count
+        (measured: 107.7s at 29,988 jobs; 5.2s after replacing it with a
+        dict lookup -- see task13 assessment-report research, evidence
+        `prompt13_checks.out.txt`). `simulate=false` isolates this line:
+        the list comprehension at assessment.py still runs unconditionally,
+        only the simulation machinery after it is skipped.
+
+        10,000 unobserved jobs extrapolates to ~12s under the old scan
+        (scaling the 29,988-job/107.7s measurement by n^2); this asserts
+        an order of magnitude under that, loose enough not to flake on a
+        slow CI box but tight enough to catch a quadratic regression."""
+        import time
+        from autosys.db.connection import sync_session
+
+        with sync_session() as session:
+            _seed_flat_jobs(session, 10_000)
+            session.commit()
+
+        t0 = time.monotonic()
+        r = ssa_client.get("/api/v1/assessment/report", params={"simulate": "false"})
+        elapsed = time.monotonic() - t0
+
+        assert r.status_code == 200
+        assert r.json()["job_count"] == 10_000
+        assert elapsed < 5.0, f"report took {elapsed:.1f}s for 10,000 jobs -- the O(n^2) scan may be back"
 
     def test_report_includes_risk_and_gap_fields(self, ssa_client, isolated_db):
         from autosys.db.connection import sync_session
