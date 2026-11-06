@@ -153,3 +153,12 @@ data/
 
 # Vulnerability scan raw output (findings.json + dashboard.html are kept)
 reports/vuln/raw/
+
+# The bare "data/" rule above (also duplicated at line 52; both are meant
+# for the live database directory at the repo root) matches a directory
+# named "data" at ANY depth, which silently swallowed
+# autosys/analysis/data/classification_rules.json -- a real committed rule
+# table, not runtime data. `git check-ignore -v` is how this was found:
+# it doesn't say "no match", it just never shows up in `git status` at all.
+!autosys/analysis/data/
+!autosys/analysis/data/*
