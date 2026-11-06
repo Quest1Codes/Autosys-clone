@@ -144,7 +144,13 @@ _CRED_FLAG_EXES = frozenset({
     "curl", "ascp", "winscp.com", "pmcmd", "dsjob", "psae", "db2",
 })
 _FLAGPASS = re.compile(r"(?i)(?<![\w-])-(-?p(?:ass(?:word)?)?|w|pw|CP)\s*=?\s*\S+")
-_USERPASS_PAIR = re.compile(r"(?i)\b-u\s+\S*:[^@\s,]+\S*")
+# R8 (05-vishy-decisions.md): ported as `\b-u`, which never matches --
+# "-" is not a word character, so \b cannot hold between a space and a
+# "-" (neither side is \w). The negative lookbehind _FLAGPASS already uses
+# for the same class of flag is the fix: "not preceded by a word char or
+# another -", which correctly allows a flag straight after whitespace or
+# string start.
+_USERPASS_PAIR = re.compile(r"(?i)(?<![\w-])-u\s+\S*:[^@\s,]+\S*")
 _DBCONN = re.compile(
     r"(?i)\b(sqlplus|expdp|impdp|exp|imp|mysql|psql|sqlcmd|bcp|osql|isql|bteq|"
     r"vsql|nzsql|snowsql|dbaccess|beeline|impala-shell|auto_ps7|concsub|fndload|psae)"

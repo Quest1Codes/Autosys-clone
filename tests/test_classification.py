@@ -179,6 +179,19 @@ class TestCredentialSafety:
         redacted, _ = redact_and_flag("sshpass -p hunter2zz ssh user@host")
         assert "hunter2zz" not in redacted
 
+    def test_curl_dash_u_is_flagged(self):
+        # R8 (05-vishy-decisions.md): ported as `\b-u`, which can never
+        # match ("-" is not a word character, so no word boundary exists
+        # between a preceding space and it). Fixed with the same negative
+        # lookbehind _FLAGPASS already uses for this exact problem.
+        redacted, flags = redact_and_flag("curl -u svc:hunter2zz https://api/x", exe="curl")
+        assert "hunter2zz" not in redacted
+        assert "inline_userpass_flag" in flags
+
+    def test_dash_u_with_no_colon_is_not_a_false_flag(self):
+        _, flags = redact_and_flag("/opt/app/run.sh -u myuser other_arg", exe="run.sh")
+        assert "inline_userpass_flag" not in flags
+
 
 class TestSyntheticConformance:
     """119 hand-written jobs, one or more per class (§6.4 of the design
