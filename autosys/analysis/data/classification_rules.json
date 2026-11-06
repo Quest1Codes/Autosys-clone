@@ -1,0 +1,1818 @@
+{
+  "rule_set": {
+    "name": "autosys-integration-classes",
+    "version": "0.1.1",
+    "date": "2026-11-06",
+    "provenance": "Vendor documentation + the 4427-job public sample; no customer data",
+    "notes": "Prototype for the assessment report classifier. One primary class per job, traits are orthogonal flags. No rule names a customer, host or job. v0.1.1: 6 ambiguous any-scope tokens split to exe-scoped sibling rules (jil, chase, forecast, oc, helm, bq, cmd, sh, isql) after finding they misclassify a plain command whose destination argument happens to share the name, while building T15. Long/distinctive vendor binary names (mysqldump, spark-submit, etc.) were checked and left at any scope: coincidental collision with those is not a realistic risk the way it is for a short word."
+  },
+  "classes": {
+    "box": {
+      "label": "Box container",
+      "kind": "structural"
+    },
+    "file_watch": {
+      "label": "File watch / trigger",
+      "kind": "native"
+    },
+    "file_trigger": {
+      "label": "File trigger (FT job type, distinct from file watcher and FTP)",
+      "kind": "native"
+    },
+    "file_transfer_native": {
+      "label": "Native FTP/SCP job",
+      "kind": "native"
+    },
+    "erp_native_sap": {
+      "label": "Native SAP job types",
+      "kind": "native"
+    },
+    "erp_native_peoplesoft": {
+      "label": "Native PeopleSoft job type",
+      "kind": "native"
+    },
+    "erp_native_oracle_ebs": {
+      "label": "Native Oracle EBS job types",
+      "kind": "native"
+    },
+    "informatica_native": {
+      "label": "Native Informatica job type",
+      "kind": "native"
+    },
+    "database_native": {
+      "label": "Native database job types",
+      "kind": "native"
+    },
+    "webservice_native": {
+      "label": "Native web-service job types",
+      "kind": "native"
+    },
+    "hadoop_native": {
+      "label": "Native Hadoop/big-data job types",
+      "kind": "native"
+    },
+    "j2ee_native": {
+      "label": "Native Java/J2EE job types",
+      "kind": "native"
+    },
+    "process_automation_native": {
+      "label": "Native process-automation job types",
+      "kind": "native"
+    },
+    "infra_native": {
+      "label": "Native monitoring/network job types",
+      "kind": "native"
+    },
+    "mainframe_native": {
+      "label": "Native mainframe-boundary job types",
+      "kind": "native"
+    },
+    "user_defined_type": {
+      "label": "Site-defined job_type",
+      "kind": "native"
+    },
+    "scheduler_self_call": {
+      "label": "AutoSys scheduler control/self-call",
+      "kind": "control"
+    },
+    "cross_scheduler": {
+      "label": "Other scheduler (Control-M/TWS/ESP)",
+      "kind": "control"
+    },
+    "erp_sap": {
+      "label": "SAP via adapter/RFC binaries",
+      "kind": "erp"
+    },
+    "erp_peoplesoft": {
+      "label": "PeopleSoft via adapter/tools binaries",
+      "kind": "erp"
+    },
+    "erp_oracle_ebs": {
+      "label": "Oracle E-Business Suite utilities",
+      "kind": "erp"
+    },
+    "etl_informatica": {
+      "label": "Informatica PowerCenter/IICS",
+      "kind": "etl"
+    },
+    "etl_datastage": {
+      "label": "IBM InfoSphere DataStage",
+      "kind": "etl"
+    },
+    "etl_abinitio": {
+      "label": "Ab Initio Co>Operating System",
+      "kind": "etl"
+    },
+    "etl_talend": {
+      "label": "Talend generated job scripts",
+      "kind": "etl"
+    },
+    "etl_ssis": {
+      "label": "Microsoft SSIS",
+      "kind": "etl"
+    },
+    "etl_odi": {
+      "label": "Oracle Data Integrator",
+      "kind": "etl"
+    },
+    "db_oracle": {
+      "label": "Oracle DB client tools",
+      "kind": "database"
+    },
+    "db_teradata": {
+      "label": "Teradata client tools",
+      "kind": "database"
+    },
+    "db_db2": {
+      "label": "IBM DB2 client tools",
+      "kind": "database"
+    },
+    "db_mssql": {
+      "label": "SQL Server client tools",
+      "kind": "database"
+    },
+    "db_postgres": {
+      "label": "PostgreSQL client tools",
+      "kind": "database"
+    },
+    "db_mysql": {
+      "label": "MySQL client tools",
+      "kind": "database"
+    },
+    "db_snowflake": {
+      "label": "Snowflake client tools",
+      "kind": "database"
+    },
+    "db_netezza": {
+      "label": "IBM Netezza client tools",
+      "kind": "database"
+    },
+    "db_vertica": {
+      "label": "Vertica client tools",
+      "kind": "database"
+    },
+    "db_informix": {
+      "label": "IBM Informix client tools",
+      "kind": "database"
+    },
+    "db_ambiguous": {
+      "label": "Generic SQL client, vendor ambiguous (isql)",
+      "kind": "database"
+    },
+    "hadoop_hdfs": {
+      "label": "Hadoop FS / YARN / MapReduce",
+      "kind": "bigdata"
+    },
+    "hadoop_hive": {
+      "label": "Hive / Impala / HBase",
+      "kind": "bigdata"
+    },
+    "hadoop_spark": {
+      "label": "Spark submit / shell",
+      "kind": "bigdata"
+    },
+    "hadoop_legacy": {
+      "label": "Sqoop / Oozie (both Apache-Attic)",
+      "kind": "bigdata"
+    },
+    "hadoop_pig": {
+      "label": "Apache Pig",
+      "kind": "bigdata"
+    },
+    "hadoop_flink": {
+      "label": "Apache Flink",
+      "kind": "bigdata"
+    },
+    "hadoop_kafka": {
+      "label": "Apache Kafka CLI",
+      "kind": "bigdata"
+    },
+    "cloud_aws": {
+      "label": "AWS CLI family",
+      "kind": "cloud"
+    },
+    "cloud_gcp": {
+      "label": "Google Cloud CLI family",
+      "kind": "cloud"
+    },
+    "cloud_azure": {
+      "label": "Azure CLI family",
+      "kind": "cloud"
+    },
+    "cloud_k8s": {
+      "label": "Kubernetes/OpenShift/Helm CLI",
+      "kind": "cloud"
+    },
+    "transfer_ftp": {
+      "label": "FTP/SFTP/SCP clients",
+      "kind": "transfer"
+    },
+    "transfer_mft": {
+      "label": "Managed file transfer (C:D, Aspera, WinSCP)",
+      "kind": "transfer"
+    },
+    "transfer_http": {
+      "label": "HTTP client (curl/wget/PS)",
+      "kind": "transfer"
+    },
+    "transfer_rsync": {
+      "label": "rsync file synchronisation",
+      "kind": "transfer"
+    },
+    "remote_exec": {
+      "label": "SSH/rsh remote execution",
+      "kind": "infra"
+    },
+    "notify": {
+      "label": "Notification (mail/SNMP)",
+      "kind": "infra"
+    },
+    "windows_script": {
+      "label": "Windows batch/PS/VBS script",
+      "kind": "os"
+    },
+    "windows_exe": {
+      "label": "Windows executable / drive-path",
+      "kind": "os"
+    },
+    "unix_script": {
+      "label": "Unix shell script",
+      "kind": "os"
+    },
+    "perl": {
+      "label": "Perl script/interpreter",
+      "kind": "os"
+    },
+    "python": {
+      "label": "Python script/interpreter",
+      "kind": "os"
+    },
+    "java": {
+      "label": "Java jar/interpreter",
+      "kind": "os"
+    },
+    "crypto": {
+      "label": "Encryption (gpg/openssl)",
+      "kind": "os"
+    },
+    "fs_ops": {
+      "label": "Filesystem/archive utility",
+      "kind": "os"
+    },
+    "no_op": {
+      "label": "Placeholder/test command",
+      "kind": "os"
+    },
+    "no_command": {
+      "label": "No command attribute",
+      "kind": "structural"
+    },
+    "unclassified": {
+      "label": "No rule matched",
+      "kind": "unclassified"
+    }
+  },
+  "rules": [
+    {
+      "id": "JT-BOX",
+      "class": "box",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "BOX"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-FW",
+      "class": "file_watch",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "FILEWATCH"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-FT",
+      "class": "file_trigger",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "FT"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/reference/ae-job-information-language/jil-job-definitions/job-type-attribute-specify-job-type.html",
+      "notes": "FT is File Trigger per vendor docs - NOT an alias of FTP"
+    },
+    {
+      "id": "JT-FT-NATIVE",
+      "class": "file_transfer_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "FTP",
+        "SCP"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-SAP",
+      "class": "erp_native_sap",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "SAP",
+        "SAPBDC",
+        "SAPBWIP",
+        "SAPBWPC",
+        "SAPDA",
+        "SAPEVT",
+        "SAPJC",
+        "SAPPM"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-PS",
+      "class": "erp_native_peoplesoft",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "PEOPLESOFT"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html",
+      "notes": "JIL 'job_type: ps' aliases to PEOPLESOFT"
+    },
+    {
+      "id": "JT-OA",
+      "class": "erp_native_oracle_ebs",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "OACOPY",
+        "OASET",
+        "OASG"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-INFA",
+      "class": "informatica_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "INFORMATICA"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-DB",
+      "class": "database_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "DBPROC",
+        "DBMON",
+        "DBTRIG",
+        "SQL",
+        "SQLAGENT"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/database-jobs-overview.html"
+    },
+    {
+      "id": "JT-WS",
+      "class": "webservice_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "HTTP",
+        "WBSVC",
+        "WSDOC",
+        "WEBSERVICE"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-BIGDATA",
+      "class": "hadoop_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "HDFS",
+        "HIVE",
+        "OOZIE",
+        "PIG",
+        "SQOOP"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-J2EE",
+      "class": "j2ee_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "ENTYBEAN",
+        "SESSBEAN",
+        "POJO",
+        "JAVARMI",
+        "JMSPUB",
+        "JMSSUB",
+        "JMXMAG",
+        "JMXMAS",
+        "JMXMC",
+        "JMXMOP",
+        "JMXMREM",
+        "JMXSUB"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-PA",
+      "class": "process_automation_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "PAPROC",
+        "PAREQ"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-INFRA",
+      "class": "infra_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "SNMPGET",
+        "SNMPSET",
+        "OMCPU",
+        "OMD",
+        "OMEL",
+        "OMIP",
+        "OMP",
+        "OMS",
+        "OMTF",
+        "WOL",
+        "PROXY",
+        "REMOTECMD",
+        "CONNECT"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-MF",
+      "class": "mainframe_native",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "ZOS",
+        "ZOSM",
+        "ZOSDST",
+        "I5",
+        "MICROFOCUS"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-2-00/scheduling/ae-scheduling/manage-your-jobs/job-types.html"
+    },
+    {
+      "id": "JT-USER",
+      "class": "user_defined_type",
+      "signal": "job_type",
+      "match": "exact",
+      "pattern": [
+        "USERDEFINED"
+      ],
+      "priority": 1,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-1-01/scheduling/ae-scheduling/manage-jil/jil-subcommands.html",
+      "notes": "insert_job_type site-defined types land here; declared name kept as evidence"
+    },
+    {
+      "id": "C-AE-CTRL",
+      "class": "scheduler_self_call",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "sendevent",
+        "autorep",
+        "autostatus",
+        "autotrack",
+        "autoping",
+        "autotimezone",
+        "job_depends",
+        "archive_events",
+        "autoflags",
+        "autocal_asc",
+        "dbstatistics",
+        "auto_helpdesk",
+        "autosyslog",
+        "clean_files",
+        "chk_auto_up",
+        "monbro",
+        "autosys_secure",
+        "cawto"
+      ],
+      "priority": 10,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-0-01/reference/ae-web-services/autosys-command-execution.html",
+      "notes": "AE command binaries; any token (a wrapper calling sendevent is still coupled)"
+    },
+    {
+      "id": "C-XSCHED-CTM",
+      "class": "cross_scheduler",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "ctmorder",
+        "ctmcreate",
+        "ctmcontb",
+        "emdef",
+        "ctmpsm",
+        "ctmserver"
+      ],
+      "priority": 11,
+      "confidence": "high",
+      "vendor_url": "https://documents.bmc.com/supportu/controlm-saas/en-US/Documentation/Utilities/ctmorder.htm"
+    },
+    {
+      "id": "C-XSCHED-TWS",
+      "class": "cross_scheduler",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "conman",
+        "composer",
+        "maestro",
+        "optman"
+      ],
+      "priority": 11,
+      "confidence": "medium",
+      "vendor_url": "https://help.hcl-software.com/workloadautomation/v1028/distr/src_ref/awsrgrunningconman.html",
+      "notes": "TWS/HCL binaries; 'composer'/'maestro' are common words so scope=exe"
+    },
+    {
+      "id": "C-XSCHED-ESP",
+      "class": "cross_scheduler",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "espcmd",
+        "espmgr",
+        "espwss"
+      ],
+      "priority": 11,
+      "confidence": "low",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-mainframe-software/automation/ca-workload-automation-esp-edition/12-0/reference/statements/espcmd-statement-issue-stacked-ca-wa-esp-edition-commands.html",
+      "notes": "ESP commands run inside ESP JCL; token hits in AutoSys commands suggest a bridge - needs review"
+    },
+    {
+      "id": "ERP-SAP-ADAPTER",
+      "class": "erp_sap",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "auto_r3*"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://knowledge.broadcom.com/external/article/41352/command-line-debug-method-for-the-autosy.html",
+      "notes": "auto_r3* are legacy CA/Broadcom SAP Adapter binaries; KB names sibling binary sapjob. Vendor claim."
+    },
+    {
+      "id": "ERP-SAP-TOOLS",
+      "class": "erp_sap",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "startrfc",
+        "sapcontrol",
+        "sapstartsrv",
+        "sapxpg",
+        "sapevt",
+        "r3trans"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://help.sap.com/docs/support/tools/sap-tools-for-all-os",
+      "notes": "SAP kernel/RFC tools; 'tp' (transport) deliberately excluded - too ambiguous"
+    },
+    {
+      "id": "ERP-PS-ADAPTER",
+      "class": "erp_peoplesoft",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "auto_ps*"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://knowledge.broadcom.com/external/article/24052/parameters-for-the-peoplesoft-adapter-co.html",
+      "notes": "Legacy AutoSys PeopleSoft Adapter binaries (auto_ps7 etc.)"
+    },
+    {
+      "id": "ERP-PS-TOOLS",
+      "class": "erp_peoplesoft",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "psae",
+        "psae.exe",
+        "sqr",
+        "sqrw",
+        "psnvs",
+        "psrun"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://docs.oracle.com/en/applications/peoplesoft/peopletools/8.63/application-engine/using-command-line-invoke-application-engine-programs.html"
+    },
+    {
+      "id": "ERP-EBS-UTIL",
+      "class": "erp_oracle_ebs",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "concsub",
+        "fndload",
+        "afcmrg"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://support.oracle.com/knowledge/Oracle%20E-Business%20Suite/457519_1.html"
+    },
+    {
+      "id": "ERP-EBS-PATH",
+      "class": "erp_oracle_ebs",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\$FND_TOP|\\$APPL_TOP",
+      "priority": 21,
+      "confidence": "medium",
+      "vendor_url": "https://support.oracle.com/knowledge/Oracle%20E-Business%20Suite/457519_1.html"
+    },
+    {
+      "id": "ETL-INFA-BIN",
+      "class": "etl_informatica",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "pmcmd",
+        "pmrep",
+        "infacmd",
+        "infacmd.sh",
+        "infasetup",
+        "pmrepagent",
+        "pmhotdeploy"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://docs.informatica.com/data-catalog/common-content-for-data-catalog/10-5-7/command-reference/pmcmd-command-reference/using-pmcmd/running-commands-in-command-line-mode.html"
+    },
+    {
+      "id": "ETL-INFA-INFACMD",
+      "class": "etl_informatica",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "infacmd*"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://docs.informatica.com/data-catalog/common-content-for-data-catalog/10-5-7/command-reference/infacmd.html"
+    },
+    {
+      "id": "ETL-INFA-NAME",
+      "class": "etl_informatica",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "*inf*_session*",
+        "*informatica*"
+      ],
+      "priority": 29,
+      "confidence": "medium",
+      "vendor_url": "https://docs.informatica.com/data-catalog/common-content-for-data-catalog/10-5-7/command-reference/pmcmd-command-reference/using-pmcmd/running-commands-in-command-line-mode.html",
+      "notes": "Name-inferred wrapper: executable contains informatica/infa tokens. Review with customer."
+    },
+    {
+      "id": "ETL-DS",
+      "class": "etl_datastage",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "dsjob",
+        "dsadmin",
+        "dsjobs",
+        "cpdctl"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/iis/11.3.0?topic=jobs-running-job-from-command-line"
+    },
+    {
+      "id": "ETL-ABINITIO",
+      "class": "etl_abinitio",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\bair\\s+(sandbox|project|graph|tag|lock)\\b",
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://www.bestdevops.com/ab-initio-workflow-full-lifecycle/",
+      "notes": "SECONDARY SOURCE - Ab Initio docs are not public. Vendor docs live behind their support portal."
+    },
+    {
+      "id": "ETL-ABINITIO-M",
+      "class": "etl_abinitio",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "m_*"
+      ],
+      "priority": 29,
+      "confidence": "low",
+      "vendor_url": "https://www.bestdevops.com/ab-initio-workflow-full-lifecycle/",
+      "notes": "m_ls/m_cp/m_eval utilities; medium-low because m_* names collide"
+    },
+    {
+      "id": "ETL-TALEND",
+      "class": "etl_talend",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "_run\\.(sh|bat|ps1)\\b.*(--context_param|talend)",
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://help.qlik.com/talend/en-US/studio-user-guide/8.0-R2026-10/building-jobs"
+    },
+    {
+      "id": "ETL-SSIS",
+      "class": "etl_ssis",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "dtexec",
+        "dtexecui",
+        "dtutil",
+        "dtsrun"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/sql/integration-services/packages/dtexec-utility?view=sql-server-ver17"
+    },
+    {
+      "id": "ETL-ODI",
+      "class": "etl_odi",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "startscen",
+        "startcmd",
+        "startloadplan",
+        "stoploadplan",
+        "stopsession",
+        "restartsession",
+        "startscenremote",
+        "getsessionstatusremote",
+        "odiparams",
+        "agentscheduler"
+      ],
+      "priority": 20,
+      "confidence": "high",
+      "vendor_url": "https://docs.oracle.com/en/middleware/fusion-middleware/data-integrator/14.1.2/quick-ref/scenarios.html"
+    },
+    {
+      "id": "DB-ORACLE",
+      "class": "db_oracle",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "sqlplus",
+        "sqlldr",
+        "expdp",
+        "impdp",
+        "rman",
+        "tnsping"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://docs.oracle.com/en/database/oracle/oracle-database/23/sqpug/"
+    },
+    {
+      "id": "DB-ORACLE-SHORT",
+      "class": "db_oracle",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "exp",
+        "imp"
+      ],
+      "priority": 25,
+      "confidence": "medium",
+      "vendor_url": "https://docs.oracle.com/en/database/oracle/oracle-database/23/sqpug/",
+      "notes": "exp/imp are 3-letter words; only trusted as the executable itself"
+    },
+    {
+      "id": "DB-TERADATA",
+      "class": "db_teradata",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "bteq",
+        "fastload",
+        "mload",
+        "tpump",
+        "fastexp",
+        "tdload",
+        "tbuild",
+        "tpt"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://docs.teradata.com/r/Enterprise_IntelliFlex_Lake_VMware/Basic-Teradata-Query-Reference-20.00"
+    },
+    {
+      "id": "DB-DB2",
+      "class": "db_db2",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\bdb2\\s+(-|[a-zA-Z])",
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/db2/12.1?topic=commands-command-line-processor"
+    },
+    {
+      "id": "DB-DB2-UTIL",
+      "class": "db_db2",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "db2batch",
+        "db2look",
+        "db2move",
+        "db2load",
+        "db2expln"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/db2/12.1"
+    },
+    {
+      "id": "DB-MSSQL",
+      "class": "db_mssql",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "sqlcmd",
+        "bcp",
+        "osql",
+        "dtsrun",
+        "tablediff"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility?view=sql-server-ver17"
+    },
+    {
+      "id": "DB-ISQL-AMBIG",
+      "class": "db_ambiguous",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "isql"
+      ],
+      "priority": 26,
+      "confidence": "medium",
+      "vendor_url": "https://www.unixodbc.org/doc/",
+      "notes": "isql exists in Sybase Adaptive Server, unixODBC and older MSSQL - vendor cannot be told from the token alone Rescoped to exe while building T15: 'isql' is short enough to collide with an ordinary bare argument.",
+      "scope": "exe"
+    },
+    {
+      "id": "DB-POSTGRES",
+      "class": "db_postgres",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "psql",
+        "pg_dump",
+        "pg_restore",
+        "pg_ctl"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://www.postgresql.org/docs/current/app-psql.html"
+    },
+    {
+      "id": "DB-MYSQL",
+      "class": "db_mysql",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "mysql",
+        "mysqldump",
+        "mysqladmin",
+        "mysqlbinlog"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://dev.mysql.com/doc/refman/8.4/en/mysql.html"
+    },
+    {
+      "id": "DB-SNOWFLAKE",
+      "class": "db_snowflake",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "snowsql",
+        "snowflake"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://docs.snowflake.com/en/user-guide/snowsql"
+    },
+    {
+      "id": "DB-NETEZZA",
+      "class": "db_netezza",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "nzsql",
+        "nzload",
+        "nzbackup",
+        "nzrestore"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/netezza"
+    },
+    {
+      "id": "DB-VERTICA",
+      "class": "db_vertica",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "vsql"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://docs.vertica.com/latest/en/using-the-administrative-tools/using-vsql/"
+    },
+    {
+      "id": "DB-INFORMIX",
+      "class": "db_informix",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "dbaccess",
+        "ontape",
+        "onunload",
+        "onload"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/informix-servers/15.0"
+    },
+    {
+      "id": "HD-HDFS",
+      "class": "hadoop_hdfs",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\b(hdfs|hadoop|mapred|yarn)\\s+",
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/CommandsManual.html"
+    },
+    {
+      "id": "HD-HIVE",
+      "class": "hadoop_hive",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "hive",
+        "beeline",
+        "impala-shell",
+        "hbase"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://cwiki.apache.org/confluence/display/Hive/HiveServer2+Clients"
+    },
+    {
+      "id": "HD-SPARK",
+      "class": "hadoop_spark",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "spark-submit",
+        "spark2-submit",
+        "pyspark",
+        "spark-shell",
+        "spark-sql"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://spark.apache.org/docs/latest/submitting-applications.html"
+    },
+    {
+      "id": "HD-LEGACY",
+      "class": "hadoop_legacy",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "sqoop",
+        "oozie"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://attic.apache.org/projects/sqoop.html",
+      "notes": "Both products retired to the Apache Attic (Sqoop 2021, Oozie 2025) - class doubles as a redesign flag"
+    },
+    {
+      "id": "HD-PIG",
+      "class": "hadoop_pig",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "pig"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://pig.apache.org/docs/latest/cmds.html"
+    },
+    {
+      "id": "HD-FLINK",
+      "class": "hadoop_flink",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\bflink\\s+run\\b",
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://nightlies.apache.org/flink/flink-docs-stable/docs/deployment/cli/"
+    },
+    {
+      "id": "HD-KAFKA",
+      "class": "hadoop_kafka",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "kafka-*"
+      ],
+      "priority": 25,
+      "confidence": "high",
+      "vendor_url": "https://kafka.apache.org/documentation/#basic_ops_add_topic"
+    },
+    {
+      "id": "CLD-AWS",
+      "class": "cloud_aws",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "aws",
+        "aws2",
+        "s3cmd",
+        "s5cmd",
+        "awscli"
+      ],
+      "priority": 27,
+      "confidence": "high",
+      "vendor_url": "https://docs.aws.amazon.com/cli/latest/reference/"
+    },
+    {
+      "id": "CLD-GCP",
+      "class": "cloud_gcp",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "gcloud",
+        "gsutil"
+      ],
+      "priority": 27,
+      "confidence": "high",
+      "vendor_url": "https://cloud.google.com/sdk/gcloud/reference"
+    },
+    {
+      "id": "CLD-AZURE",
+      "class": "cloud_azure",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "az",
+        "azcopy",
+        "azure-cli"
+      ],
+      "priority": 27,
+      "confidence": "medium",
+      "vendor_url": "https://learn.microsoft.com/en-us/cli/azure/",
+      "notes": "'az' is a very short token; exe scope only, medium confidence"
+    },
+    {
+      "id": "CLD-K8S",
+      "class": "cloud_k8s",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "kubectl"
+      ],
+      "priority": 27,
+      "confidence": "high",
+      "vendor_url": "https://kubernetes.io/docs/reference/kubectl/"
+    },
+    {
+      "id": "TR-FTP-BIN",
+      "class": "transfer_ftp",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "ftp",
+        "sftp",
+        "psftp",
+        "lftp",
+        "ncftp",
+        "ncftpput",
+        "ncftpget",
+        "ftp.exe",
+        "sftp.exe"
+      ],
+      "priority": 28,
+      "confidence": "high",
+      "vendor_url": "https://man.openbsd.org/sftp.1"
+    },
+    {
+      "id": "TR-FTP-NAMED",
+      "class": "transfer_ftp",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "*ftp*.exe",
+        "*ftp*.com"
+      ],
+      "priority": 31,
+      "confidence": "medium",
+      "vendor_url": "https://man.openbsd.org/sftp.1",
+      "notes": "Unidentified ftp-named binary (e.g. a site MFT wrapper). Class is right; vendor is unknown."
+    },
+    {
+      "id": "TR-CD",
+      "class": "transfer_mft",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "direct",
+        "ndm",
+        "ndmcli"
+      ],
+      "priority": 28,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/connect-direct/6.3.0?topic=guide-using-cli",
+      "notes": "IBM Sterling Connect:Direct; 'direct' is an English word - exe scope only"
+    },
+    {
+      "id": "TR-ASPERA",
+      "class": "transfer_mft",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "ascp",
+        "ascp4",
+        "ascli"
+      ],
+      "priority": 28,
+      "confidence": "high",
+      "vendor_url": "https://www.ibm.com/docs/en/ahts/4.4.x?topic=line-ascp-command-reference"
+    },
+    {
+      "id": "TR-WINSCP",
+      "class": "transfer_mft",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "winscp",
+        "winscp.com",
+        "winscp.exe"
+      ],
+      "priority": 28,
+      "confidence": "high",
+      "vendor_url": "https://winscp.net/eng/docs/scripting"
+    },
+    {
+      "id": "TR-MFT-NAME",
+      "class": "transfer_mft",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "moveit",
+        "staxway",
+        "cftutil",
+        "cleo",
+        "vltrader",
+        "b2bi",
+        "goanywhere"
+      ],
+      "priority": 31,
+      "confidence": "low",
+      "vendor_url": "",
+      "notes": "MFT tool name heuristics - no public CLI doc to cite; review with customer"
+    },
+    {
+      "id": "TR-HTTP",
+      "class": "transfer_http",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "curl",
+        "wget",
+        "invoke-webrequest",
+        "invoke-restmethod",
+        "iwr"
+      ],
+      "priority": 28,
+      "confidence": "high",
+      "vendor_url": "https://curl.se/docs/manpage.html"
+    },
+    {
+      "id": "TR-RSYNC",
+      "class": "transfer_rsync",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "rsync",
+        "scp"
+      ],
+      "priority": 28,
+      "confidence": "high",
+      "vendor_url": "https://download.samba.org/pub/rsync/rsync.1"
+    },
+    {
+      "id": "INF-SSH",
+      "class": "remote_exec",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "ssh",
+        "plink",
+        "putty",
+        "rsh",
+        "rexec",
+        "sshpass"
+      ],
+      "priority": 40,
+      "confidence": "high",
+      "vendor_url": "https://man.openbsd.org/ssh.1"
+    },
+    {
+      "id": "INF-NOTIFY",
+      "class": "notify",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "mailx",
+        "sendmail",
+        "mutt",
+        "blat",
+        "snmptrap",
+        "mail"
+      ],
+      "priority": 40,
+      "confidence": "medium",
+      "vendor_url": "https://www.net-snmp.org/docs/man/snmptrap.html",
+      "notes": "'mail' alone is a common word - exe scope, medium confidence"
+    },
+    {
+      "id": "INF-PING",
+      "class": "infra_native",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "ping",
+        "telnet",
+        "nc",
+        "ncat",
+        "dig",
+        "nslookup",
+        "traceroute",
+        "nmap"
+      ],
+      "priority": 45,
+      "confidence": "medium",
+      "vendor_url": "https://man.openbsd.org/ping.8",
+      "notes": "Reachability probes; 'ping'/'nc' are mid-command words too - exe scope only"
+    },
+    {
+      "id": "OS-WIN-SCRIPT",
+      "class": "windows_script",
+      "signal": "command",
+      "match": "ext",
+      "pattern": [
+        "bat",
+        "cmd",
+        "ps1",
+        "psm1",
+        "vbs",
+        "wsf",
+        "hta"
+      ],
+      "priority": 42,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/windows-commands"
+    },
+    {
+      "id": "OS-WIN-INTERP",
+      "class": "windows_script",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "powershell",
+        "pwsh",
+        "cscript",
+        "wscript"
+      ],
+      "priority": 42,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/powershell/"
+    },
+    {
+      "id": "OS-WIN-EXE",
+      "class": "windows_exe",
+      "signal": "command",
+      "match": "ext",
+      "pattern": [
+        "exe",
+        "msi",
+        "com"
+      ],
+      "priority": 50,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/windows-commands"
+    },
+    {
+      "id": "OS-WIN-UTIL",
+      "class": "windows_exe",
+      "signal": "command",
+      "match": "token",
+      "scope": "exe",
+      "pattern": [
+        "robocopy",
+        "xcopy"
+      ],
+      "priority": 50,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/robocopy",
+      "notes": "Windows-only utilities without an extension in the command"
+    },
+    {
+      "id": "OS-WIN-PATH",
+      "class": "windows_exe",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "^\"?[A-Za-z]:[\\\\/]|^\"?\\\\\\\\",
+      "priority": 50,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/windows-commands"
+    },
+    {
+      "id": "OS-UNIX-SH",
+      "class": "unix_script",
+      "signal": "command",
+      "match": "ext",
+      "pattern": [
+        "sh",
+        "ksh",
+        "bash",
+        "csh",
+        "zsh"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html"
+    },
+    {
+      "id": "OS-UNIX-INTERP",
+      "class": "unix_script",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "bash",
+        "ksh",
+        "zsh",
+        "csh"
+      ],
+      "priority": 46,
+      "confidence": "medium",
+      "vendor_url": "https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html",
+      "notes": "'sh' bare token as interpreter call"
+    },
+    {
+      "id": "OS-PERL",
+      "class": "perl",
+      "signal": "command",
+      "match": "ext",
+      "pattern": [
+        "pl",
+        "pm"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://perldoc.perl.org/perl"
+    },
+    {
+      "id": "OS-PERL-INTERP",
+      "class": "perl",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "perl"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://perldoc.perl.org/perl"
+    },
+    {
+      "id": "OS-PY",
+      "class": "python",
+      "signal": "command",
+      "match": "ext",
+      "pattern": [
+        "py",
+        "pyw",
+        "ipynb"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://docs.python.org/3/using/cmdline.html"
+    },
+    {
+      "id": "OS-PY-INTERP",
+      "class": "python",
+      "signal": "command",
+      "match": "exe_glob",
+      "pattern": [
+        "python*",
+        "ipython",
+        "jupyter"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://docs.python.org/3/using/cmdline.html"
+    },
+    {
+      "id": "OS-JAVA",
+      "class": "java",
+      "signal": "command",
+      "match": "ext",
+      "pattern": [
+        "jar",
+        "class"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html"
+    },
+    {
+      "id": "OS-JAVA-INTERP",
+      "class": "java",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "java",
+        "javaw",
+        "javac"
+      ],
+      "priority": 45,
+      "confidence": "high",
+      "vendor_url": "https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html"
+    },
+    {
+      "id": "OS-CRYPTO",
+      "class": "crypto",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "gpg",
+        "gpg2",
+        "openssl",
+        "mcrypt"
+      ],
+      "priority": 44,
+      "confidence": "high",
+      "vendor_url": "https://gnupg.org/documentation/manpage.html"
+    },
+    {
+      "id": "OS-FS",
+      "class": "fs_ops",
+      "signal": "command",
+      "match": "exe_exact",
+      "pattern": [
+        "tar",
+        "zip",
+        "unzip",
+        "gzip",
+        "gunzip",
+        "bzip2",
+        "rar",
+        "7z",
+        "cp",
+        "mv",
+        "rm",
+        "del",
+        "move",
+        "copy",
+        "md5sum",
+        "sha256sum",
+        "touch",
+        "mkdir",
+        "rmdir",
+        "ls",
+        "dir",
+        "find",
+        "cat",
+        "cmp",
+        "diff",
+        "sort",
+        "awk",
+        "sed",
+        "grep",
+        "egrep",
+        "fgrep",
+        "wc",
+        "head",
+        "tail",
+        "date",
+        "cal",
+        "basename",
+        "dirname",
+        "xargs",
+        "tee",
+        "tr",
+        "cut",
+        "paste",
+        "join",
+        "comm",
+        "uniq",
+        "dd",
+        "mount",
+        "umount",
+        "df",
+        "du",
+        "chmod",
+        "chown",
+        "chgrp",
+        "ln",
+        "kill",
+        "ps",
+        "top",
+        "crontab",
+        "at",
+        "batch",
+        "env",
+        "printenv",
+        "export",
+        "set",
+        "umask",
+        "id",
+        "whoami",
+        "hostname",
+        "uname",
+        "which",
+        "whereis",
+        "locate",
+        "stat",
+        "file",
+        "test",
+        "[",
+        "[[",
+        "expr",
+        "bc",
+        "seq",
+        "yes",
+        "nohup",
+        "time",
+        "nice",
+        "timeout",
+        "su",
+        "sudo",
+        "cd",
+        "pushd",
+        "popd",
+        "pwd"
+      ],
+      "priority": 60,
+      "confidence": "high",
+      "vendor_url": "https://pubs.opengroup.org/onlinepubs/9699919799/idx/utilities.html",
+      "notes": "Catch-all for single-utility commands; composite scripts land in unix_script"
+    },
+    {
+      "id": "OS-NOOP",
+      "class": "no_op",
+      "signal": "command",
+      "match": "exe_exact",
+      "pattern": [
+        "sleep",
+        "echo",
+        "true",
+        "exit",
+        "rem",
+        "pause",
+        "wait"
+      ],
+      "priority": 59,
+      "confidence": "medium",
+      "vendor_url": "https://pubs.opengroup.org/onlinepubs/9699919799/idx/utilities.html",
+      "notes": "Test/placeholder commands; medium because echo is also used inside real scripts"
+    },
+    {
+      "id": "C-AE-CTRL-AMBIG",
+      "class": "scheduler_self_call",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "jil",
+        "chase",
+        "forecast"
+      ],
+      "priority": 10,
+      "confidence": "high",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-0-01/reference/ae-web-services/autosys-command-execution.html",
+      "notes": "AE command binaries; any token (a wrapper calling sendevent is still coupled) Split from C-AE-CTRL: these tokens are short/common enough to collide with an ordinary file or directory name used as a bare argument (found while building T15, e.g. a destination literally named 'jil' or 'chase'); restricted to the executable position only, per this schema's own stated rule for short/ambiguous tokens (Part B S3.1).",
+      "scope": "exe"
+    },
+    {
+      "id": "CLD-K8S-AMBIG",
+      "class": "cloud_k8s",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "oc",
+        "helm"
+      ],
+      "priority": 27,
+      "confidence": "high",
+      "vendor_url": "https://kubernetes.io/docs/reference/kubectl/",
+      "scope": "exe",
+      "notes": "Split from CLD-K8S: these tokens are short/common enough to collide with an ordinary file or directory name used as a bare argument (found while building T15, e.g. a destination literally named 'jil' or 'chase'); restricted to the executable position only, per this schema's own stated rule for short/ambiguous tokens (Part B S3.1)."
+    },
+    {
+      "id": "CLD-GCP-AMBIG",
+      "class": "cloud_gcp",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "bq"
+      ],
+      "priority": 27,
+      "confidence": "high",
+      "vendor_url": "https://cloud.google.com/sdk/gcloud/reference",
+      "scope": "exe",
+      "notes": "Split from CLD-GCP: these tokens are short/common enough to collide with an ordinary file or directory name used as a bare argument (found while building T15, e.g. a destination literally named 'jil' or 'chase'); restricted to the executable position only, per this schema's own stated rule for short/ambiguous tokens (Part B S3.1)."
+    },
+    {
+      "id": "OS-WIN-INTERP-AMBIG",
+      "class": "windows_script",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "cmd",
+        "cmd.exe"
+      ],
+      "priority": 42,
+      "confidence": "high",
+      "vendor_url": "https://learn.microsoft.com/en-us/powershell/",
+      "scope": "exe",
+      "notes": "Split from OS-WIN-INTERP: these tokens are short/common enough to collide with an ordinary file or directory name used as a bare argument (found while building T15, e.g. a destination literally named 'jil' or 'chase'); restricted to the executable position only, per this schema's own stated rule for short/ambiguous tokens (Part B S3.1)."
+    },
+    {
+      "id": "OS-UNIX-INTERP-AMBIG",
+      "class": "unix_script",
+      "signal": "command",
+      "match": "token",
+      "pattern": [
+        "sh"
+      ],
+      "priority": 46,
+      "confidence": "medium",
+      "vendor_url": "https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html",
+      "notes": "'sh' bare token as interpreter call Split from OS-UNIX-INTERP: these tokens are short/common enough to collide with an ordinary file or directory name used as a bare argument (found while building T15, e.g. a destination literally named 'jil' or 'chase'); restricted to the executable position only, per this schema's own stated rule for short/ambiguous tokens (Part B S3.1).",
+      "scope": "exe"
+    }
+  ],
+  "traits": [
+    {
+      "id": "T-CRED-INLINE",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "(password|passwd|pwd|secret|token|apikey|api[-_]?key|credential|auth)\\s*[=:]\\s*\\S+|\\b[\\w.-]+:[^/\\s:@]+@",
+      "label": "inline-credential-shape",
+      "notes": "Generic kv/uri shapes only - short -p/-w flags need exe context and are handled by the fixed redactor layer"
+    },
+    {
+      "id": "T-CRED-DB",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\b(sqlplus|expdp|impdp|mysql|psql|sqlcmd|bcp|osql|isql|bteq|vsql|nzsql|snowsql|dbaccess|beeline|impala-shell|auto_ps7|concsub|fndload|psae)\\s+[^\\n]*?\\b[\\w$%.-]+/[^\\s]+",
+      "label": "inline-db-connect",
+      "notes": "tool user/pass@db style connect strings"
+    },
+    {
+      "id": "T-TALEND-HINT",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "_run\\.(sh|bat|ps1)\\b",
+      "label": "talend-name-shape",
+      "notes": "Talend jobs look like <job>_run.<ext>; name alone is too weak to be a class so it is a review hint"
+    },
+    {
+      "id": "T-ENV-AUTOSYS",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\$\\{?AUTO_JOB_NAME\\}?|\\$\\{?AUTORUN\\}?|\\$\\{?AUTOSERV\\}?|\\$\\{?AUTOUSER\\}?|\\$\\{?AUTOSYS\\}?|\\$\\{?AUTOROOT\\}?|%AUTO_\\w+%",
+      "label": "autosys-runtime-env",
+      "vendor_url": "https://knowledge.broadcom.com/external/article/145411/auto-job-runtime-varaibles.html"
+    },
+    {
+      "id": "T-GLOBAL-VAR",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "\\$\\$\\(?\\{?\\w+\\)?\\}?",
+      "label": "autosys-global-var",
+      "vendor_url": "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/autosys-workload-automation/24-0-01/global-variables.html"
+    },
+    {
+      "id": "T-WIN-PATH",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "[A-Za-z]:\\\\|\\\\\\\\[A-Za-z0-9_.-]+\\\\",
+      "label": "windows-path-shape"
+    },
+    {
+      "id": "T-SCRIPTFILE",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "-s:\\S+|-script\\s+\\S+|/script[=\\s]",
+      "label": "credential-via-scriptfile",
+      "notes": "ftp -s:file and winscp /script move secrets out of the command but into a file"
+    },
+    {
+      "id": "T-ENV-WIN",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "%[A-Za-z_]\\w*%|%%[A-Za-z_]\\w*%%",
+      "label": "windows-env-var-shape",
+      "notes": "%VAR% or %%VAR%% are cmd environment references, NOT AutoSys $$ globals - separate trait"
+    },
+    {
+      "id": "T-PLACEHOLDER",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "^\\s*<[^>]+>",
+      "label": "placeholder-command",
+      "notes": "literal <...> template text - unparseable placeholder, not a real command"
+    },
+    {
+      "id": "T-AUTOSYS-NAME",
+      "signal": "command",
+      "match": "regex",
+      "pattern": "autosys",
+      "label": "autosys-name-hint",
+      "notes": "command mentions autosys by name - scheduler coupling hint for review, not a class"
+    }
+  ],
+  "unclassified": {
+    "class": "unclassified",
+    "fallback": true,
+    "behavior": "Never scores XS/trivial. Printed as its own line in the report with the matched evidence field empty; the top executable basenames of the unclassified set are listed for customer review."
+  }
+}

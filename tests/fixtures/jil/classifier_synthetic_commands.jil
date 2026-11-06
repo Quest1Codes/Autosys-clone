@@ -1,0 +1,260 @@
+/* synthetic_commands.jil - one or more jobs per integration class.
+   Commands are realistic shapes written by hand; hosts/users are placeholders. */
+
+/* ---------- native job types ---------- */
+insert_job: T_SAPN_01   job_type: SAP
+  sap_job_name: ZPAYROLL  machine: sapbox
+insert_job: T_SAPN_02   job_type: SAPBDC
+  sap_bdc_name: BDCDATA  machine: sapbox
+insert_job: T_PSN_01    job_type: PS
+  ps_process_name: PAYGL01 machine: psbox
+insert_job: T_OAN_01    job_type: OASG
+  oracle_appl_name: SYSADMIN  machine: ebsbox
+insert_job: T_DBN_01    job_type: SQL
+  sql_command: "select count(*) from t"  machine: dbb01
+insert_job: T_DBN_02    job_type: DBPROC
+  sp_name: pkg_run.proc  machine: dbb01
+insert_job: T_WSN_01    job_type: HTTP
+  invocation_type: GET  uri: http://example.test/x  machine: web01
+insert_job: T_HDN_01    job_type: HIVE
+  hive_scriptfile: /scripts/q.sql  machine: edge01
+insert_job: T_HDN_02    job_type: SQOOP
+  sqoop_args: import --connect jdbc:x  machine: edge01
+insert_job: T_MFN_01    job_type: ZOS
+  jcl_name: PAYJOB01  machine: mf01
+insert_job: T_MFN_02    job_type: I5
+  i5_name: NIGHTLY  machine: i5box
+insert_job: T_J2N_01    job_type: POJO
+  class_name: com.x.Run  machine: appsrv1
+insert_job: T_PAN_01    job_type: PAPROC
+  pa_process_name: flow1  machine: pabox
+insert_job: T_INF_01    job_type: SNMPGET
+  snmp_host: h1  machine: mon01
+insert_job: T_INF_02    job_type: CONNECT
+  connect_host: h1  connect_port: 443  machine: mon01
+insert_job: T_INF_03    job_type: REMOTECMD
+  remote_cmd: ls /tmp  machine: mon01
+insert_job: T_INFN_01   job_type: INFORMATICA
+  informatica_workflow: wf_x  machine: infa01
+insert_job: T_UDT_01    job_type: MYTYPE9
+  command: /opt/custom/mytype9.bin  machine: misc01
+insert_job: T_FTPN_01   job_type: FTP
+  ftp_server_name: ftphost  ftp_transfer_direction: GET  machine: filebox
+insert_job: T_SCPN_01   job_type: SCP
+  scp_server_name: scphost  machine: filebox
+insert_job: T_FWN_01    job_type: f
+  watch_file: /inbound/ready.trg  machine: filebox
+insert_job: T_BOX_01    job_type: b
+  owner: batch
+
+/* ---------- scheduler self-calls and cross-scheduler ---------- */
+insert_job: T_AEC_01    job_type: c
+  command: sendevent -E FORCE_STARTJOB -J NIGHT_BOX  machine: sched01
+insert_job: T_AEC_02    job_type: c
+  command: jil < /export/daily_load.jil  machine: sched01
+insert_job: T_AEC_03    job_type: c
+  command: autorep -J ALL -q > /tmp/status.txt  machine: sched01
+insert_job: T_AEC_04    job_type: c
+  command: /opt/CA/scripts/wrap.sh sendevent -E SET_GLOBAL -G FLAG=Y  machine: sched01
+insert_job: T_XSC_01    job_type: c
+  command: ctmorder -FOLDER DAILY -NAME * -ODATE ODAT  machine: ctmagt
+insert_job: T_XSC_02    job_type: c
+  command: conman "submit jx1 into pool"  machine: twsagt
+insert_job: T_XSC_03    job_type: c
+  command: espcmd AJ PAYROLL COMPLETE  machine: espagt
+insert_job: T_AEC_05    job_type: c
+  command: /scripts/log_run.sh $$JOBENV done  machine: log01
+insert_job: T_AEC_06    job_type: c
+  command: cp $AUTO_JOB_NAME.out /archive/$AUTORUN/  machine: log01
+
+/* ---------- ERP via command ---------- */
+insert_job: T_SAP_01    job_type: c
+  command: auto_r3v45 prog RSLG0000 SAP_TODAY  machine: sapagt1
+insert_job: T_SAP_02    job_type: c
+  command: /usr/sap/bin/startrfc -t -h saphost -c 001 -F RFC_PING  machine: sapagt1
+insert_job: T_SAP_03    job_type: c
+  command: sapcontrol -nr 00 -function StopSystem  machine: sapagt1
+insert_job: T_PS_01     job_type: c
+  command: auto_ps7 -i%%INSTANCE%% PS_INS %%RUNCNTLID%% %%PRCSNAME%% %%OPRID%%  machine: psagt1
+insert_job: T_PS_02     job_type: c
+  command: psae -CT ORACLE -CS dbh -CD FINPRD -CO opr -CP %%PSPASS%% -R RC1 -AI PAYGL01  machine: psagt1
+insert_job: T_EBS_01    job_type: c
+  command: $FND_TOP/bin/CONCSUB apps/%%APPSPW%% SYSADMIN "System Administrator" SYSADMIN WAIT=N CONCURRENT FND FNDSCURS  machine: ebsagt1
+insert_job: T_EBS_02    job_type: c
+  command: FNDLOAD apps/%%APPSPW%% 0 Y DOWNLOAD $FND_TOP/patch/115/import/aflob.lct cust.ldt FND_LOBS  machine: ebsagt1
+
+/* ---------- ETL ---------- */
+insert_job: T_INF_10    job_type: c
+  command: pmcmd startworkflow -sv INT01 -d DOM01 -u etluser -p %%INFAPW%% -f PROD wf_load  machine: infa01
+insert_job: T_INF_11    job_type: c
+  command: /opt/informatica/scripts/start_inf_session.sh -w wf_nightly  machine: infa01
+insert_job: T_INF_12    job_type: c
+  command: infacmd.sh ping -dn DOM01 -sn DIS01  machine: infa01
+insert_job: T_DS_01     job_type: c
+  command: dsjob -server DSENG -user dsuser -password %%DSPW%% -run -wait PROJ1 jb_nightly  machine: dseng
+insert_job: T_ABI_01    job_type: c
+  command: air sandbox run nightly_load.pset -reposit-tracking  machine: abihost
+insert_job: T_ABI_02    job_type: c
+  command: m_eval '(sum(in.amount))'  machine: abihost
+insert_job: T_TLND_01   job_type: c
+  command: /jobs/orders/orders_run.sh --context_param env=PROD --context_param dt=$$BDATE  machine: talend01
+insert_job: T_TLND_02   job_type: c
+  command: /jobs/daily_refresh/daily_refresh_run.bat  machine: "wintal01"
+insert_job: T_SSIS_01   job_type: c
+  command: "C:\\Program Files\\Microsoft SQL Server\\150\\DTS\\Binn\\DTExec.exe" /FILE "D:\\pkg\\load.dtsx"  machine: winssis
+insert_job: T_SSIS_02   job_type: c
+  command: dtexec /ISServer "\\SSISDB\\P1\\load.dtsx" /Server dbhost  machine: winssis
+insert_job: T_ODI_01    job_type: c
+  command: startscen.sh SCN_LOAD 001 GLOBAL -AGENT_CODE=local  machine: odi01
+
+/* ---------- database clients ---------- */
+insert_job: T_DBO_01    job_type: c
+  command: sqlplus batch/%%DBPW%%@FINDB @/sql/daily_load.sql  machine: dbhost1
+insert_job: T_DBO_02    job_type: c
+  command: sqlldr control=/load/ctl/daily.ctl log=/log/daily.log  machine: dbhost1
+insert_job: T_DBT_01    job_type: c
+  command: bteq < /scripts/daily.bteq  machine: tdhost1
+insert_job: T_DBT_02    job_type: c
+  command: fastload < /scripts/weekly.fastload  machine: tdhost1
+insert_job: T_DB2_01    job_type: c
+  command: db2 -tvf /scripts/reorg.sql  machine: db2host
+insert_job: T_DBM_01    job_type: c
+  command: sqlcmd -S dbhost -d FIN -i D:\\sql\\daily.sql  machine: winds01
+insert_job: T_DBM_02    job_type: c
+  command: bcp FIN.dbo.daily out D:\\out\\daily.dat -S dbhost -T -c  machine: winds01
+insert_job: T_DBP_01    job_type: c
+  command: psql -h pg01 -U batch -d warehouse -f /sql/load.sql  machine: pghost
+insert_job: T_DBMY_01   job_type: c
+  command: mysql -h myhost -u etl -p%%MYPW%% reports < /sql/daily.sql  machine: myhost
+insert_job: T_DBSN_01   job_type: c
+  command: snowsql -a acct1 -u etl -d prod -f /sql/load.sql  machine: snow01
+insert_job: T_DBNZ_01   job_type: c
+  command: nzsql -host nz01 -u etl -pw %%NZPW%% -db analytics -c "call proc()"  machine: nzhost
+insert_job: T_DBV_01    job_type: c
+  command: vsql -h vrt01 -U etl -w %%VPW%% -f /sql/load.sql  machine: vrthost
+insert_job: T_DBI_01    job_type: c
+  command: isql -S syb01 -U etl -P %%SYPW%% -i /sql/daily.sql  machine: sybhost
+insert_job: T_DBIF_01   job_type: c
+  command: dbaccess - /sql/daily.sql  machine: ifxhost
+
+/* ---------- hadoop / spark ---------- */
+insert_job: T_HDF_01    job_type: c
+  command: hdfs dfs -put /landing/daily.csv /raw/daily/  machine: edge01
+insert_job: T_HDF_02    job_type: c
+  command: hadoop jar /jars/daily.jar com.etl.Load /conf/  machine: edge01
+insert_job: T_HIV_01    job_type: c
+  command: hive -f /sql/daily_load.hql  machine: edge01
+insert_job: T_HIV_02    job_type: c
+  command: beeline -u jdbc:hive2://hs2:10000 -f /sql/load.hql  machine: edge01
+insert_job: T_SPK_01    job_type: c
+  command: spark-submit --master yarn --deploy-mode cluster /jobs/daily.py  machine: edge01
+insert_job: T_SPK_02    job_type: c
+  command: pyspark /jobs/nightly.py  machine: edge01
+insert_job: T_SQP_01    job_type: c
+  command: sqoop import --connect jdbc:oracle:thin:@db:1521/FIN --table TRX --target-dir /raw/trx  machine: edge01
+insert_job: T_OOZ_01    job_type: c
+  command: oozie job -oozie http://oozhost:11000/oozie -config /cfg/nightly.properties -run  machine: edge01
+insert_job: T_PIG_01    job_type: c
+  command: pig -f /pig/daily.pig  machine: edge01
+insert_job: T_FLK_01    job_type: c
+  command: flink run -c com.etl.Daily /jars/daily.jar  machine: flink01
+insert_job: T_KFK_01    job_type: c
+  command: kafka-console-producer.sh --broker-list kfk1:9092 --topic daily < /out/ev.json  machine: kfk01
+
+/* ---------- cloud CLIs ---------- */
+insert_job: T_AWS_01    job_type: c
+  command: aws s3 cp /out/daily.csv s3://landing/daily/  machine: cloud01
+insert_job: T_AWS_02    job_type: c
+  command: s3cmd sync /out/ s3://landing/nightly/  machine: cloud01
+insert_job: T_GCP_01    job_type: c
+  command: gsutil cp /out/daily.csv gs://landing/daily/  machine: cloud01
+insert_job: T_GCP_02    job_type: c
+  command: gcloud dataproc jobs submit pyspark --cluster c1 /jobs/daily.py  machine: cloud01
+insert_job: T_AZ_01     job_type: c
+  command: az storage blob upload -f /out/daily.csv -c landing -n daily.csv  machine: cloud01
+insert_job: T_AZ_02     job_type: c
+  command: azcopy copy "/out/daily.csv" "https://st.blob.core.windows.net/landing/daily.csv"  machine: cloud01
+insert_job: T_K8S_01    job_type: c
+  command: kubectl exec deploy/etl -- /app/run_daily.sh  machine: k8s01
+
+/* ---------- file transfer ---------- */
+insert_job: T_FTP_01    job_type: c
+  command: ftp -n -s:/scripts/daily.ftp  machine: file01
+insert_job: T_FTP_02    job_type: c
+  command: sftp -b /scripts/daily.sftp batch@filehost:/inbound/  machine: file01
+insert_job: T_FTP_03    job_type: c
+  command: "C:\\Scripts\\bkftp.exe" -h ftphost -u %%FTPUSR%% -p %%FTPPW%% -t put D:\\out\\daily.dat  machine: winfile
+insert_job: T_FTP_04    job_type: c
+  command: psftp -l batch -pw %%FTPPW%% -b /scripts/daily.ftp filehost  machine: winfile
+insert_job: T_FTP_05    job_type: c
+  command: lftp -u batch,%%FTPPW%% -e "put /out/daily.csv; bye" filehost  machine: file01
+insert_job: T_MFT_01    job_type: c
+  command: direct -s <<EOF submit file=/processes/daily.cd; EOF  machine: ndmnode
+insert_job: T_MFT_02    job_type: c
+  command: ascp -l 100m /out/daily.csv batch@asp01:/inbound/  machine: asp01
+insert_job: T_MFT_03    job_type: c
+  command: winscp.com /script=/scripts/daily.scp /log=D:\\log\\daily.log  machine: winfile
+insert_job: T_HTT_01    job_type: c
+  command: curl -u %%APIUSR%%:%%APIPW%% -T /out/daily.csv https://files.example.test/in/  machine: web01
+insert_job: T_HTT_02    job_type: c
+  command: wget -O /in/daily.csv https://files.example.test/daily.csv  machine: web01
+insert_job: T_RSY_01    job_type: c
+  command: rsync -avz /out/ batch@filehost:/inbound/  machine: file01
+insert_job: T_SCP_01    job_type: c
+  command: scp /out/daily.csv batch@filehost:/inbound/  machine: file01
+
+/* ---------- OS families ---------- */
+insert_job: T_WSH_01    job_type: c
+  command: "C:\\Scripts\\Daily Sync.bat"  machine: win01
+insert_job: T_WSH_02    job_type: c
+  command: powershell -File D:\\scripts\\daily.ps1 -RunDate $$BDATE  machine: win01
+insert_job: T_WSH_03    job_type: c
+  command: cscript //nologo D:\\scripts\\daily.vbs  machine: win01
+insert_job: T_WSH_04    job_type: c
+  command: D:\\bin\\loader.exe /cfg:D:\\cfg\\daily.ini  machine: win01
+insert_job: T_WSH_05    job_type: c
+  command: robocopy D:\\out \\\\nas01\\landing\\daily /MIR /LOG:D:\\log\\rc.log  machine: win01
+insert_job: T_USH_01    job_type: c
+  command: /scripts/daily_load.sh  machine: ux01
+insert_job: T_USH_02    job_type: c
+  command: ksh /scripts/nightly.ksh $$BDATE  machine: ux01
+insert_job: T_PRL_01    job_type: c
+  command: perl /scripts/reconcile.pl --date $$BDATE  machine: ux01
+insert_job: T_PY_01     job_type: c
+  command: python3 /scripts/daily_extract.py --env prod  machine: ux01
+insert_job: T_PY_02     job_type: c
+  command: /opt/tools/daily.py  machine: ux01
+insert_job: T_JAV_01    job_type: c
+  command: java -jar /opt/etl/daily.jar --config /cfg/daily.yml  machine: ux01
+insert_job: T_CRY_01    job_type: c
+  command: gpg --batch --encrypt -r ops /out/daily.csv  machine: ux01
+insert_job: T_CRY_02    job_type: c
+  command: openssl enc -aes-256-cbc -in /out/daily.csv -out /out/daily.csv.enc -pass file:/keys/daily.key  machine: ux01
+insert_job: T_FSO_01    job_type: c
+  command: tar -czf /archive/daily.tar.gz /out/daily/  machine: ux01
+insert_job: T_FSO_02    job_type: c
+  command: zip -j /out/daily.zip /out/daily.csv  machine: ux01
+insert_job: T_NOP_01    job_type: c
+  command: sleep 60  machine: ux01
+insert_job: T_NOP_02    job_type: c
+  command: echo done  machine: ux01
+insert_job: T_SSH_01    job_type: c
+  command: ssh batch@rmthost /scripts/daily.sh  machine: ux01
+insert_job: T_SSH_02    job_type: c
+  command: sshpass -p %%SSHPW%% ssh batch@rmthost ls /inbound  machine: ux01
+insert_job: T_NTF_01    job_type: c
+  command: mailx -s "daily load finished" ops@example.test < /log/daily.log  machine: ux01
+insert_job: T_NTF_02    job_type: c
+  command: snmptrap -v 2c -c public nms01 '' .1.3.6.1.4.1.99  machine: ux01
+insert_job: T_NTF_03    job_type: c
+  command: blat - -to ops@example.test -subject "done" -body daily  machine: win01
+insert_job: T_PNG_01    job_type: c
+  command: ping -c 3 filehost  machine: ux01
+
+/* ---------- unclassified ---------- */
+insert_job: T_UNC_01    job_type: c
+  command: /opt/frobco/bin/frobco_loader --run nightly --profile prod  machine: misc01
+insert_job: T_UNC_02    job_type: c
+  command: capchain -i /in/daily.dat -o /out/daily.out  machine: misc01
+insert_job: T_UNC_03    job_type: c
+  command: pending  machine: misc01
