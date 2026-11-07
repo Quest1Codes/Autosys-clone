@@ -3,6 +3,11 @@ Assessment router — Phase 1 migration-assessment export for Shinro.
 
 GET  /api/v1/assessment/prescan              Light, read-only estate summary: no scoring, no
                                              simulation. See analysis/prescan.py.
+GET  /api/v1/assessment/manifest             Classification, disposition and size data for
+                                             shinro's new fact-sheet report pipeline. No scoring,
+                                             no simulation. See analysis/prescan.py's sibling
+                                             modules: classification.py, disposition.py,
+                                             size_model.py.
 GET  /api/v1/assessment/report               Full complexity report (JSON): T-shirt size, effort,
                                              operational risk, gap tags, the A1-A10 migration
                                              signals, and an Indicative Otto Token Budget. Risk
@@ -45,7 +50,10 @@ from autosys.analysis.complexity import (
     AssessmentSummary, JobAssessment, astronomer_mapping, box_effort_breakdown,
     build_report, compute_summary, export_csv, risk_mitigation,
 )
+from autosys.analysis.classification import load_rules
+from autosys.analysis.disposition import build_manifest
 from autosys.analysis.migration_signals import run_all_structural_analyses
+from autosys.analysis.size_model import size
 from autosys.analysis.workload_profile import compute_workload_profile
 from autosys.analysis.operational_risk import (
     MIN_OBSERVED_RUNS, MIN_OBSERVED_WINDOW_DAYS, fetch_run_stats,
@@ -57,7 +65,7 @@ from autosys.app_server.schemas import (
     AssessmentCoverage, AssessmentJobRecord, AssessmentReportResponse,
     AssessmentSimulation, AssessmentSummaryResponse, AssessmentWorkload,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
-    PrescanResponse,
+    ManifestJobEntry, ManifestResponse, PrescanResponse, SizeVectorResponse,
 )
 from autosys.db.repository import (
     calendars as calendar_repo, globs as global_repo, jobs as job_repo, machines as machine_repo,
@@ -263,6 +271,35 @@ def get_prescan(
         calendars_defined=len(calendar_repo.list_all(session)),
         globals_defined=len(global_repo.list_all(session)),
         history_jobs=len(observed),
+    )
+
+
+@router.get("/manifest", response_model=ManifestResponse)
+def get_manifest(
+    session: Session     = Depends(get_session),
+    _user:   CurrentUser = Depends(get_current_user),
+):
+    """
+    T39: classification, disposition and size -- the data `shinro`'s
+    report pipeline (`autosys_report.facts.build_sheet()`) needs, no
+    scoring or simulation. No answers yet (T27's questionnaire isn't
+    built): `build_manifest()` and `size()` both default every
+    not-yet-asked question to "unsure", which is their own documented,
+    tested fail-open behaviour, not a gap introduced here.
+    """
+    rows = job_repo.list_all(session)
+    manifest = build_manifest(rows, session)
+    vector = size(rows)
+    return ManifestResponse(
+        manifest=[
+            ManifestJobEntry(job_name=m.job_name, class_=m.class_, best=m.best, worst=m.worst, rule_id=m.rule_id)
+            for m in manifest
+        ],
+        size_vector=SizeVectorResponse(
+            low=vector.low, high=vector.high, cu=vector.cu, families=vector.families,
+            row_count=vector.row_count, dominant_order=[list(pair) for pair in vector.dominant_order()],
+        ),
+        rules_version=load_rules().meta.get("version", ""),
     )
 
 

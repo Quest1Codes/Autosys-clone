@@ -890,6 +890,54 @@ class TestPrescanAPI:
         assert prescan["job_count"] == report["job_count"]
 
 
+class TestManifestAPI:
+    """T39: GET /api/v1/assessment/manifest -- classification, disposition
+    and size data, no scoring, no simulation."""
+
+    def test_manifest_empty_db(self, ssa_client):
+        r = ssa_client.get("/api/v1/assessment/manifest")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["manifest"] == []
+        assert data["size_vector"]["row_count"] == 0
+        assert data["rules_version"]  # a real version string, not blank
+
+    def test_manifest_matches_seeded_jobs(self, ssa_client, isolated_db):
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            session.commit()
+
+        r = ssa_client.get("/api/v1/assessment/manifest")
+        assert r.status_code == 200
+        data = r.json()
+        names = {m["job_name"] for m in data["manifest"]}
+        assert names == {"seq_box", "a", "b", "c"}
+        for m in data["manifest"]:
+            assert m["best"] in ("NONE", "MECH", "JUDG", "REDESIGN")
+            assert m["worst"] in ("NONE", "MECH", "JUDG", "REDESIGN")
+        assert data["size_vector"]["row_count"] == 4
+        assert data["size_vector"]["low"]["I"] == 3  # box excluded from I
+
+    def test_manifest_shape_matches_shinros_build_sheet_contract(self, ssa_client, isolated_db):
+        """Field names only -- autosys-clone and shinro are separate repos
+        and this suite can't import shinro's code (same reasoning as
+        every import-isolation test on that side). The contract itself is
+        documented in both `ManifestResponse`'s docstring here and
+        `autosys_report.facts.build_sheet()`'s docstring there; this just
+        proves this endpoint's response actually has the fields that
+        contract promises."""
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            session.commit()
+
+        data = ssa_client.get("/api/v1/assessment/manifest").json()
+        for entry in data["manifest"]:
+            assert set(entry) == {"job_name", "class_", "best", "worst", "rule_id"}
+        assert set(data["size_vector"]) == {"low", "high", "cu", "families", "row_count", "dominant_order"}
+
+
 class TestBoxTraceAPI:
 
     def test_trace_sequential_box(self, ssa_client, isolated_db):

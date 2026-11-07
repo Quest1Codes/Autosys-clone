@@ -407,6 +407,49 @@ class PrescanResponse(BaseModel):
     fingerprint:            str = ""
 
 
+class ManifestJobEntry(BaseModel):
+    """One row of the disposition manifest (`analysis/disposition.py`'s
+    `JobDisposition`), the shape `shinro`'s `autosys_report.facts.
+    build_sheet()` takes as its `manifest` argument."""
+    job_name: str
+    class_:   str
+    best:     str
+    worst:    str
+    rule_id:  str
+
+
+class SizeVectorResponse(BaseModel):
+    """`analysis/size_model.py`'s `SizeVector`, as `facts.build_sheet()`'s
+    `size_vector` argument expects it -- `dominant_order` added as a list
+    of pairs, since `SizeVector.dominant_order()` is a method, not a
+    stored field."""
+    low:            dict[str, float] = Field(default_factory=dict)
+    high:           dict[str, float] = Field(default_factory=dict)
+    cu:             dict[str, int] = Field(default_factory=dict)
+    families:       dict[str, dict[str, int]] = Field(default_factory=dict)
+    row_count:      int = 0
+    dominant_order: list[list[str]] = Field(default_factory=list)
+
+
+class ManifestResponse(BaseModel):
+    """
+    T39: the classification/disposition/size data `shinro`'s report
+    pipeline (`autosys_report.facts.build_sheet()`) needs, computed fresh
+    from stored jobs -- no scoring, no simulation, nothing this endpoint
+    invents: every field here is a direct pass-through of T15-T17's
+    already-tested `classify_row`/`build_manifest`/`size()`.
+
+    Synchronous for now. On a very large estate this can be slow (the old
+    full `/report` pipeline measured ~500s at 99,960 jobs, though that
+    included scoring and simulation this endpoint never does) -- the
+    background start/poll pattern the design calls for isn't built yet;
+    that's a follow-up, not assumed away.
+    """
+    manifest:      list[ManifestJobEntry] = Field(default_factory=list)
+    size_vector:   SizeVectorResponse = Field(default_factory=SizeVectorResponse)
+    rules_version: str = ""
+
+
 class AssessmentWorkload(BaseModel):
     """
     Workload timing measured from REAL run history (imported client export,
