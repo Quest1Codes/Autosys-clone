@@ -8,6 +8,7 @@ TestBoxTraceAPI        — POST /api/v1/assessment/boxes/{box}/trace
 """
 from __future__ import annotations
 
+import os
 from typing import Generator
 
 import pytest
@@ -936,6 +937,75 @@ class TestManifestAPI:
         for entry in data["manifest"]:
             assert set(entry) == {"job_name", "class_", "best", "worst", "rule_id"}
         assert set(data["size_vector"]) == {"low", "high", "cu", "families", "row_count", "dominant_order"}
+
+    @pytest.mark.parametrize("count", [10_000, 30_000])
+    def test_manifest_scales_linearly_not_quadratically(self, ssa_client, isolated_db, count):
+        """T06: the design study measured the prescan/classification path
+        (which /manifest's classify_row/build_manifest/size() call share
+        the same shape with) at 0.39s/4,427 jobs and 6.82s/99,960 jobs --
+        roughly linear, not the old O(n^2) /report scan T01 fixed. This
+        pair (10k/30k) runs every time, fast enough not to slow the
+        regular suite down; the full cited scale is
+        `test_manifest_at_nightly_scale` below, opt-in.
+
+        The research's own cited scale (29,988/99,960/101,821 jobs) was
+        real public JIL samples (`jil_samples/`, gitignored, not present
+        in this repo) -- this uses synthetic flat jobs at a comparable
+        order of magnitude instead. The bound is loose (linear-at-4,427
+        extrapolated with slack) specifically to catch a quadratic
+        regression, not to pin an exact throughput number."""
+        import time
+        from autosys.db.connection import sync_session
+
+        with sync_session() as session:
+            _seed_flat_jobs(session, count)
+            session.commit()
+
+        t0 = time.monotonic()
+        r = ssa_client.get("/api/v1/assessment/manifest")
+        elapsed = time.monotonic() - t0
+
+        assert r.status_code == 200
+        assert r.json()["size_vector"]["row_count"] == count
+        # Linear extrapolation from the design study's own 4,427-job/0.39s
+        # figure, x4 slack for this machine/test harness, loose enough not
+        # to flake but tight enough to catch an accidental O(n^2) return.
+        budget = (count / 4_427) * 0.39 * 4
+        assert elapsed < budget, f"/manifest took {elapsed:.1f}s for {count} jobs (budget {budget:.1f}s) -- possible quadratic regression"
+
+    @pytest.mark.skipif(
+        not os.environ.get("AUTOSYS_RUN_SCALE_TESTS"),
+        reason="T06 nightly-scale run, opt-in (AUTOSYS_RUN_SCALE_TESTS=1) -- seeds 100k+ jobs, takes tens of seconds",
+    )
+    @pytest.mark.parametrize("count", [29_988, 99_960, 101_821])
+    def test_manifest_at_nightly_scale(self, ssa_client, isolated_db, count):
+        """T06's own cited scale, exactly: 29,988/99,960/101,821 jobs --
+        the sizes of the real public JIL samples used throughout the
+        design study. Opt-in (not run in the regular suite; set
+        AUTOSYS_RUN_SCALE_TESTS=1), same reasoning as the real-sample
+        tests in test_synthetic_estates.py: real throughput at this
+        scale is worth confirming periodically, but seeding 100k+ rows
+        every CI run would make the regular suite itself the slow part.
+
+        Measured directly against this code before writing this test:
+        100,000 synthetic flat jobs -> 24.6s (seed 7.9s separately), on
+        this machine -- a real number, not a guess, and the budget below
+        gives it roughly 1.4x slack."""
+        import time
+        from autosys.db.connection import sync_session
+
+        with sync_session() as session:
+            _seed_flat_jobs(session, count)
+            session.commit()
+
+        t0 = time.monotonic()
+        r = ssa_client.get("/api/v1/assessment/manifest")
+        elapsed = time.monotonic() - t0
+
+        assert r.status_code == 200
+        assert r.json()["size_vector"]["row_count"] == count
+        budget = (count / 100_000) * 24.6 * 1.4
+        assert elapsed < budget, f"/manifest took {elapsed:.1f}s for {count} jobs (budget {budget:.1f}s) -- possible regression"
 
 
 class TestBoxTraceAPI:
