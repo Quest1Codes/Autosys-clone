@@ -342,6 +342,13 @@ class SizeVector:
     cu: dict[str, int]
     families: dict[str, dict[str, int]]
     row_count: int
+    # T32 (S9, "Cutover plan"): job count per cutover group, largest first
+    # -- "top N groups with totals" needs this breakdown; `cu`'s own
+    # largest_jobs/largest_flows are just the single biggest group's
+    # numbers, not the ranked list a top-N table needs. No job names here
+    # on purpose (05 §4.9: "Every job's group is in the workbook" -- this
+    # is the summary-table view, not the per-job detail).
+    cutover_group_sizes: tuple[int, ...] = field(default_factory=tuple)
     # T32 (S6, "Behaviour that changes"): per-construct-type job counts --
     # how many jobs carry each kind of exception construct (constructs()'s
     # own set members: cond_or, look_back, exit_code, not_running,
@@ -528,7 +535,8 @@ def size(rows: list[JobRow], answers: Optional[dict[str, str]] = None, level: Li
         fam[label]["EP"] = len(v)
 
     return SizeVector(low=lo, high=hi, cu=cu, families={k: dict(v) for k, v in fam.items()},
-                       row_count=len(rows), constructs=dict(construct_counts))
+                       row_count=len(rows), constructs=dict(construct_counts),
+                       cutover_group_sizes=tuple(sorted(jobs_in, reverse=True)))
 
 
 # ---------------------------------------------------------------------------

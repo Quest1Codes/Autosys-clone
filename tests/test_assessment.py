@@ -937,7 +937,8 @@ class TestManifestAPI:
         for entry in data["manifest"]:
             assert set(entry) == {"job_name", "class_", "best", "worst", "rule_id"}
         assert set(data["size_vector"]) == {
-            "low", "high", "cu", "families", "row_count", "dominant_order", "constructs",
+            "low", "high", "cu", "families", "row_count", "dominant_order",
+            "constructs", "cutover_group_sizes",
         }
 
     @pytest.mark.parametrize("count", [10_000, 30_000])

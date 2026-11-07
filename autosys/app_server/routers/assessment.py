@@ -298,7 +298,7 @@ def get_manifest(
         size_vector=SizeVectorResponse(
             low=vector.low, high=vector.high, cu=vector.cu, families=vector.families,
             row_count=vector.row_count, dominant_order=[list(pair) for pair in vector.dominant_order()],
-            constructs=vector.constructs,
+            constructs=vector.constructs, cutover_group_sizes=list(vector.cutover_group_sizes),
         ),
         rules_version=load_rules().meta.get("version", ""),
     )

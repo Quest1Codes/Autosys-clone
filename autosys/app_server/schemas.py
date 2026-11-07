@@ -431,6 +431,8 @@ class SizeVectorResponse(BaseModel):
     dominant_order: list[list[str]] = Field(default_factory=list)
     #: T32 (S6): per-construct-type job counts (SizeVector.constructs).
     constructs:     dict[str, int] = Field(default_factory=dict)
+    #: T32 (S9): job count per cutover group, largest first.
+    cutover_group_sizes: list[int] = Field(default_factory=list)
 
 
 class ManifestResponse(BaseModel):

@@ -213,6 +213,42 @@ class TestSizeVectorConstructBreakdown:
         assert v.constructs == {}
 
 
+class TestCutoverGroupSizes:
+    """T32 (S9): job count per cutover group, largest first -- the
+    ranked list a "top N groups" table needs, distinct from cu's own
+    single largest_jobs/largest_flows numbers."""
+
+    def test_sorted_largest_first(self):
+        jobs = [
+            # Group 1: a -> b -> c (3 jobs)
+            {"job_name": "a", "job_type": "CMD", "command": "/bin/echo a", "machine": "m1"},
+            {"job_name": "b", "job_type": "CMD", "command": "/bin/echo b", "machine": "m1", "condition": "s(a)"},
+            {"job_name": "c", "job_type": "CMD", "command": "/bin/echo c", "machine": "m1", "condition": "s(b)"},
+            # Group 2: standalone (1 job)
+            {"job_name": "d", "job_type": "CMD", "command": "/bin/echo d", "machine": "m1"},
+            # Group 3: e -> f (2 jobs)
+            {"job_name": "e", "job_type": "CMD", "command": "/bin/echo e", "machine": "m1"},
+            {"job_name": "f", "job_type": "CMD", "command": "/bin/echo f", "machine": "m1", "condition": "s(e)"},
+        ]
+        _reseed(jobs)
+        v = size(_rows())
+        assert v.cutover_group_sizes == (3, 2, 1)
+
+    def test_largest_matches_cus_own_figure(self):
+        jobs = [
+            {"job_name": "a", "job_type": "CMD", "command": "/bin/echo a", "machine": "m1"},
+            {"job_name": "b", "job_type": "CMD", "command": "/bin/echo b", "machine": "m1", "condition": "s(a)"},
+        ]
+        _reseed(jobs)
+        v = size(_rows())
+        assert v.cutover_group_sizes[0] == v.cu["largest_jobs"]
+
+    def test_empty_estate_gives_an_empty_tuple(self):
+        _reseed([])
+        v = size(_rows())
+        assert v.cutover_group_sizes == ()
+
+
 class TestRateCardGating:
     """O1: no hours print until a signed, unexpired, fully-priced card exists."""
 
