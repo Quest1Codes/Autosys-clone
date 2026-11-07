@@ -936,7 +936,9 @@ class TestManifestAPI:
         data = ssa_client.get("/api/v1/assessment/manifest").json()
         for entry in data["manifest"]:
             assert set(entry) == {"job_name", "class_", "best", "worst", "rule_id"}
-        assert set(data["size_vector"]) == {"low", "high", "cu", "families", "row_count", "dominant_order"}
+        assert set(data["size_vector"]) == {
+            "low", "high", "cu", "families", "row_count", "dominant_order", "constructs",
+        }
 
     @pytest.mark.parametrize("count", [10_000, 30_000])
     def test_manifest_scales_linearly_not_quadratically(self, ssa_client, isolated_db, count):

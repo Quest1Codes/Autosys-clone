@@ -429,6 +429,8 @@ class SizeVectorResponse(BaseModel):
     families:       dict[str, dict[str, int]] = Field(default_factory=dict)
     row_count:      int = 0
     dominant_order: list[list[str]] = Field(default_factory=list)
+    #: T32 (S6): per-construct-type job counts (SizeVector.constructs).
+    constructs:     dict[str, int] = Field(default_factory=dict)
 
 
 class ManifestResponse(BaseModel):
