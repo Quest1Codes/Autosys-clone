@@ -834,6 +834,62 @@ class TestAssessmentReportAPI:
         assert job_a["estimated_otto_tokens_min"] <= job_a["estimated_otto_tokens_max"]
 
 
+class TestPrescanAPI:
+    """T26: GET /api/v1/assessment/prescan -- no scoring, no simulation."""
+
+    def test_prescan_empty_db(self, ssa_client):
+        r = ssa_client.get("/api/v1/assessment/prescan")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["job_count"] == 0
+        assert data["families"] == {}
+
+    def test_prescan_matches_seeded_jobs(self, ssa_client, isolated_db):
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            session.commit()
+
+        r = ssa_client.get("/api/v1/assessment/prescan")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["job_count"] == 4  # box + a + b + c
+        assert data["non_box"] == 3
+        assert data["by_job_type"]["BOX"] == 1
+
+    def test_prescan_includes_catalog_table_counts(self, ssa_client, isolated_db):
+        # Baseline first: the running app may self-register its own agent
+        # machine on startup, independent of anything this test adds.
+        baseline = ssa_client.get("/api/v1/assessment/prescan").json()
+
+        from autosys.db.connection import sync_session
+        from autosys.db.repository import calendars as calendar_repo, machines as machine_repo
+        from autosys.db.schema import CalendarRow
+
+        with sync_session() as session:
+            machine_repo.register(session, "m1", "host1", 7000)
+            calendar_repo.upsert(session, CalendarRow(calendar_name="CAL_A", dates_json="[]"))
+            session.commit()
+
+        r = ssa_client.get("/api/v1/assessment/prescan")
+        data = r.json()
+        assert data["machines_defined"] == baseline["machines_defined"] + 1
+        assert data["calendars_defined"] == baseline["calendars_defined"] + 1
+
+    def test_prescan_is_much_lighter_than_report_on_the_same_estate(self, ssa_client, isolated_db):
+        """Not a timing assertion (too flaky for CI) -- just that both
+        endpoints agree on the one fact they share, job_count, proving
+        prescan isn't silently looking at different data."""
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_sequential_box(session)
+            session.commit()
+
+        prescan = ssa_client.get("/api/v1/assessment/prescan").json()
+        report = ssa_client.get("/api/v1/assessment/report", params={"simulate": False}).json()
+        assert prescan["job_count"] == report["job_count"]
+
+
 class TestBoxTraceAPI:
 
     def test_trace_sequential_box(self, ssa_client, isolated_db):

@@ -376,6 +376,37 @@ class AssessmentCoverage(BaseModel):
     alarms_observed:            bool = False
 
 
+class PrescanResponse(BaseModel):
+    """
+    T26: a light, read-only estate summary -- no scoring, no simulation.
+    Meant to replace the connectivity check's current habit of running
+    the whole ``/report`` pipeline just to keep ``job_count`` (N5 in
+    ``dev/task13-assessment-report-research/llm-responses/
+    11-questionnaire-redesign-opus5.5.md``). Field meanings and intended
+    use are documented there, §3.3's response table.
+    """
+    job_count:              int = 0
+    non_box:                int = 0
+    by_job_type:            dict[str, int] = Field(default_factory=dict)
+    machines_named:         int = 0
+    machines_defined:       int = 0
+    calendars_named:        int = 0
+    calendars_defined:      int = 0
+    globals_named:          int = 0
+    globals_defined:        int = 0
+    clock_jobs:             int = 0
+    clock_no_tz:            int = 0
+    dangling_refs:          int = 0
+    credential_jobs:        int = 0
+    windows_jobs:           int = 0
+    mainframe_native:       int = 0
+    families:               dict[str, dict[str, int]] = Field(default_factory=dict)
+    unclassified:           int = 0
+    jobs_with_app_or_group: int = 0
+    history_jobs:           int = 0
+    fingerprint:            str = ""
+
+
 class AssessmentWorkload(BaseModel):
     """
     Workload timing measured from REAL run history (imported client export,

@@ -1,6 +1,8 @@
 """
 Assessment router — Phase 1 migration-assessment export for Shinro.
 
+GET  /api/v1/assessment/prescan              Light, read-only estate summary: no scoring, no
+                                             simulation. See analysis/prescan.py.
 GET  /api/v1/assessment/report               Full complexity report (JSON): T-shirt size, effort,
                                              operational risk, gap tags, the A1-A10 migration
                                              signals, and an Indicative Otto Token Budget. Risk
@@ -48,14 +50,18 @@ from autosys.analysis.workload_profile import compute_workload_profile
 from autosys.analysis.operational_risk import (
     MIN_OBSERVED_RUNS, MIN_OBSERVED_WINDOW_DAYS, fetch_run_stats,
 )
+from autosys.analysis.prescan import compute_prescan
 from autosys.app_server.deps    import get_session, get_current_user, CurrentUser
 from autosys.app_server.schemas import (
     AITokenBudgetResponse,
     AssessmentCoverage, AssessmentJobRecord, AssessmentReportResponse,
     AssessmentSimulation, AssessmentSummaryResponse, AssessmentWorkload,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
+    PrescanResponse,
 )
-from autosys.db.repository import jobs as job_repo
+from autosys.db.repository import (
+    calendars as calendar_repo, globs as global_repo, jobs as job_repo, machines as machine_repo,
+)
 
 router = APIRouter(prefix="/api/v1/assessment", tags=["assessment"])
 
@@ -230,6 +236,33 @@ def _ai_token_budget_response(ai_budget) -> AITokenBudgetResponse:
         architecture_pattern_count=ai_budget.architecture_pattern_count,
         by_route=ai_budget.by_route, by_tier=ai_budget.by_tier,
         disclaimer=ai_budget.disclaimer, pricing_note=ai_budget.pricing_note,
+    )
+
+
+@router.get("/prescan", response_model=PrescanResponse)
+def get_prescan(
+    session: Session     = Depends(get_session),
+    _user:   CurrentUser = Depends(get_current_user),
+):
+    """
+    T26: a light, read-only estate summary -- no scoring, no simulation.
+    Meant to replace the connectivity check's current full ``/report``
+    call, which exists only to keep ``job_count`` today (N5). See
+    ``analysis/prescan.py`` for what each field measures.
+    """
+    rows = job_repo.list_all(session)
+    prescan = compute_prescan(rows)
+    job_names = [r.job_name for r in rows]
+    # Any job with recorded run history at all, imported or this instance's
+    # own -- never simulated history, which is fiction for sizing purposes
+    # (same "real evidence only" rule _assess() applies above).
+    observed = fetch_run_stats(session, job_names, sources=("imported", "live")) if job_names else {}
+    return PrescanResponse(
+        **prescan,
+        machines_defined=len(machine_repo.list_all(session)),
+        calendars_defined=len(calendar_repo.list_all(session)),
+        globals_defined=len(global_repo.list_all(session)),
+        history_jobs=len(observed),
     )
 
 
