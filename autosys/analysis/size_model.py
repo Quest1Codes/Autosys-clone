@@ -342,6 +342,14 @@ class SizeVector:
     cu: dict[str, int]
     families: dict[str, dict[str, int]]
     row_count: int
+    # T32 (S6, "Behaviour that changes"): per-construct-type job counts --
+    # how many jobs carry each kind of exception construct (constructs()'s
+    # own set members: cond_or, look_back, exit_code, not_running,
+    # value_cond, cross_instance, box_logic, terminator, resource,
+    # global_var). "E" above is just len(hits) summed; this is the
+    # breakdown S6 needs to say *which* behaviour changes, not just how
+    # many decisions there are in total.
+    constructs: dict[str, int] = field(default_factory=dict)
 
     def excess_unknown_jobs(self) -> int:
         """U, for the "N jobs not sized" line -- read here, not re-derived
@@ -379,6 +387,7 @@ def size(rows: list[JobRow], answers: Optional[dict[str, str]] = None, level: Li
     fam: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
     fam_patterns: dict[str, set] = collections.defaultdict(set)
     fam_eps: dict[str, set] = collections.defaultdict(set)
+    construct_counts: collections.Counter = collections.Counter()
     link = {f: f for f in flows}
 
     def find(x):
@@ -398,6 +407,7 @@ def size(rows: list[JobRow], answers: Optional[dict[str, str]] = None, level: Li
         e_count = len(hits)
         lo["E"] += e_count
         hi["E"] += e_count
+        construct_counts.update(hits)
         integ, kind = FAMILY.get(cls, (OTHER_INTEGRATION.get(cls), None))
         label = integ or ("unknown" if cls in UNKNOWN_CLASSES else "box" if jt == "BOX" else "generic")
         fam[label]["E"] += e_count
@@ -517,7 +527,8 @@ def size(rows: list[JobRow], answers: Optional[dict[str, str]] = None, level: Li
     for label, v in fam_eps.items():
         fam[label]["EP"] = len(v)
 
-    return SizeVector(low=lo, high=hi, cu=cu, families={k: dict(v) for k, v in fam.items()}, row_count=len(rows))
+    return SizeVector(low=lo, high=hi, cu=cu, families={k: dict(v) for k, v in fam.items()},
+                       row_count=len(rows), constructs=dict(construct_counts))
 
 
 # ---------------------------------------------------------------------------

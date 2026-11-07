@@ -179,6 +179,40 @@ class TestSizeBasics:
         assert v_forward.low == v_reversed.low and v_forward.high == v_reversed.high
 
 
+class TestSizeVectorConstructBreakdown:
+    """T32 (S6): per-construct-type job counts, so the report can say
+    *which* behaviour changes, not just how many decisions exist in
+    total (size.E)."""
+
+    def test_breaks_down_by_construct_type(self):
+        _reseed([
+            {"job_name": "a", "job_type": "CMD", "command": "/bin/echo a", "machine": "m1",
+             "condition": "s(x) | e(y) = 0"},
+            {"job_name": "b", "job_type": "CMD", "command": "/bin/echo b", "machine": "m1",
+             "condition": "e(z) = 0"},
+        ])
+        v = size(_rows())
+        assert v.constructs["cond_or"] == 1
+        assert v.constructs["exit_code"] == 2  # both jobs have an exit-code condition
+        assert "look_back" not in v.constructs
+
+    def test_sums_to_e_when_no_credential_shapes_present(self):
+        # E counts every hit, including "credential" when redact_and_flag
+        # fires; with no credential-shaped command, constructs' own hits
+        # (not "credential") must sum to exactly size.E across the estate.
+        _reseed([
+            {"job_name": "a", "job_type": "CMD", "command": "/bin/echo a", "machine": "m1",
+             "condition": "s(x) | e(y,12) = 0"},
+        ])
+        v = size(_rows())
+        assert sum(v.constructs.values()) == v.low["E"] == v.high["E"]
+
+    def test_empty_estate_gives_an_empty_breakdown_not_a_crash(self):
+        _reseed([])
+        v = size(_rows())
+        assert v.constructs == {}
+
+
 class TestRateCardGating:
     """O1: no hours print until a signed, unexpired, fully-priced card exists."""
 
