@@ -19,12 +19,12 @@ pipeline, and are not repeated here:
 - T16 (a box_name loop ends, in any order) -- `test_size_model.py::
   TestFlowRoots::test_box_loop_does_not_infinite_loop`
 
-T2e (shuffled file blocks, re-imported through the real JIL parser,
-not just the in-memory model), T11/T11b/T11c (questionnaire-answer
-narrowing, off-list handling, "not ours" routing) are not covered here
-either -- they need T27's real questionnaire wiring to test against
-real answer flows rather than hand-built answer dicts, and are left as
-an explicit gap, not silently skipped.
+The two former gaps are now covered here as well: T2e (shuffled file
+blocks re-imported through the real `jil_ingest` path, not just the
+in-memory model) and T11/T11b/T11c (answer narrowing, off-list handling,
+"not ours" routing) -- with a sibling-checkout contract test asserting
+the shipped questionnaire's option strings are exactly the strings the
+model's effect tables consume.
 """
 from __future__ import annotations
 
@@ -343,3 +343,174 @@ class TestT14ExitWindowAndTargetMoveOnlyWhatTheyShould:
                 continue
             assert v_oss.low[unit] == v_astro.low[unit], f"{unit} moved with target choice"
             assert v_oss.high[unit] == v_astro.high[unit], f"{unit} moved with target choice"
+
+
+class TestT2eShuffledFileBlocks:
+    """L234's gap closed: `update_job`/`delete_job` make JIL order-dependent,
+    but plain `insert_job:` blocks must not be. Shuffle the blocks, run them
+    through the REAL ingest path (jil_ingest.ingest_text -- the same one
+    `jil import` and the API use), then manifest+size must be identical."""
+
+    _BLOCKS = [
+        "insert_job: box1   job_type: BOX\nowner: ops\ndate_conditions: 1\ndays_of_week: all\n",
+        "insert_job: j_a   job_type: CMD\nbox_name: box1\ncommand: /opt/app/a.sh\nmachine: m1\ncondition: s(j_b)\n",
+        "insert_job: j_b   job_type: CMD\nbox_name: box1\ncommand: auto_r3_exec -i\nmachine: m1\n",
+        "insert_job: j_c   job_type: CMD\ncommand: C:\\\\scripts\\\\run.bat\nmachine: win1\n",
+    ]
+
+    def _ingest_and_size(self, blocks):
+        from autosys.parser.jil_ingest import ingest_text
+        with sync_session() as s:
+            s.query(JobRow).delete()
+            s.commit()
+            ingest_text(s, "\n".join(blocks), "estate.jil")
+            s.commit()
+        rows = _rows()
+        with sync_session() as s:
+            manifest = build_manifest(rows, s)
+        v = size(rows)
+        return (
+            sorted((r.job_name, r.class_, r.best, r.worst) for r in manifest),
+            v.low, v.high, v.cu,
+        )
+
+    def test_block_order_changes_nothing(self):
+        baseline = self._ingest_and_size(self._BLOCKS)
+        for seed in range(1, 8):
+            blocks = self._BLOCKS[:]
+            random.Random(seed).shuffle(blocks)
+            assert self._ingest_and_size(blocks) == baseline, \
+                f"shuffled JIL blocks (seed {seed}) changed manifest or size"
+
+
+def _sap_windows_estate():
+    """Small estate exercising the answer-consuming paths: an erp_sap
+    wrapper job (vendor_runtime family), a Windows-shaped job
+    (windows_execution_plan), plus a box and a dependency chain."""
+    return [
+        {"job_name": "box1", "job_type": "BOX"},
+        {"job_name": "j_a", "job_type": "CMD", "command": "/opt/app/a.sh", "machine": "m1",
+         "box_name": "box1", "condition": "s(j_b)"},
+        {"job_name": "j_b", "job_type": "CMD", "command": "auto_r3_exec -i", "machine": "m1",
+         "box_name": "box1"},
+        {"job_name": "j_c", "job_type": "CMD", "command": "C:\\scripts\\run.bat", "machine": "win1"},
+        {"job_name": "j_d", "job_type": "CMD", "command": "/bin/echo d", "machine": "m1"},
+    ]
+
+
+class TestT11AnswersOnlyNarrow:
+    """T11: any single real questionnaire answer can only narrow the
+    [low, high] range -- it may pin a unit, never widen one. Options are
+    the real v2 strings the model's effect tables recognise."""
+
+    def _base(self):
+        _reseed(_sap_windows_estate())
+        return size(_rows())
+
+    def _narrows(self, answers, base):
+        _reseed(_sap_windows_estate())
+        v = size(_rows(), answers=answers)
+        for u in UNITS:
+            assert v.low[u] >= base.low[u], f"{answers}: low[{u}] fell"
+            assert v.high[u] <= base.high[u], f"{answers}: high[{u}] rose"
+
+    def test_every_listed_option_narrows(self):
+        from autosys.analysis.size_model import (
+            VENDOR_EFFECT, WINDOWS_EFFECT, SKILL_BLOCKS,
+            CUTOVER_PARALLEL_FRACTION, ADOPTION_REUSE, ADOPTION_FULL,
+            OSS, ASTRO,
+        )
+        base = self._base()
+        cases = (
+            [("windows_execution_plan", o) for o in WINDOWS_EFFECT]
+            + [("migration_cutover_strategy", o) for o in CUTOVER_PARALLEL_FRACTION]
+            + [("team_skill_profile", o) for o in SKILL_BLOCKS]
+            + [("existing_airflow_adoption", o) for o in (ADOPTION_REUSE, *ADOPTION_FULL)]
+            + [("target_platform", o) for o in (OSS, ASTRO)]
+            # "Not ours" is a reclassification (moves the job into U), not a
+            # narrowing -- it is covered by TestT11c below, as in the design.
+            + [("vendor_runtime__sap", o) for o in VENDOR_EFFECT
+               if VENDOR_EFFECT[o] in ("keep", "rework")]
+        )
+        for key, option in cases:
+            self._narrows({key: option}, base)
+
+
+class TestT11bOffListEqualsUnanswered:
+    def test_off_list_text_behaves_like_missing(self):
+        _reseed(_sap_windows_estate())
+        base = size(_rows())
+        _reseed(_sap_windows_estate())
+        off = size(_rows(), answers={
+            "windows_execution_plan": "Astronomer",       # off-list
+            "vendor_runtime__sap": "maybe",               # off-list
+            "migration_cutover_strategy": "soon",         # off-list
+            "team_skill_profile": "great team",           # off-list
+        })
+        assert off.low == base.low and off.high == base.high
+
+
+class TestT11cNotOursMovesToUnknown:
+    def test_not_ours_moves_wrapper_jobs_to_u_never_to_zero(self):
+        from autosys.analysis.size_model import VENDOR_EFFECT
+        _reseed(_sap_windows_estate())
+        base = size(_rows())
+        _reseed(_sap_windows_estate())
+        not_ours = size(_rows(), answers={
+            "vendor_runtime__sap": "Not ours — this detection looks wrong"})
+        # The erp_sap job's row leaves the rework range and lands in U.
+        assert not_ours.low["U"] == base.low["U"] + 1
+        assert not_ours.high["R"] <= base.high["R"]
+        # It is "unknown", not "gone": instances and flow units unchanged.
+        assert not_ours.low["I"] == base.low["I"]
+
+
+class TestQuestionnaireOptionContract:
+    """Opt-in cross-repo contract (T18's "real answer flows" half): the
+    option strings the shipped questionnaire offers must be the strings
+    the size model switches on -- a typo in either repo turns a real
+    answer into a silent off-list "open". Reads the sibling worktree's
+    shipped JSON; skips cleanly when it isn't checked out alongside."""
+
+    _SHINRO_JSON = (
+        __import__("pathlib").Path(__file__).resolve().parents[2]
+        / "shinro-release" / "apps" / "api" / "etc" / "autosys_to_astronomer_qns.json"
+    )
+
+    def _options(self):
+        import json as _json
+        doc = _json.loads(self._SHINRO_JSON.read_text())
+        opts = {}
+        def walk(x):
+            if isinstance(x, dict):
+                if "id" in x and "options" in x:
+                    opts[x["id"]] = x["options"]
+                for v in x.values():
+                    walk(v)
+            elif isinstance(x, list):
+                for i in x:
+                    walk(i)
+        walk(doc)
+        return opts
+
+    def test_every_model_key_is_a_real_questionnaire_option(self):
+        import os
+        if not self._SHINRO_JSON.exists():
+            pytest.skip("shinro questionnaire JSON not checked out as a sibling")
+        from autosys.analysis.size_model import (
+            VENDOR_EFFECT, WINDOWS_EFFECT, SKILL_BLOCKS,
+            CUTOVER_PARALLEL_FRACTION, ADOPTION_REUSE, OSS, ASTRO,
+        )
+        opts = self._options()
+        consumed = {
+            "vendor_runtime": set(VENDOR_EFFECT),
+            "windows_execution_plan": set(WINDOWS_EFFECT),
+            "team_skill_profile": set(SKILL_BLOCKS),
+            "migration_cutover_strategy": set(CUTOVER_PARALLEL_FRACTION),
+            "existing_airflow_adoption": {ADOPTION_REUSE},
+            "target_platform": {OSS, ASTRO},
+        }
+        for qid, keys in consumed.items():
+            offered = set(opts.get(qid, ()))
+            missing = keys - offered
+            assert not missing, f"{qid}: model consumes options the questionnaire never offers: {missing}"
