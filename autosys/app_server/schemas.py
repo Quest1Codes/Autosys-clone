@@ -443,11 +443,12 @@ class ManifestResponse(BaseModel):
     invents: every field here is a direct pass-through of T15-T17's
     already-tested `classify_row`/`build_manifest`/`size()`.
 
-    Synchronous for now. On a very large estate this can be slow (the old
-    full `/report` pipeline measured ~500s at 99,960 jobs, though that
-    included scoring and simulation this endpoint never does) -- the
-    background start/poll pattern the design calls for isn't built yet;
-    that's a follow-up, not assumed away.
+    On a very large estate this can be slow (the old full `/report`
+    pipeline measured ~500s at 99,960 jobs, though that included scoring
+    and simulation this endpoint never does), so the route builds in the
+    background through ``analysis/manifest_build.ensure_manifest`` and
+    answers 202 "pending" when the caller's `wait_s` runs out -- this
+    model is the ready-state body only.
     """
     manifest:      list[ManifestJobEntry] = Field(default_factory=list)
     size_vector:   SizeVectorResponse = Field(default_factory=SizeVectorResponse)

@@ -9,6 +9,7 @@ TestBoxTraceAPI        — POST /api/v1/assessment/boxes/{box}/trace
 from __future__ import annotations
 
 import os
+import unittest.mock
 from typing import Generator
 
 import pytest
@@ -41,6 +42,16 @@ def fresh_sim_cache():
     simulated_risk.reset_cache()
     yield
     simulated_risk.reset_cache()
+
+
+@pytest.fixture(autouse=True)
+def fresh_manifest_cache():
+    """The manifest-build cache is process-global; isolate it per test
+    (same reasoning as fresh_sim_cache)."""
+    from autosys.analysis import manifest_build
+    manifest_build.reset_cache()
+    yield
+    manifest_build.reset_cache()
 
 
 @pytest.fixture()
@@ -940,6 +951,97 @@ class TestManifestAPI:
             "low", "high", "cu", "families", "row_count", "dominant_order",
             "constructs", "cutover_group_sizes",
         }
+
+    def test_wait_s_zero_returns_202_pending_while_building(self, ssa_client, isolated_db):
+        """The build runs in a background thread; wait_s=0 must not block
+        for it -- it answers 202 pending and a later poll serves the same
+        cached result the synchronous path would have returned."""
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_flat_jobs(session, 50)
+            session.commit()
+
+        # Block the worker just long enough to observe the pending state.
+        import threading
+        from autosys.analysis import manifest_build
+        gate = threading.Event()
+        real_build = manifest_build._build_payload
+        def slow(session, answers):
+            gate.wait(5)
+            return real_build(session, answers)
+        with unittest.mock.patch.object(manifest_build, "_build_payload", side_effect=slow):
+            r = ssa_client.get("/api/v1/assessment/manifest", params={"wait_s": 0})
+            assert r.status_code == 202
+            assert r.json()["status"] == "pending"
+            gate.set()
+            # The build finishes; the same request now serves it.
+            import time
+            for _ in range(50):
+                r = ssa_client.get("/api/v1/assessment/manifest", params={"wait_s": 2})
+                if r.status_code == 200:
+                    break
+                time.sleep(0.1)
+            assert r.status_code == 200
+            assert r.json()["size_vector"]["row_count"] == 50
+
+    def test_concurrent_callers_share_one_build(self, ssa_client, isolated_db):
+        """Two callers against the same estate key join the same build --
+        _build_payload runs once."""
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_flat_jobs(session, 30)
+            session.commit()
+
+        from autosys.analysis import manifest_build
+        calls = []
+        real_build = manifest_build._build_payload
+        def counting(session, answers):
+            calls.append(1)
+            return real_build(session, answers)
+        with unittest.mock.patch.object(manifest_build, "_build_payload", side_effect=counting):
+            for _ in range(3):
+                r = ssa_client.get("/api/v1/assessment/manifest")
+                assert r.status_code == 200
+        assert len(calls) == 1
+
+    def test_manifest_failure_surfaces_as_500(self, ssa_client, isolated_db):
+        from autosys.db.connection import sync_session
+        with sync_session() as session:
+            _seed_flat_jobs(session, 10)
+            session.commit()
+
+        from autosys.analysis import manifest_build
+        with unittest.mock.patch.object(
+            manifest_build, "_build_payload", side_effect=RuntimeError("boom")
+        ):
+            r = ssa_client.get("/api/v1/assessment/manifest")
+            assert r.status_code == 500
+            assert "boom" in r.json()["detail"]
+
+    def test_jil_change_produces_a_fresh_manifest(self, ssa_client, isolated_db):
+        """The cache key covers every job-definition column: a JIL edit
+        that keeps names but changes a command must not serve stale
+        disposition data."""
+        from autosys.db.connection import sync_session
+        from autosys.db.repository import jobs as job_repo
+        from autosys.db.schema import JobRow
+        from autosys.models.job import parse_job
+        with sync_session() as session:
+            job_repo.upsert(session, parse_job({
+                "job_name": "a", "job_type": "CMD",
+                "command": "echo hi", "machine": "m1",
+            }))
+            session.commit()
+
+        first = ssa_client.get("/api/v1/assessment/manifest").json()
+
+        with sync_session() as session:
+            row = session.query(JobRow).filter_by(job_name="a").one()
+            row.command = "ssh winhost cmd.exe /c run.bat"  # windows-shaped now
+            session.commit()
+
+        second = ssa_client.get("/api/v1/assessment/manifest").json()
+        assert first["manifest"][0]["class_"] != second["manifest"][0]["class_"]
 
     @pytest.mark.parametrize("count", [10_000, 30_000])
     def test_manifest_scales_linearly_not_quadratically(self, ssa_client, isolated_db, count):

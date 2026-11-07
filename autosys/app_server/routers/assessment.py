@@ -5,9 +5,9 @@ GET  /api/v1/assessment/prescan              Light, read-only estate summary: no
                                              simulation. See analysis/prescan.py.
 GET  /api/v1/assessment/manifest             Classification, disposition and size data for
                                              shinro's new fact-sheet report pipeline. No scoring,
-                                             no simulation. See analysis/prescan.py's sibling
-                                             modules: classification.py, disposition.py,
-                                             size_model.py.
+                                             no simulation. Built in the background and cached by
+                                             estate content -- ``wait_s`` bounds the wait before a
+                                             202 "pending" (see analysis/manifest_build.py).
 GET  /api/v1/assessment/report               Full complexity report (JSON): T-shirt size, effort,
                                              operational risk, gap tags, the A1-A10 migration
                                              signals, and an Indicative Otto Token Budget. Risk
@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from autosys.analysis.box_trace import (
@@ -51,9 +52,7 @@ from autosys.analysis.complexity import (
     build_report, compute_summary, export_csv, risk_mitigation,
 )
 from autosys.analysis.classification import load_rules
-from autosys.analysis.disposition import build_manifest
 from autosys.analysis.migration_signals import run_all_structural_analyses
-from autosys.analysis.size_model import size
 from autosys.analysis.workload_profile import compute_workload_profile
 from autosys.analysis.operational_risk import (
     MIN_OBSERVED_RUNS, MIN_OBSERVED_WINDOW_DAYS, fetch_run_stats,
@@ -65,7 +64,7 @@ from autosys.app_server.schemas import (
     AssessmentCoverage, AssessmentJobRecord, AssessmentReportResponse,
     AssessmentSimulation, AssessmentSummaryResponse, AssessmentWorkload,
     BoxTraceJobEntry, BoxTraceRequest, BoxTraceResponse, BoxTraceTransitionEntry,
-    ManifestJobEntry, ManifestResponse, PrescanResponse, SizeVectorResponse,
+    ManifestResponse, PrescanResponse,
 )
 from autosys.db.repository import (
     calendars as calendar_repo, globs as global_repo, jobs as job_repo, machines as machine_repo,
@@ -274,34 +273,35 @@ def get_prescan(
     )
 
 
-@router.get("/manifest", response_model=ManifestResponse)
+@router.get("/manifest")
 def get_manifest(
+    wait_s:  float | None = Query(None, description="Seconds to wait for an in-flight build before answering 202 pending (default: wait until it finishes -- the historical synchronous behaviour)."),
     session: Session     = Depends(get_session),
     _user:   CurrentUser = Depends(get_current_user),
 ):
     """
     T39: classification, disposition and size -- the data `shinro`'s
     report pipeline (`autosys_report.facts.build_sheet()`) needs, no
-    scoring or simulation. No answers yet (T27's questionnaire isn't
-    built): `build_manifest()` and `size()` both default every
-    not-yet-asked question to "unsure", which is their own documented,
-    tested fail-open behaviour, not a gap introduced here.
+    scoring or simulation. The build now runs in the background, cached
+    by estate content (see ``analysis/manifest_build.py``): with no
+    ``wait_s`` this endpoint still blocks until the build is done --
+    the historical synchronous behaviour; pass ``wait_s`` to get
+    ``202 {"status": "pending"}`` instead and poll. No answers yet
+    (T27's questionnaire isn't built): `build_manifest()` and `size()`
+    both default every not-yet-asked question to "unsure", which is
+    their own documented, tested fail-open behaviour, not a gap
+    introduced here.
     """
-    rows = job_repo.list_all(session)
-    manifest = build_manifest(rows, session)
-    vector = size(rows)
-    return ManifestResponse(
-        manifest=[
-            ManifestJobEntry(job_name=m.job_name, class_=m.class_, best=m.best, worst=m.worst, rule_id=m.rule_id)
-            for m in manifest
-        ],
-        size_vector=SizeVectorResponse(
-            low=vector.low, high=vector.high, cu=vector.cu, families=vector.families,
-            row_count=vector.row_count, dominant_order=[list(pair) for pair in vector.dominant_order()],
-            constructs=vector.constructs, cutover_group_sizes=list(vector.cutover_group_sizes),
-        ),
-        rules_version=load_rules().meta.get("version", ""),
-    )
+    from autosys.analysis import manifest_build
+
+    out = manifest_build.ensure_manifest(session, wait_s=wait_s)
+    if out.status == "empty":
+        return ManifestResponse(rules_version=load_rules().meta.get("version", ""))
+    if out.status == "failed":
+        raise HTTPException(status_code=500, detail=f"Manifest build failed: {out.error}")
+    if out.status == "pending":
+        return JSONResponse(status_code=202, content={"status": "pending"})
+    return ManifestResponse(**out.payload)
 
 
 @router.get("/report", response_model=AssessmentReportResponse)
