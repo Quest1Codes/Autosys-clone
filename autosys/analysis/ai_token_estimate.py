@@ -77,9 +77,10 @@ OTTO_PRICING_NOTE = (
 )
 
 DISCLAIMER = (
-    "Indicative Otto Token Budget -- a pre-pilot, order-of-magnitude planning "
-    "range, not a usage quote, cost estimate, or contractual commitment. "
-    "Replace with observed pilot usage once a Phase 3 pilot has run."
+    "Indicative Otto model-usage estimate -- a pre-pilot, order-of-magnitude "
+    "planning range, not a usage quote, cost estimate, or contractual "
+    "commitment. Replace with observed usage once a real pilot migration has "
+    "run."
 )
 
 
