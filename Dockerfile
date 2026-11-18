@@ -45,7 +45,7 @@ RUN npm run build
 #     libxml, gssapi, ldap, pam, icu and readline switched off, so none of
 #     those libraries are installed at all. Same major version as before, so
 #     existing /app/data volumes still open.
-FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pgbuild
+FROM registry.access.redhat.com/ubi10/ubi:10.3 AS pgbuild
 # pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG PG_VERSION=17.11
@@ -81,7 +81,7 @@ RUN ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readl
     && rm -rf /opt/pgsql/include /opt/pgsql/lib/pkgconfig /opt/pgsql/share/doc /opt/pgsql/share/man \
     && test -x /opt/pgsql/bin/initdb
 
-FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pybuild
+FROM registry.access.redhat.com/ubi10/ubi:10.3 AS pybuild
 ARG UV_VERSION=0.11.27
 ARG PY_VERSION=3.12
 RUN dnf install -y --setopt=install_weak_deps=false python3-pip \
@@ -93,7 +93,7 @@ RUN dnf install -y --setopt=install_weak_deps=false python3-pip \
     && find /opt/python -name EXTERNALLY-MANAGED -delete \
     && /opt/python/bin/python3 --version
 
-FROM registry.access.redhat.com/ubi10/ubi:10.2 AS rootfs
+FROM registry.access.redhat.com/ubi10/ubi:10.3 AS rootfs
 # pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
