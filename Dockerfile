@@ -219,7 +219,7 @@ RUN for p in ncurses-base pcre2-syntax; do \
       rpm --root /mnt/rootfs -e --nodeps "$p"; \
     done
 
-FROM registry.access.redhat.com/ubi10/ubi-micro:10.2 AS runtime
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.3 AS runtime
 COPY --from=rootfs /mnt/rootfs/ /
 # The python base image this replaced set the same; initdb, psql and Python
 # derive their encoding from it.
