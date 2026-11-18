@@ -326,7 +326,7 @@ CMD []
 # is where auth/JIL-import/sendevent live, so serving the SPA from its own
 # process would break login the moment a real browser (not curl hitting a
 # port directly) loads it.
-FROM registry.access.redhat.com/ubi10/ubi-minimal:10.2 AS nginx-runtime
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.3 AS nginx-runtime
 
 # nginx from the UBI 10 AppStream repo, patched to whatever Red Hat has already
 # released. Runs as the unprivileged `nginx` user: the main config below is
