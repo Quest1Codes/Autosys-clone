@@ -15,7 +15,7 @@
 # reused (different major version, UID and musl -> glibc collation). Dump with
 # `pg_dump -Fc` and restore with `pg_restore` into the new volume.
 
-FROM registry.access.redhat.com/ubi10/ubi:10.2 AS pgbuild
+FROM registry.access.redhat.com/ubi10/ubi:10.3 AS pgbuild
 # pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG PG_VERSION=17.11
@@ -51,7 +51,7 @@ RUN ./configure --prefix=/opt/pgsql --with-openssl --without-icu --without-readl
     && rm -rf /opt/pgsql/include /opt/pgsql/lib/pkgconfig /opt/pgsql/share/doc /opt/pgsql/share/man \
     && test -x /opt/pgsql/bin/initdb
 
-FROM registry.access.redhat.com/ubi10/ubi:10.2 AS rootfs
+FROM registry.access.redhat.com/ubi10/ubi:10.3 AS rootfs
 # pipefail: a failing first command in a pipe (curl | sha256sum, rpm -ql | while) must fail the build
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN mkdir -p /mnt/rootfs && rpm --root /mnt/rootfs --initdb \
