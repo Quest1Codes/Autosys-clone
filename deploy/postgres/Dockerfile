@@ -68,7 +68,7 @@ RUN groupadd --root /mnt/rootfs -g 26 postgres \
     && chown -R 26:26 /mnt/rootfs/var/lib/postgresql \
     && chmod 700 /mnt/rootfs/var/lib/postgresql/data
 
-FROM registry.access.redhat.com/ubi10/ubi-micro:10.2 AS runtime
+FROM registry.access.redhat.com/ubi10/ubi-micro:10.3 AS runtime
 COPY --from=rootfs /mnt/rootfs/ /
 ENV LANG=C.UTF-8 \
     PGDATA=/var/lib/postgresql/data \
